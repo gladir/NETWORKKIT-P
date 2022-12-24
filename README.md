@@ -11,9 +11,21 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<th>Description</th>	
 	</tr>
 	<tr>
+		<td><b>IPCONFIG.PAS</b></td>
+		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
+	</tr>	
+	<tr>
 		<td><b>ISEMAIL.PAS</b></td>
 		<td>Cette commande permet de vérifier si le courriel est un courriel valide.</td>
 	</tr>
+	<tr>
+		<td><b>WHOAMI.PAS</b></td>
+		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
+	</tr>
+	<tr>
+		<td><b>WHOIS.PAS</b></td>
+		<td>Cette commande permet de rechercher l'organisme associé avec un IP en se basant sur un dictionnaire locale hors ligne.</td>
+	</tr>	
 </table>
 
 <h2>Compilation</h2>
