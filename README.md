@@ -1,5 +1,5 @@
 # NETWORKKIT-P
-Liste de commande sur la réseautique écrit en Pascal
+Liste de commandes sur la réseautique écrit en Pascal
 
 <h2>Liste des fichiers</h2>
 
