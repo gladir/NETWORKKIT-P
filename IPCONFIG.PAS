@@ -94,10 +94,48 @@ Begin
              IntToStr((IP shr 24) and $FF);
 End;
 
-{ Fonction simple qui simule la détection d'une adresse IP }
-
-Function DetectTCPIP:LongInt;Begin
- DetectTCPIP:=$C0A80019; { 192.168.0.25 en format réseau }
+{ Fonction qui tente de détecter une adresse IP via interruptions DOS }
+Function DetectTCPIP:LongInt;
+Var
+ IPDetected:Boolean;
+ IPAddress:LongInt;
+Begin
+ IPDetected:=False;
+ IPAddress:=0;
+ 
+ { Test pour WATTCP/DOS TCP/IP stack via interruption 2Fh }
+ asm
+  mov ax, 6100h        { WATTCP function }
+  int 2Fh              { Multiplex interrupt }
+  cmp al, 0            { Stack installé ? }
+  jne @no_wattcp       { Si pas installé, passer au suivant }
+  mov ax, 6101h        { Get IP address }
+  int 2Fh              { Appel WATTCP }
+  jc @no_wattcp        { Si erreur, passer au suivant }
+  mov word ptr IPAddress, ax     { IP partie basse }
+  mov word ptr IPAddress+2, dx   { IP partie haute }
+  mov IPDetected, 1    { Marquer comme trouvé }
+ @no_wattcp:
+ end;
+ 
+ { Test pour Microsoft LAN Manager via interruption 2Fh }
+ if not IPDetected then
+ asm
+  mov ax, 0B800h       { LAN Manager function }
+  int 2Fh              { Multiplex interrupt }
+  cmp al, 0FFh         { LAN Manager installé ? }
+  jne @no_lanman       { Si pas installé, passer au suivant }
+  mov ax, 0B801h       { Get network info }
+  int 2Fh              { Appel LAN Manager }
+  { Note: LAN Manager ne retourne pas directement l'IP }
+ @no_lanman:
+ end;
+ 
+ { Si aucune détection réussie, utiliser une IP simulée }
+ if not IPDetected then
+  IPAddress:=$C0A80019; { 192.168.0.25 - IP simulée pour démonstration }
+ 
+ DetectTCPIP:=IPAddress;
 End;
 
 Function IntToHex(Value:Byte;Digits:Byte):String;
@@ -112,17 +150,17 @@ Begin
  IntToHex:=Result;
 End;
 
-{ Procédure pour appeler NetBIOS via interruption inline }
+{ Procédure pour appeler NetBIOS via assembleur standard }
 Procedure CallNetBIOS(Var NCB:TNetBIOSNCB);
 Begin
- Inline(
-  $1E/                    { push ds }
-  $C4/$5E/$04/           { les bx,[bp+4] ; charge l'adresse du NCB }
-  $8C/$D8/               { mov ax,ds }
-  $8E/$C0/               { mov es,ax ; ES = DS }
-  $CD/$5C/               { int 5Ch ; appel NetBIOS }
-  $1F                    { pop ds }
- );
+ asm
+  push ds              { Sauvegarder DS }
+  les bx, NCB          { ES:BX pointe vers le NCB }
+  mov ax, ds           { Copier DS dans ES }
+  mov es, ax           { ES = DS }
+  int 5Ch              { Appel NetBIOS }
+  pop ds               { Restaurer DS }
+ end;
 End;
 {$ENDIF}
 
