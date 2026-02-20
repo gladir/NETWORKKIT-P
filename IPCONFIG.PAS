@@ -6,19 +6,21 @@
 
 Program IPCONFIG;
 
-Uses
- Winsock;
+{$IFDEF FPC}
+ Uses
+  Winsock;
 
-Type
+ Type
   TaPInAddr=Array [0..10]of PInAddr;
   PaPInAddr=^TaPInAddr;
 
-Var
- phe:PHostEnt;
- pptr:PaPInAddr;
- Buffer:Array [0..63] of Ansichar;
- I:Integer;
- GInitData:TWSADATA;
+ Var
+  phe:PHostEnt;
+  pptr:PaPInAddr;
+  Buffer:Array [0..63] of Ansichar;
+  I:Integer;
+  GInitData:TWSADATA;
+{$ENDIF}
 
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
@@ -29,26 +31,30 @@ BEGIN
  End
   Else
  Begin
-  WriteLn;
-  WriteLn('Configuration IP de Windows');
-  WriteLn;
-  WriteLn;
-  WSAStartup($101,GInitData);
-  GetHostName(Buffer,SizeOf(Buffer));
-  phe:=GetHostByName(Buffer);
-  If phe = nil Then Begin
-   WriteLn('Hote introuvable');
-   Exit;
-  End;
-  pptr:=PaPInAddr(phe^.h_addr_list);
-  i:=0;
-  While pptr^[i] <> nil do Begin
-   WriteLn('Carte Ethernet Local Area Connection ',I+1,' :');
+  {$IFDEF FPC}
    WriteLn;
-   WriteLn('   Adresse IPv4 . . . :',StrPas(inet_ntoa(pptr^[i]^)));
+   WriteLn('Configuration IP de Windows');
    WriteLn;
-   Inc(i);
-  End;
-  WSACleanup;
+   WriteLn;
+   WSAStartup($101,GInitData);
+   GetHostName(Buffer,SizeOf(Buffer));
+   phe:=GetHostByName(Buffer);
+   If phe = nil Then Begin
+    WriteLn('Hote introuvable');
+    Exit;
+   End;
+   pptr:=PaPInAddr(phe^.h_addr_list);
+   i:=0;
+   While pptr^[i] <> nil do Begin
+    WriteLn('Carte Ethernet Local Area Connection ',I+1,' :');
+    WriteLn;
+    WriteLn('   Adresse IPv4 . . . :',StrPas(inet_ntoa(pptr^[i]^)));
+    WriteLn;
+    Inc(i);
+   End;
+   WSACleanup;
+  {$ELSE}
+   WriteLn('Cette fonctionnalit‚ n''est pas impl‚ment‚ dans cette environnement.');
+  {$ENDIF}
  End;
 END.

@@ -6,13 +6,16 @@
 
 Program CURL;
 
-{$mode objfpc}
-
+{$IFDEF FPC}
+ {$mode objfpc}
 Uses
  fphttpclient,OpenSSLSockets,SysUtils;
 
 Var
  Client:TFPHTTPClient;
+{$ENDIF}
+
+Var
  URL,Response:String;
 
 BEGIN
@@ -30,19 +33,23 @@ BEGIN
    WriteLn('Un URL est requis comme paramŠtre !');
    Halt(1);
   End;
-   { Cr‚e une instance de TFPHTTPClient }
-  Client:=TFPHTTPClient.Create(nil);
-  Try
-    { Envoie une requˆte GET … l'URL donn‚e et stocke la r‚ponse }
-   Response:=Client.SimpleGet(URL);
-    { Affiche la r‚ponse }
-   Writeln('Response:');
-   Writeln(Response);
-  Except
-   On E: Exception do
-    Writeln('Error: ', E.Message);
-  End;
-  { LibŠre la m‚moire utilis‚e par l'instance de TFPHTTPClient }
-  Client.Free;
+  {$IFDEF FPC}
+    { Cr‚e une instance de TFPHTTPClient }
+   Client:=TFPHTTPClient.Create(nil);
+   Try
+     { Envoie une requˆte GET … l'URL donn‚e et stocke la r‚ponse }
+    Response:=Client.SimpleGet(URL);
+     { Affiche la r‚ponse }
+    Writeln('Response:');
+    Writeln(Response);
+   Except
+    On E: Exception do
+     Writeln('Error: ', E.Message);
+   End;
+   { LibŠre la m‚moire utilis‚e par l'instance de TFPHTTPClient }
+   Client.Free;
+  {$ELSE}
+   WriteLn('Fonctionnalit‚ non impl‚ment‚ dans cette environnement.');
+  {$ENDIF}
  End;
 END.
