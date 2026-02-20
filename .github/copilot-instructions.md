@@ -120,8 +120,12 @@ END;
 ```
 
 ## Langue et localisation
-- Utilisation la page de code CP437 (IBM 437) pour la compatibilité avec les systèmes DOS et Turbo Pascal
+- **Page de code obligatoire** : CP437 (IBM 437) - NE JAMAIS modifier les caractères accentués lors des éditions de code
+- **Préservation des accents** : Lors de toute modification de code source, conserver exactement les caractères accentués existants (é, è, à, ç, etc.)
+- **Encodage des fichiers** : Tous les fichiers `.PAS` utilisent l'encodage IBM 437 pour la compatibilité avec les systèmes DOS et Turbo Pascal
 - Tout le texte orienté utilisateur en **français**
-- Commentaires en français 
+- Commentaires en français avec accents CP437
 - Noms de variables en anglais
 - Messages d'erreur et texte d'aide localisés selon les conventions du français canadien
+
+**IMPORTANT** : Ne jamais remplacer ou corriger les accents lors des modifications de code - ils sont encodés en CP437 et doivent être préservés tels quels.
