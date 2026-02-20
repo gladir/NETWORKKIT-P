@@ -102,6 +102,23 @@ tpc NOMFICHIER.PAS
 - PChar utilisé pour les noms d'organisation afin de minimiser la mémoire dans les grands tableaux
 - Codes pays comme valeurs Word avec table de recherche
 
+### Standards de syntaxe assembleur
+- **Blocs ASM** : Utilisation de `ASM` et `END` en majuscules (pas `asm`/`end` en minuscules)
+- **Mnémoniques en majuscules** : Toutes les instructions assembleur en majuscules (`MOV`, `INT`, `CMP`, `JNE`, etc.)
+- **Directives en majuscules** : `WORD PTR`, `BYTE PTR`, `DWORD PTR` toujours en majuscules
+- **Labels** : Format standard `@label_name` avec commentaires en français
+- **Exemple conforme** :
+```pascal
+ASM
+ MOV AX, 6100h        { WATTCP function }
+ INT 2Fh              { Multiplex interrupt }
+ CMP AL, 0            { Stack installé ? }
+ JNE @no_wattcp       { Si pas installé, passer au suivant }
+ MOV WORD PTR Variable, AX
+@no_wattcp:
+END;
+```
+
 ## Langue et localisation
 - Utilisation la page de code CP437 (IBM 437) pour la compatibilité avec les systèmes DOS et Turbo Pascal
 - Tout le texte orienté utilisateur en **français**
