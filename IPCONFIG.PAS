@@ -104,32 +104,32 @@ Begin
  IPAddress:=0;
  
  { Test pour WATTCP/DOS TCP/IP stack via interruption 2Fh }
- asm
-  mov ax, 6100h        { WATTCP function }
-  int 2Fh              { Multiplex interrupt }
-  cmp al, 0            { Stack installé ? }
-  jne @no_wattcp       { Si pas installé, passer au suivant }
-  mov ax, 6101h        { Get IP address }
-  int 2Fh              { Appel WATTCP }
-  jc @no_wattcp        { Si erreur, passer au suivant }
-  mov word ptr IPAddress, ax     { IP partie basse }
-  mov word ptr IPAddress+2, dx   { IP partie haute }
-  mov IPDetected, 1    { Marquer comme trouvé }
+ ASM
+  MOV AX, 6100h        { WATTCP function }
+  INT 2Fh              { Multiplex interrupt }
+  CMP AL, 0            { Stack installé ? }
+  JNE @no_wattcp       { Si pas installé, passer au suivant }
+  MOV AX, 6101h        { Get IP address }
+  INT 2Fh              { Appel WATTCP }
+  JC @no_wattcp        { Si erreur, passer au suivant }
+  MOV WORD PTR IPAddress, AX     { IP partie basse }
+  MOV WORD PTR IPAddress+2, DX   { IP partie haute }
+  MOV IPDetected, 1    { Marquer comme trouvé }
  @no_wattcp:
- end;
+ END;
  
  { Test pour Microsoft LAN Manager via interruption 2Fh }
  if not IPDetected then
- asm
-  mov ax, 0B800h       { LAN Manager function }
-  int 2Fh              { Multiplex interrupt }
-  cmp al, 0FFh         { LAN Manager installé ? }
-  jne @no_lanman       { Si pas installé, passer au suivant }
-  mov ax, 0B801h       { Get network info }
-  int 2Fh              { Appel LAN Manager }
+ ASM
+  MOV AX, 0B800h       { LAN Manager function }
+  INT 2Fh              { Multiplex interrupt }
+  CMP AL, 0FFh         { LAN Manager installé ? }
+  JNE @no_lanman       { Si pas installé, passer au suivant }
+  MOV AX, 0B801h       { Get network info }
+  INT 2Fh              { Appel LAN Manager }
   { Note: LAN Manager ne retourne pas directement l'IP }
  @no_lanman:
- end;
+ END;
  
  { Si aucune détection réussie, utiliser une IP simulée }
  if not IPDetected then
@@ -153,14 +153,14 @@ End;
 { Procédure pour appeler NetBIOS via assembleur standard }
 Procedure CallNetBIOS(Var NCB:TNetBIOSNCB);
 Begin
- asm
-  push ds              { Sauvegarder DS }
-  les bx, NCB          { ES:BX pointe vers le NCB }
-  mov ax, ds           { Copier DS dans ES }
-  mov es, ax           { ES = DS }
-  int 5Ch              { Appel NetBIOS }
-  pop ds               { Restaurer DS }
- end;
+ ASM
+  PUSH DS              { Sauvegarder DS }
+  LES BX, NCB          { ES:BX pointe vers le NCB }
+  MOV AX, DS           { Copier DS dans ES }
+  MOV ES, AX           { ES = DS }
+  INT 5Ch              { Appel NetBIOS }
+  POP DS               { Restaurer DS }
+ END;
 End;
 {$ENDIF}
 
