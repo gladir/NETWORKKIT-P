@@ -13,7 +13,11 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 	<tr>
 		<td><b>CURL.PAS</b></td>
 		<td>Cette commande permet de lire le contenu d'un URL et de le retourner dans la console.</td>
-	</tr>	
+	</tr>
+	<tr>
+		<td><b>FINGER.PAS</b></td>
+		<td>Cette commande permet d'afficher des informations sur les utilisateurs connectés ou à distance.</td>
+	</tr>
 	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
 		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
