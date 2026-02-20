@@ -103,7 +103,7 @@ tpc NOMFICHIER.PAS
 - Codes pays comme valeurs Word avec table de recherche
 
 ## Langue et localisation
-- Utilisation la page de code OEM-US pour la compatibilité avec les systèmes DOS et Turbo Pascal
+- Utilisation la page de code CP437 (IBM 437) pour la compatibilité avec les systèmes DOS et Turbo Pascal
 - Tout le texte orienté utilisateur en **français**
 - Commentaires en français 
 - Noms de variables en anglais
