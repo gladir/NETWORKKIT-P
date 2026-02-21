@@ -37,7 +37,11 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
 		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
-	</tr>	
+	</tr>
+	<tr>
+		<td><b>DNSQUERY.PAS</b></td>
+		<td>Cette commande permet de lancer l'outil de requête DNS.</td>
+	</tr>
 	<tr>
 		<td><b>ISEMAIL.PAS</b></td>
 		<td>Cette commande permet de vérifier si le courriel est un courriel valide.</td>
