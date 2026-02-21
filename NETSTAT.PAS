@@ -394,9 +394,12 @@ Begin
   For I:=0 To UDPCount-1 Do Begin
    With UDPConnections[I] Do Begin
     Write('udp        0      0 ');
-    Write(LocalAddr,':',GetServiceName(LocalPort,'udp'));
-    { Padding pour LocalAddr }
-    While Length(LocalAddr)+1+Length(GetServiceName(LocalPort,'udp'))<22 Do Write(' ');
+    Write(LocalAddr,':');
+    If LocalPort<1024 Then
+     Write(GetServiceName(LocalPort,'udp'))
+    Else
+     Write(LocalPort);
+    Write('                  ');
     WriteLn('0.0.0.0:*');
    End;
   End;
@@ -417,9 +420,12 @@ Begin
    With TCPConnections[I] Do Begin
     If State='LISTEN' Then Begin
      Write('tcp    ');
-     Write(LocalAddr,':',GetServiceName(LocalPort,'tcp'));
-     { Padding pour LocalAddr }
-     While Length(LocalAddr)+1+Length(GetServiceName(LocalPort,'tcp'))<22 Do Write(' ');
+     Write(LocalAddr,':');
+     If LocalPort<1024 Then
+      Write(GetServiceName(LocalPort,'tcp'))
+     Else
+      Write(LocalPort);
+     Write('                  ');
      WriteLn('LISTEN');
     End;
    End;
@@ -430,9 +436,12 @@ Begin
   For I:=0 To UDPCount-1 Do Begin
    With UDPConnections[I] Do Begin
     Write('udp    ');
-    Write(LocalAddr,':',GetServiceName(LocalPort,'udp'));
-    { Padding pour LocalAddr }
-    While Length(LocalAddr)+1+Length(GetServiceName(LocalPort,'udp'))<22 Do Write(' ');
+    Write(LocalAddr,':');
+    If LocalPort<1024 Then
+     Write(GetServiceName(LocalPort,'udp'))
+    Else
+     Write(LocalPort);
+    Write('                  ');
     WriteLn('*:*');
    End;
   End;
