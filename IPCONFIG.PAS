@@ -28,9 +28,9 @@ Program IPCONFIG;
    ncb_command:Byte;                  { Commande NetBIOS }
    ncb_retcode:Byte;                  { Code de retour }
    ncb_lsn:Byte;                      { Local Session Number }
-   ncb_num:Byte;                      { Num‚ro de nom }
+   ncb_num:Byte;                      { Numï¿½ro de nom }
    ncb_buffer:Pointer;                { Pointeur vers un tampon }
-   ncb_length:Word;                   { Longueur du buffer }
+   ncb_length:Word;                   { Longueur du tampon }
    ncb_callname:Array[0..15] of Char; { Nom appel‚ }
    ncb_name:Array[0..15] of Char;     { Nom local }
    ncb_rto:Byte;                      { D‚passement de d‚lai de r‚ception }
@@ -87,8 +87,7 @@ Begin
  IntToStr:=S;
 End;
 
-Function IPToString(IP:LongInt):String;
-Begin
+Function IPToString(IP:LongInt):String;Begin
  IPToString:=IntToStr(IP and $FF)+'.'+
              IntToStr((IP shr 8) and $FF)+'.'+
              IntToStr((IP shr 16) and $FF)+'.'+
@@ -128,8 +127,7 @@ Begin
   { Note: LAN Manager ne retourne pas directement l'IP }
  @no_lanman:
  END;
-
- { Si aucune d‚tection r‚ussie, utiliser une IP simul‚e }
+  { Si aucune d‚tection r‚ussie, utiliser une IP simul‚e }
  If Not IPDetected Then
   IPAddress:=$C0A80019; { 192.168.0.25 - IP simul‚e pour d‚monstration }
  DetectTCPIP:=IPAddress;
@@ -147,9 +145,35 @@ Begin
  IntToHex:=Result;
 End;
 
-{ Proc‚dure pour appeler NetBIOS via assembleur standard }
+{ Fonction pour v‚rifier si NetBIOS est install‚ }
+Function IsNetBIOSInstalled:Boolean;
+Var
+ NetBIOSPresent:Boolean;
+Begin
+ NetBIOSPresent:=False;
+ ASM
+  PUSH ES              { Sauvegarder ES }
+  MOV AX, 0            { Segment 0 }
+  MOV ES, AX           { ES pointe vers le vecteur d'interruption }
+  MOV BX, 5Ch * 4      { Offset de l'interruption 5Ch }
+  MOV AX, ES:[BX]      { Charger l'offset }
+  MOV DX, ES:[BX+2]    { Charger le segment }
+  OR AX, DX            { Tester si AX ou DX est non-zï¿½ro }
+  JZ @no_netbios       { Si z‚ro, NetBIOS pas install‚ }
+  MOV NetBIOSPresent, 1 { Marquer comme pr‚sent }
+ @no_netbios:
+  POP ES               { Restaurer ES }
+ END;
+ IsNetBIOSInstalled:=NetBIOSPresent;
+End;
+
+{ Procï¿½dure pour appeler NetBIOS via assembleur standard }
 Procedure CallNetBIOS(Var NCB:TNetBIOSNCB);
 Begin
+ If Not IsNetBIOSInstalled Then Begin
+  NCB.ncb_retcode:=$FF; { Code d'erreur: NetBIOS non installï¿½ }
+  Exit;
+ End;
  ASM
   PUSH DS              { Sauvegarder DS }
   LES BX, NCB          { ES:BX pointe vers le NCB }
@@ -213,7 +237,7 @@ BEGIN
     WriteLn('Carte r‚seau TCP/IP d‚tect‚e :');
     WriteLn;
     WriteLn('   Adresse IPv4 . . . : ',IPToString(IPAddr));
-    WriteLn('   Masque de sous-r‚seau: 255.255.255.0');
+    WriteLn('   Masque de sous-rï¿½seau: 255.255.255.0');
     WriteLn('   Passerelle . . . . . : D‚tection non support‚e');
     WriteLn;
     WriteLn('Source: Pilote r‚seau DOS d‚tect‚ (simulation)');
@@ -246,16 +270,23 @@ BEGIN
      WriteLn;
      WriteLn('   Type adaptateur . . : ',AdapterInfo.adapter_type);
      WriteLn('   Paquets transmis  . : ',AdapterInfo.xmit_success);
-     WriteLn('   Paquets reï¿½us . . . : ',AdapterInfo.recv_success);
+     WriteLn('   Paquets re‡us . . . : ',AdapterInfo.recv_success);
      WriteLn;
-      { Tentative d'obtenir plus d'informations r‚seau }
+      { Tentative d'obtenir plus d'informations rï¿½seau }
      WriteLn('Note: Adresse IP non disponible via NetBIOS');
      WriteLn('      Utilisez Free Pascal pour plus d''informations');
     End
      Else
     Begin
-     WriteLn('Erreur NetBIOS (code ',NCB.ncb_retcode,')');
-     WriteLn('V‚rifiez que NetBIOS est install‚ et configur‚');
+     If NCB.ncb_retcode=$FF Then Begin
+      WriteLn('NetBIOS n''est pas installï¿½ sur cette machine.');
+      WriteLn('L''interruption 5Ch n''est pas disponible.');
+     End
+      Else
+     Begin
+      WriteLn('Erreur NetBIOS (code ',NCB.ncb_retcode,')');
+      WriteLn('V‚rifiez que NetBIOS est install‚ et configur‚');
+     End;
      WriteLn;
      WriteLn('Configuration r‚seau simple :');
      WriteLn('   Adaptateur r‚seau d‚tect‚ mais informations limit‚es');
