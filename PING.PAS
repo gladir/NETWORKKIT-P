@@ -16,13 +16,13 @@ Program PING;
 
 {$IFDEF FPC}
 Type
- { Structure pour l'en-t√™te ICMP }
+ { Structure pour l'entàte ICMP }
  TICMPHeader = Packed Record
   IcmpType:Byte;      { Type ICMP (8 = Echo Request) }
   IcmpCode:Byte;      { Code ICMP (0 pour ping) }
-  IcmpChecksum:Word;  { Somme de contr√¥le }
+  IcmpChecksum:Word;  { Somme de contrìle }
   IcmpId:Word;        { Identificateur }
-  IcmpSequence:Word;  { Num√©ro de s√©quence }
+  IcmpSequence:Word;  { NumÇro de sÇquence }
  End;
 
  { Structure pour les statistiques de ping }
@@ -78,7 +78,7 @@ End;
 {$ENDIF}
 
 {$IFDEF FPC}
-{ Fonction pour calculer la somme de contr√¥le ICMP }
+ { Fonction pour calculer la somme de contrìle ICMP }
 Function CalculateChecksum(Data:Pointer;Size:Integer):Word;
 Var
  Sum:LongInt;
@@ -87,26 +87,20 @@ Var
 Begin
  Sum:=0;
  WordPtr:=Data;
-
- { Additionner tous les mots de 16 bits }
+  { Additionner tous les mots de 16 bits }
  For I:=0 To (Size div 2)-1 Do Begin
   Inc(Sum,WordPtr^);
   Inc(WordPtr);
  End;
-
- { Ajouter l'octet restant si la taille est impaire }
- If (Size mod 2)=1 Then
-  Inc(Sum,PByte(WordPtr)^ shl 8);
-
- { Replier les bits de report }
- While (Sum shr 16)<>0 Do
-  Sum:=(Sum and $FFFF)+(Sum shr 16);
-
- { Compl√©ment √† un }
+  { Ajouter l'octet restant si la taille est impaire }
+ If(Size mod 2)=1 Then Inc(Sum,PByte(WordPtr)^ shl 8);
+  { Replier les bits de report }
+ While (Sum shr 16)<>0 Do Sum:=(Sum and $FFFF)+(Sum shr 16);
+  { ComplÇment Ö un }
  CalculateChecksum:=not Sum;
 End;
 
-{ Fonction pour r√©soudre une adresse IP }
+ { Fonction pour rÇsoudre une adresse IP }
 Function ResolveHost(HostName:String):String;
 Var
  HostEnt:PHostEnt;
@@ -114,19 +108,16 @@ Var
  InAddr:TInAddr;
 Begin
  ResolveHost:='';
-
- { Convertir en cha√Æne C }
+  { Convertir en chaåne C }
  Move(HostName[1],HostCStr[0],Length(HostName));
  HostCStr[Length(HostName)]:=#0;
-
- { V√©rifier si c'est d√©j√† une adresse IP }
+  { VÇrifier si c'est dÇjÖ une adresse IP }
  InAddr.s_addr:=inet_addr(HostCStr);
  If InAddr.s_addr<>INADDR_NONE Then Begin
   ResolveHost:=StrPas(inet_ntoa(InAddr));
   Exit;
  End;
-
- { R√©soudre le nom d'h√¥te }
+  { RÇsoudre le nom d'hìte }
  HostEnt:=gethostbyname(HostCStr);
  If HostEnt<>nil Then Begin
   Move(HostEnt^.h_addr_list^^,InAddr,SizeOf(InAddr));
@@ -134,7 +125,7 @@ Begin
  End;
 End;
 
-{ Fonction pour envoyer un paquet ICMP ping }
+ { Fonction pour envoyer un paquet ICMP ping }
 Function SendPing(TargetAddr:String;Sequence:Word;DataSize:Integer):Boolean;
 Var
  SockAddr:TSockAddrIn;
@@ -145,8 +136,7 @@ Var
  I:Integer;
 Begin
  SendPing:=False;
-
- { Pr√©parer l'adresse de destination }
+  { PrÇparer l'adresse de destination }
  FillChar(SockAddr,SizeOf(SockAddr),0);
  SockAddr.sin_family:=AF_INET;
  SockAddr.sin_addr.s_addr:=inet_addr(PAnsiChar(AnsiString(TargetAddr)));
