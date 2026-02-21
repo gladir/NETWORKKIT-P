@@ -140,33 +140,27 @@ Begin
  FillChar(SockAddr,SizeOf(SockAddr),0);
  SockAddr.sin_family:=AF_INET;
  SockAddr.sin_addr.s_addr:=inet_addr(PAnsiChar(AnsiString(TargetAddr)));
-
- { Pr√©parer le paquet ICMP }
+  { PrÇparer le paquet ICMP }
  PacketSize:=SizeOf(TICMPHeader)+DataSize;
  FillChar(ICMPPacket,SizeOf(ICMPPacket),0);
-
  ICMPHeader:=@ICMPPacket[0];
- ICMPHeader^.IcmpType:=8;        { Echo Request }
+ ICMPHeader^.IcmpType:=8;        { Requàte Echo }
  ICMPHeader^.IcmpCode:=0;
  ICMPHeader^.IcmpChecksum:=0;
  ICMPHeader^.IcmpId:=GetCurrentProcessId and $FFFF;
  ICMPHeader^.IcmpSequence:=htons(Sequence);
-
- { Remplir les donn√©es }
+  { Remplir les donnÇes }
  DataPtr:=@ICMPPacket[SizeOf(TICMPHeader)];
- For I:=0 To DataSize-1 Do
-  DataPtr^:=(I mod 256);
-  Inc(DataPtr);
-
- { Calculer la somme de contr√¥le }
+ For I:=0 To DataSize-1 Do DataPtr^:=(I mod 256);
+ Inc(DataPtr);
+  { Calculer la somme de contrìle }
  ICMPHeader^.IcmpChecksum:=CalculateChecksum(@ICMPPacket,PacketSize);
-
- { Envoyer le paquet }
+  { Envoyer le paquet }
  If sendto(Socket,ICMPPacket,PacketSize,0,SockAddr,SizeOf(SockAddr))>0 Then
   SendPing:=True;
 End;
 
-{ Fonction pour recevoir une r√©ponse ICMP }
+ { Fonction pour recevoir une rÇponse ICMP }
 Function ReceivePing(Var ResponseTime:DWORD):Boolean;
 Var
  Buffer:Array[0..1023] of Byte;
@@ -178,23 +172,20 @@ Var
 Begin
  ReceivePing:=False;
  ResponseTime:=0;
-
- { D√©finir le timeout }
+  { DÇfinir le timeout }
  TimeoutVal:=PingTimeout;
  setsockopt(Socket,SOL_SOCKET,SO_RCVTIMEO,@TimeoutVal,SizeOf(TimeoutVal));
-
  StartTime:=GetTickCount;
  AddrLen:=SizeOf(SockAddr);
  BytesReceived:=recvfrom(Socket,Buffer,SizeOf(Buffer),0,SockAddr,AddrLen);
  EndTime:=GetTickCount;
-
  If BytesReceived>0 Then Begin
   ResponseTime:=EndTime-StartTime;
   ReceivePing:=True;
  End;
 End;
 
-{ Proc√©dure principale de ping }
+ { ProcÇdure principale de ping }
 Procedure DoPing;
 Var
  I:Integer;
@@ -202,57 +193,48 @@ Var
  ResponseTime:DWORD;
  StartTime:DWORD;
 Begin
- WriteLn('PING ',TargetHost,' (',TargetIP,') ',PingSize,' octets de donn√©es :');
+ WriteLn('PING ',TargetHost,' (',TargetIP,') ',PingSize,' octets de donnÇes :');
  WriteLn;
-
- { Initialiser les statistiques }
+  { Initialiser les statistiques }
  FillChar(PingStats,SizeOf(PingStats),0);
  PingStats.MinTime:=$FFFFFFFF;
-
  For I:=1 To PingCount Do Begin
   StartTime:=GetTickCount;
-
   If SendPing(TargetIP,I,PingSize) Then Begin
    Inc(PingStats.PacketsSent);
-
    Success:=ReceivePing(ResponseTime);
    If Success Then Begin
     Inc(PingStats.PacketsReceived);
-
-    Write('R√©ponse de ',TargetIP,': octets=',PingSize);
+    Write('RÇponse de ',TargetIP,': octets=',PingSize);
     WriteLn(' temps=',ResponseTime,'ms TTL=64');
-
-    { Mettre √† jour les statistiques }
+     { Mettre Ö jour les statistiques }
     Inc(PingStats.TotalTime,ResponseTime);
     If ResponseTime<PingStats.MinTime Then PingStats.MinTime:=ResponseTime;
     If ResponseTime>PingStats.MaxTime Then PingStats.MaxTime:=ResponseTime;
    End Else Begin
-    WriteLn('D√©lai d''attente de la demande d√©pass√©.');
+    WriteLn('DÇlai d''attente de la demande dÇpassÇ.');
    End;
-  End Else Begin
+  End
+   Else
+  Begin
    WriteLn('Erreur lors de l''envoi du paquet.');
   End;
-
-  { Attendre avant le prochain ping (sauf le dernier) }
+   { Attendre avant le prochain ping (sauf le dernier) }
   If I<PingCount Then Sleep(1000);
  End;
-
  { Calculer les statistiques finales }
  PingStats.PacketsLost:=PingStats.PacketsSent-PingStats.PacketsReceived;
- If PingStats.PacketsReceived>0 Then
-  PingStats.AvgTime:=PingStats.TotalTime div PingStats.PacketsReceived;
-
- { Afficher les statistiques }
+ If PingStats.PacketsReceived>0 Then PingStats.AvgTime:=PingStats.TotalTime div PingStats.PacketsReceived;
+  { Afficher les statistiques }
  WriteLn;
  WriteLn('Statistiques de ping pour ',TargetIP,' :');
- WriteLn('    Paquets : envoy√©s = ',PingStats.PacketsSent,
-         ', re√ßus = ',PingStats.PacketsReceived,
+ WriteLn('    Paquets : envoyÇs = ',PingStats.PacketsSent,
+         ', reáus = ',PingStats.PacketsReceived,
          ', perdus = ',PingStats.PacketsLost);
  If PingStats.PacketsSent>0 Then
   WriteLn('             (',((PingStats.PacketsLost*100) div PingStats.PacketsSent),'% de perte),');
-
  If PingStats.PacketsReceived>0 Then Begin
-  WriteLn('Dur√©e approximative des boucles en millisecondes :');
+  WriteLn('DurÇe approximative des boucles en millisecondes :');
   WriteLn('    Minimum = ',PingStats.MinTime,'ms, Maximum = ',PingStats.MaxTime,'ms, Moyenne = ',PingStats.AvgTime,'ms');
  End;
 End;
@@ -269,35 +251,33 @@ Begin
  WriteLn;
 
  For I:=1 To 4 Do Begin
-  SimTime:=50+Random(100);  { Temps simul√© entre 50-150ms }
-  WriteLn('R√©ponse de ',ParamStr(1),': octets=32 temps=',SimTime,'ms TTL=64');
+  SimTime:=50+Random(100);  { Temps simulÇ entre 50-150ms }
+  WriteLn('RÇponse de ',ParamStr(1),': octets=32 temps=',SimTime,'ms TTL=64');
   If I<4 Then Begin
    { Attendre 1 seconde (simulation) }
    Delay(1000);
   End;
  End;
-
  WriteLn;
  WriteLn('Statistiques de ping pour ',ParamStr(1),' :');
- WriteLn('    Paquets : envoy√©s = 4, re√ßus = 4, perdus = 0');
+ WriteLn('    Paquets : envoyÇs = 4, reáus = 4, perdus = 0');
  WriteLn('             (0% de perte),');
- WriteLn('Dur√©e approximative des boucles en millisecondes :');
+ WriteLn('DurÇe approximative des boucles en millisecondes :');
  WriteLn('    Minimum = 50ms, Maximum = 150ms, Moyenne = 100ms');
 End;
 {$ENDIF}
 
-{ Proc√©dure pour analyser les param√®tres de ligne de commande }
+{ ProcÇdure pour analyser les paramätres de ligne de commande }
 Procedure ParseParameters;
 Var
  I:Integer;
  Param:String;
 Begin
  {$IFDEF FPC}
- PingCount:=4;      { Nombre de pings par d√©faut }
- PingSize:=32;      { Taille des donn√©es par d√©faut }
- PingTimeout:=4000; { Timeout par d√©faut (4 secondes) }
+ PingCount:=4;      { Nombre de pings par dÇfaut }
+ PingSize:=32;      { Taille des donnÇes par dÇfaut }
+ PingTimeout:=4000; { Timeout par dÇfaut (4 secondes) }
  TargetHost:='';
-
  I:=1;
  While I<=ParamCount Do Begin
   Param:=UpperCase(ParamStr(I));
@@ -321,64 +301,58 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('PING : Commande de test de connectivit√© r√©seau');
+  WriteLn('PING : Cette commande permet de tester la connectivitÇ rÇseau.');
   WriteLn;
   WriteLn('Syntaxe : PING [-n nombre] [-l taille] [-w timeout] destination');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  destination  Nom d''h√¥te ou adresse IP √† ping');
-  WriteLn('  -n nombre    Nombre de requ√™tes √† envoyer (d√©faut: 4)');
-  WriteLn('  -l taille    Taille des donn√©es en octets (d√©faut: 32)');
-  WriteLn('  -w timeout   D√©lai d''attente en millisecondes (d√©faut: 4000)');
+  WriteLn('  destination  Nom d''hìte ou adresse IP Ö ping');
+  WriteLn('  -n nombre    Nombre de requàtes Ö envoyer (dÇfaut: 4)');
+  WriteLn('  -l taille    Taille des donnÇes en octets (dÇfaut: 32)');
+  WriteLn('  -w timeout   DÇlai d''attente en millisecondes (dÇfaut: 4000)');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  PING google.com');
   WriteLn('  PING 8.8.8.8');
   WriteLn('  PING -n 10 -l 64 192.168.1.1');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (ICMP r√©el)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (ICMP rÇel)');
  End
   Else
  If ParamStr(1)='--version'Then Begin
   WriteLn('PING 1.00 - Commande Ping ICMP, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
   Else
  If ParamCount>=1 Then Begin
   ParseParameters;
-
   {$IFDEF FPC}
   If TargetHost='' Then TargetHost:=ParamStr(1);
-
   WriteLn('Ping ICMP - NETWORKKIT-P');
   WriteLn;
-
-  { Initialiser Winsock }
+   { Initialiser Winsock }
   If WSAStartup($0202,WSAData)<>0 Then Begin
    WriteLn('Erreur d''initialisation Winsock');
    Halt(1);
   End;
-
-  { R√©soudre l'adresse IP }
-  WriteLn('R√©solution de ',TargetHost,'...');
+   { RÇsoudre l'adresse IP }
+  WriteLn('RÇsolution de ',TargetHost,'...');
   TargetIP:=ResolveHost(TargetHost);
   If TargetIP='' Then Begin
    WriteLn('Impossible de r√©soudre ',TargetHost);
    WSACleanup;
    Halt(1);
   End;
-
-  { Cr√©er un socket RAW ICMP }
+   { CrÇer un socket RAW ICMP }
   Socket:=Winsock.socket(AF_INET,SOCK_RAW,IPPROTO_ICMP);
   If Socket=INVALID_SOCKET Then Begin
-   WriteLn('Erreur : Impossible de cr√©er un socket ICMP');
-   WriteLn('(N√©cessite des privil√®ges administrateur)');
+   WriteLn('Erreur : Impossible de crÇer un socket ICMP');
+   WriteLn('(NÇcessite des priviläges administrateur)');
    WSACleanup;
    Halt(1);
   End;
-
   Try
    DoPing;
   Finally
