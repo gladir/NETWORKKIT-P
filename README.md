@@ -35,6 +35,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de vérifier si le courriel est un courriel valide.</td>
 	</tr>
 	<tr>
+		<td><b>NETBIOS.PAS</b></td>
+		<td>Cette commande permet d'afficher des informations NetBIOS.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
