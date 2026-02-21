@@ -50,6 +50,11 @@ Par exemple, si vous voulez compiler ISEMAIL.PAS, vous devrez tapez la commande 
 
 <pre><b>fpc</b> ISEMAIL.PAS</pre>
 
+<h3>Remarque</h3>
+<ul>
+	<li>A partir de la version 1.01 de la commande IPCONFIG, il est possible d'utiliser la commande en Turbo Pascal si le système d'exploitation supporte WATTCP ou NetBIOS.</li>
+</ul>
+
 <h2>Licence</h2>
 <ul>
  <li>Le code source est publié sous la licence <a href="https://github.com/gladir/NETWORKKIT-P/blob/main/LICENSE">MIT</a>.</li>
