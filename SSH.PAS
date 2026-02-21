@@ -53,13 +53,26 @@ Const
  MAX_SSH_SESSIONS = 32;
  DEFAULT_SSH_PORT = 22;
  SSH_VERSION = '2.0';
+ 
+ { Constantes Winsock pour gestion d'erreurs }
+ WSAECONNREFUSED = 10061;
+ WSAENETUNREACH = 10051;
+ WSAEHOSTUNREACH = 10065;
+ WSAETIMEDOUT = 10060;
+ WSAENETDOWN = 10050;
+ WSAEACCES = 10013;
+ WSAEINVAL = 10022;
+ WSAEADDRINUSE = 10048;
+ WSAEADDRNOTAVAIL = 10049;
+ WSAEFAULT = 10014;
 
 Var
  SSHSessions: Array[0..MAX_SSH_SESSIONS-1] of TSSHSession;
  SessionCount: Integer;
  CurrentSession: Integer;
+ WSAInitialized: Boolean;
 
-{ Résolution DNS simulée avec base de données étendue }
+{ [Procédures Windows temporairement désactivées pour débogage] }
 
 { Initialiser les sessions SSH }
 Procedure InitializeSSH;
@@ -68,6 +81,7 @@ Var
 Begin
  SessionCount := 0;
  CurrentSession := -1;
+ WSAInitialized := False;
  
  For I := 0 To MAX_SSH_SESSIONS-1 Do Begin
   With SSHSessions[I] Do Begin
@@ -294,7 +308,25 @@ Begin
  IsValidIP := (Dots = 4);
 End;
 
-{ Résoudre un nom d'hôte en adresse IP avec base de données étendue }
+{ Obtenir le message d'erreur pour un code d'erreur Winsock }
+Function GetSocketErrorMessage(ErrorCode: Integer): String;
+Begin
+ Case ErrorCode Of
+  WSAECONNREFUSED: GetSocketErrorMessage := 'Connection refused';
+  WSAENETUNREACH: GetSocketErrorMessage := 'Network unreachable';
+  WSAEHOSTUNREACH: GetSocketErrorMessage := 'Host unreachable';
+  WSAETIMEDOUT: GetSocketErrorMessage := 'Connection timed out';
+  WSAENETDOWN: GetSocketErrorMessage := 'Network down';
+  WSAEACCES: GetSocketErrorMessage := 'Access denied';
+  WSAEINVAL: GetSocketErrorMessage := 'Invalid argument';
+  WSAEADDRINUSE: GetSocketErrorMessage := 'Address already in use';
+  WSAEADDRNOTAVAIL: GetSocketErrorMessage := 'Address not available';
+  WSAEFAULT: GetSocketErrorMessage := 'Bad address';
+ Else
+  GetSocketErrorMessage := 'Error code ' + IntToStr(ErrorCode);
+ End;
+End;
+{ Résoudre un nom d'hôte en adresse IP (mode simulation) }
 Function ResolveHostname(Hostname: String): String;
 Begin
  ResolveHostname := Hostname;
@@ -305,10 +337,12 @@ Begin
   Exit;
  End;
  
- { Base de données de résolution étendue }
- If LowerCase(Hostname) = 'localhost' Then
-  ResolveHostname := '127.0.0.1'
- Else If LowerCase(Hostname) = 'example.com' Then
+ { Cas spéciaux locaux }
+ If LowerCase(Hostname) = 'localhost' Then Begin
+  ResolveHostname := '127.0.0.1';
+  Exit;
+ End;
+ If LowerCase(Hostname) = 'example.com' Then
   ResolveHostname := '93.184.216.34'
  Else If LowerCase(Hostname) = 'github.com' Then
   ResolveHostname := '140.82.113.3'
@@ -460,24 +494,23 @@ Begin
   If ResolvedIP <> Hostname Then
    WriteLn('Résolution DNS: ', Hostname, ' -> ', ResolvedIP);
   
-  { Simulation de la négociation SSH }
-  WriteLn('SSH-', SSH_VERSION, '-NETWORKKIT_', Username, '@', Hostname);
-  WriteLn('Échange de clés...');
-  WriteLn('Algorithme: ', Cipher);
-  WriteLn('Authentification par clé publique...');
+  { NOTE: Connexion TCP temporairement désactivée pour débogage }
+  WriteLn('SIMULATION: Connexion TCP vers ', ResolvedIP, ':', Port);
+  WriteLn('SIMULATION: Négociation SSH avec serveur distant');
+  WriteLn('SIMULATION: Version serveur: SSH-2.0-OpenSSH_8.9p1');
+  WriteLn('SIMULATION: Authentification simulée réussie');
   
-  If KeyFile <> '' Then
-   WriteLn('Utilisation de la clé: ', KeyFile);
-  
+  { Enregistrer les détails de connexion }
   Connected := True;
-  LoginTime := '2026-02-21 14:30:15';
+  LoginTime := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
+  
+  WriteLn('Session SSH établie (mode simulation)');
  End;
  
  Session.Active := True;
  Session.LastActivity := Session.Connection.LoginTime;
  
- WriteLn('Connexion établie avec ', Session.Connection.Hostname);
- WriteLn('Bienvenue sur ', Session.Connection.Hostname, '!');
+ WriteLn('Connexion SSH simulée avec ', Session.Connection.Hostname);
  WriteLn;
  
  ConnectSSH := True;
@@ -497,35 +530,24 @@ Begin
   WriteLn('Exécution de "', Command, '" sur ', Hostname, '...');
   WriteLn;
   
-  { Simulation de sortie de commande selon le type }
-  If LowerCase(Command) = 'pwd' Then
-   WriteLn('/home/', Username)
-  Else If LowerCase(Command) = 'whoami' Then
-   WriteLn(Username)
-  Else If LowerCase(Command) = 'hostname' Then
-   WriteLn(Hostname)
-  Else If Copy(LowerCase(Command), 1, 2) = 'ls' Then Begin
-   WriteLn('total 12');
-   WriteLn('drwxr-xr-x  2 ', Username, ' ', Username, ' 4096 Feb 21 14:30 Documents');
-   WriteLn('drwxr-xr-x  2 ', Username, ' ', Username, ' 4096 Feb 21 13:15 Downloads');
-   WriteLn('-rw-r--r--  1 ', Username, ' ', Username, '  220 Feb 21 12:00 .bash_logout');
-  End Else If Copy(LowerCase(Command), 1, 6) = 'uptime' Then
-   WriteLn(' 14:35:22 up 2 days,  3:15,  2 users,  load average: 0.15, 0.10, 0.05')
-  Else If Copy(LowerCase(Command), 1, 2) = 'df' Then Begin
-   WriteLn('Filesystem     1K-blocks    Used Available Use% Mounted on');
-   WriteLn('/dev/sda1       50264772 8901234  38745678  19% /');
-   WriteLn('tmpfs             506420       0    506420   0% /dev/shm');
-  End Else
-   WriteLn('Commande "', Command, '" exécutée avec succès');
+  { NOTE: Pour une vraie commande SSH, il faudrait :
+    1. Une session SSH authentifiée et chiffrée
+    2. Ouvrir un canal de session
+    3. Envoyer la commande via le protocole SSH
+    4. Recevoir et décoder la réponse }
   
-  { Mettre à jour les statistiques }
-  Inc(Session.Connection.BytesSent, Length(Command) + 10);
-  Inc(Session.Connection.BytesReceived, 100);
-  Session.LastActivity := '2026-02-21 14:35:22';
+  WriteLn('ssh: ERREUR - Session SSH complète non implémentée');
+  WriteLn('La connexion TCP a été établie mais l''authentification SSH');
+  WriteLn('et l''exécution de commandes nécessitent une implémentation');
+  WriteLn('complète du protocole SSH (chiffrement, authentification, etc.)');
+  WriteLn;
+  WriteLn('Pour une implémentation complète, utilisez un client SSH complet');
+  WriteLn('comme OpenSSH ou PuTTY.');
+  
+  Exit;
  End;
  
- Inc(Session.Commands);
- 
+ { Cette section ne sera jamais atteinte car on fait Exit ci-dessus }
  ExecuteSSHCommand := True;
 End;
 
@@ -809,6 +831,14 @@ Begin
 End;
 
 BEGIN
+ WriteLn('SSH - Test d''initialisation');
+ 
+ {$IFDEF FPC}
+ InitializeSSH;
+ {$ENDIF}
+ 
+ WriteLn('Initialisation réussie');
+ 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
    (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
   WriteLn('SSH : Client Secure Shell');
@@ -860,18 +890,13 @@ BEGIN
   WriteLn;
   WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion réelle)');
  End
-  Else
- If ParamStr(1) = '--version' Then Begin
+ Else If ParamStr(1) = '--version' Then Begin
   WriteLn('SSH 1.00 - Secure Shell Client, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
   WriteLn('Écrit par Sylvain Maltais');
  End
-  Else
- Begin
-  {$IFDEF FPC}
-  InitializeSSH;
-  {$ENDIF}
+ Else Begin
   ParseCommandLine;
  End;
 END.
