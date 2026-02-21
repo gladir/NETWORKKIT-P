@@ -15,6 +15,24 @@ Program DNSQUERY;
  { Turbo Pascal 7 }
 {$ENDIF}
 
+{$IFNDEF FPC}
+ Function UpperCase(S:String):String;
+ Var
+  I:Integer;
+ Begin
+  For I:=1 To Length(S) Do If S[I] in ['a'..'z'] Then S[I]:=Chr(Ord(S[I])-32);
+  UpperCase:=S;
+ End;
+
+ Function LowerCase(S:String):String;
+ Var
+  I:Integer;
+ Begin
+  For I:=1 To Length(S) Do If S[I] in ['A'..'Z'] Then S[I]:=Chr(Ord(S[I])+32);
+  LowerCase:=S;
+ End;
+{$ENDIF}
+
 {$IFDEF FPC}
 Type
  { Types d'enregistrements DNS }
@@ -342,7 +360,7 @@ Begin
 End;
 
  { Validation d'un nom de domaine }
-Function IsValidDomainName(Domain: String): Boolean;
+Function IsValidDomainName(Domain:String): Boolean;
 Var
  I: Integer;
  HasDot: Boolean;
@@ -372,11 +390,9 @@ Var
 Begin
  IsValidIPAddress := False;
  If Length(IP) = 0 Then Exit;
-
  Dots := 0;
  S := IP + '.';
  P := 1;
-
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -391,23 +407,21 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
-
  IsValidIPAddress := (Dots = 4);
 End;
 
-{ Afficher les serveurs DNS configur√©s }
-Procedure ShowDNSServers;
-Begin
- WriteLn('Serveurs DNS configur√©s:');
+{ Afficher les serveurs DNS configurÇs }
+Procedure ShowDNSServers;Begin
+ WriteLn('Serveurs DNS configurÇs:');
  WriteLn('========================');
  WriteLn('Primaire   : 8.8.8.8 (Google DNS)');
  WriteLn('Secondaire : 1.1.1.1 (Cloudflare DNS)');
- WriteLn('Syst√®me    : Configuration automatique');
+ WriteLn('Systäme    : Configuration automatique');
  WriteLn;
- WriteLn('Note: Free Pascal utilise la r√©solution DNS du syst√®me.');
+ WriteLn('Note: Free Pascal utilise la rÇsolution DNS du systäme.');
 End;
 
-{ Analyser la ligne de commande }
+ { Analyser la ligne de commande }
 Procedure ParseCommandLine;
 Var
  I: Integer;
@@ -419,33 +433,34 @@ Begin
  Verbose := False;
  ShowAll := False;
  Timeout := 5;
-
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-
-  If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--verbose') Then
-   Verbose := True
-  Else If (LowerCase(Param) = '-a') or (LowerCase(Param) = '--all') Then
-   ShowAll := True
-  Else If (LowerCase(Param) = '-t') or (LowerCase(Param) = '--type') Then Begin
+  If(LowerCase(Param) = '-v')or(LowerCase(Param) = '--verbose')Then Verbose:=True Else
+  If(LowerCase(Param) = '-a')or(LowerCase(Param) = '--all')Then ShowAll:=True Else
+  If(LowerCase(Param) = '-t')or(LowerCase(Param) = '--type')Then Begin
    If I < ParamCount Then Begin
     Inc(I);
     QueryType := StringToDNSType(ParamStr(I));
    End;
-  End Else If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--server') Then Begin
+  End
+   Else
+  If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--server') Then Begin
    If I < ParamCount Then Begin
     Inc(I);
     DNSServer := ParamStr(I);
    End;
-  End Else If LowerCase(Param) = '--servers' Then Begin
+  End
+   Else
+  If LowerCase(Param) = '--servers' Then Begin
    ShowDNSServers;
    Exit;
-  End Else If Copy(Param, 1, 1) <> '-' Then Begin
+  End
+   Else
+  If Copy(Param, 1, 1) <> '-' Then Begin
    If QueryName = '' Then
     QueryName := Param;
   End;
-
   Inc(I);
  End;
 End;
@@ -453,26 +468,29 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedDNSQuery(Name: String; RecType: String);
-Begin
- WriteLn('R√©sultats DNS pour ', Name, ' (simulation):');
+Procedure ShowSimulatedDNSQuery(Name:String;RecType:String);Begin
+ WriteLn('RÇsultats DNS pour ', Name, ' (simulation):');
  WriteLn;
-
  If UpperCase(RecType) = 'A' Then Begin
   WriteLn(Copy(Name + '                         ', 1, 25), ' 300      IN   A      93.184.216.34');
- End Else If UpperCase(RecType) = 'MX' Then Begin
+ End
+  Else
+ If UpperCase(RecType) = 'MX' Then Begin
   WriteLn(Copy(Name + '                         ', 1, 25), ' 3600     IN   MX     10 mail.', Name);
- End Else If UpperCase(RecType) = 'NS' Then Begin
+ End
+  Else
+ If UpperCase(RecType) = 'NS' Then Begin
   WriteLn(Copy(Name + '                         ', 1, 25), ' 172800   IN   NS     ns1.', Name);
   WriteLn(Copy(Name + '                         ', 1, 25), ' 172800   IN   NS     ns2.', Name);
- End Else Begin
-  WriteLn('Simulation pour type ', RecType, ' non impl√©ment√©e');
+ End
+  Else
+ Begin
+  WriteLn('Simulation pour type ', RecType, ' non implÇmentÇe');
  End;
 End;
 
-Procedure SimulateAllQueries(Name: String);
-Begin
- WriteLn('Requ√™tes DNS compl√®tes pour ', Name, ' (simulation):');
+Procedure SimulateAllQueries(Name:String);Begin
+ WriteLn('Requàtes DNS complätes pour ', Name, ' (simulation):');
  WriteLn('=====================================================');
  WriteLn;
  WriteLn('>>> Type A <<<');
@@ -487,65 +505,64 @@ End;
 {$ENDIF}
 
 BEGIN
- {$IFDEF FPC}
- { Initialiser Winsock pour Free Pascal }
- If Not InitializeWinsock Then Begin
-  WriteLn('Erreur : Impossible d''initialiser Winsock');
-  Halt(3);
- End;
- {$ENDIF}
-
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('DNSQUERY : Outil de requ√™te DNS');
+  WriteLn('DNSQUERY : Cette commande permet de laner l''outil de requàte DNS.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  DNSQUERY [options] nom_de_domaine');
   WriteLn('  DNSQUERY [options] adresse_ip');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -t, --type TYPE       Type d''enregistrement (A, NS, MX, CNAME, TXT, etc.)');
-  WriteLn('  -s, --server SERVEUR  Serveur DNS √† utiliser');
-  WriteLn('  -v, --verbose         Mode verbeux avec d√©tails');
+  WriteLn('  -t, --type TYPE       Type d''enregistrement (A, NS, MX, CNAME, TXT,...)');
+  WriteLn('  -s, --server SERVEUR  Serveur DNS Ö utiliser');
+  WriteLn('  -v, --verbose         Mode verbeux avec dÇtails');
   WriteLn('  -a, --all             Interroger tous les types d''enregistrements');
-  WriteLn('  --servers             Afficher les serveurs DNS configur√©s');
+  WriteLn('  --servers             Afficher les serveurs DNS configurÇs');
   WriteLn;
-  WriteLn('Types d''enregistrements support√©s :');
+  WriteLn('Types d''enregistrements supportÇs :');
   WriteLn('  A      Adresse IPv4');
   WriteLn('  NS     Serveur de noms');
   WriteLn('  MX     Serveur de messagerie');
   WriteLn('  CNAME  Nom canonique (alias)');
   WriteLn('  TXT    Enregistrement texte');
-  WriteLn('  PTR    Pointeur (r√©solution inverse)');
+  WriteLn('  PTR    Pointeur (rÇsolution inverse)');
   WriteLn('  AAAA   Adresse IPv6');
   WriteLn('  SRV    Service');
   WriteLn('  SOA    Start of Authority');
   WriteLn('  ANY    Tous les types');
   WriteLn;
   WriteLn('Exemples :');
-  WriteLn('  DNSQUERY google.com                   # R√©solution A par d√©faut');
+  WriteLn('  DNSQUERY google.com                   # RÇsolution A par dÇfaut');
   WriteLn('  DNSQUERY -t MX gmail.com              # Serveurs de messagerie');
   WriteLn('  DNSQUERY -t NS example.com            # Serveurs de noms');
-  WriteLn('  DNSQUERY -t PTR 8.8.8.8               # R√©solution inverse');
+  WriteLn('  DNSQUERY -t PTR 8.8.8.8               # RÇsolution inverse');
   WriteLn('  DNSQUERY -v -t A github.com           # Mode verbeux');
   WriteLn('  DNSQUERY -a stackoverflow.com         # Tous les types');
   WriteLn('  DNSQUERY --servers                    # Serveurs DNS');
   WriteLn;
-  WriteLn('Note: Utilise la r√©solution DNS r√©elle du syst√®me en Free Pascal,');
-  WriteLn('simulation en Turbo Pascal. Supporte IPv4 et r√©solution inverse.');
+  WriteLn('Note: Utilise la rÇsolution DNS rÇelle du systäme en Free Pascal,');
+  WriteLn('simulation en Turbo Pascal. Supporte IPv4 et rÇsolution inverse.');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (r√©solution r√©elle)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (rÇsolution rÇelle)');
  End
- Else If ParamStr(1) = '--version' Then Begin
+  Else
+ If ParamStr(1) = '--version' Then Begin
   WriteLn('DNSQUERY 1.00 - DNS Query Tool, NETWORKKIT-P');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
  Else Begin
   {$IFDEF FPC}
+   { Initialiser Winsock pour Free Pascal }
+   If Not InitializeWinsock Then Begin
+    WriteLn('Erreur : Impossible d''initialiser Winsock');
+    Halt(3);
+   End;
+  {$ENDIF}
+  {$IFDEF FPC}
   ParseCommandLine;
-
   If QueryName = '' Then Begin
    WriteLn('dnsquery: Nom de domaine ou adresse IP requis');
    WriteLn('Usage: dnsquery [options] nom_de_domaine');
