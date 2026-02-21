@@ -722,7 +722,7 @@ End;
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
    (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('ACONNECT : Gestionnaire de connexions ALSA MIDI');
+  WriteLn('ACONNECT : Cette commande permet de lancer le gestionnaire de connexions ALSA MIDI');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  ACONNECT [options] [sender] [receiver]');
