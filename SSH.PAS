@@ -59,8 +59,7 @@ Var
  SessionCount: Integer;
  CurrentSession: Integer;
 
-{ Procédures Windows pour réseau (simulées) }
-{ Résolution DNS simplifiée }
+{ Résolution DNS simulée avec base de données étendue }
 
 { Initialiser les sessions SSH }
 Procedure InitializeSSH;
@@ -295,18 +294,75 @@ Begin
  IsValidIP := (Dots = 4);
 End;
 
-{ Résoudre un nom d'hôte en adresse IP (simulation) }
+{ Résoudre un nom d'hôte en adresse IP avec base de données étendue }
 Function ResolveHostname(Hostname: String): String;
 Begin
  ResolveHostname := Hostname;
  
- { Simulation de résolution pour quelques hôtes courants }
+ { Vérifier si c'est déjà une adresse IP valide }
+ If IsValidIP(Hostname) Then Begin
+  ResolveHostname := Hostname;
+  Exit;
+ End;
+ 
+ { Base de données de résolution étendue }
  If LowerCase(Hostname) = 'localhost' Then
   ResolveHostname := '127.0.0.1'
  Else If LowerCase(Hostname) = 'example.com' Then
   ResolveHostname := '93.184.216.34'
+ Else If LowerCase(Hostname) = 'github.com' Then
+  ResolveHostname := '140.82.113.3'
+ Else If LowerCase(Hostname) = 'google.com' Then
+  ResolveHostname := '142.250.185.46'
+ Else If LowerCase(Hostname) = 'microsoft.com' Then
+  ResolveHostname := '20.112.250.133'
+ Else If LowerCase(Hostname) = 'stackoverflow.com' Then
+  ResolveHostname := '151.101.129.69'
+ Else If LowerCase(Hostname) = 'wikipedia.org' Then
+  ResolveHostname := '208.80.154.224'
+ Else If LowerCase(Hostname) = 'youtube.com' Then
+  ResolveHostname := '172.217.16.238'
+ Else If LowerCase(Hostname) = 'facebook.com' Then
+  ResolveHostname := '157.240.241.35'
+ Else If LowerCase(Hostname) = 'amazon.com' Then
+  ResolveHostname := '176.32.103.205'
+ Else If LowerCase(Hostname) = 'twitter.com' Then
+  ResolveHostname := '104.244.42.129'
+ Else If LowerCase(Hostname) = 'reddit.com' Then
+  ResolveHostname := '151.101.1.140'
+ Else If LowerCase(Hostname) = 'linkedin.com' Then
+  ResolveHostname := '13.107.42.14'
+ Else If LowerCase(Hostname) = 'instagram.com' Then
+  ResolveHostname := '157.240.241.174'
+ Else If LowerCase(Hostname) = 'netflix.com' Then
+  ResolveHostname := '54.155.178.5'
+ Else If LowerCase(Hostname) = 'ubuntu.com' Then
+  ResolveHostname := '185.125.190.39'
+ Else If LowerCase(Hostname) = 'debian.org' Then
+  ResolveHostname := '151.101.2.132'
+ Else If LowerCase(Hostname) = 'freepascal.org' Then
+  ResolveHostname := '85.158.180.26'
+ Else If LowerCase(Hostname) = 'sourceforge.net' Then
+  ResolveHostname := '216.105.38.12'
+ Else If LowerCase(Hostname) = 'gitlab.com' Then
+  ResolveHostname := '172.65.251.78'
+ Else If LowerCase(Hostname) = 'bitbucket.org' Then
+  ResolveHostname := '104.192.143.3'
+ Else If Copy(LowerCase(Hostname), 1, 4) = 'www.' Then
+  { Retirer www. et résoudre à nouveau }
+  ResolveHostname := ResolveHostname(Copy(Hostname, 5, Length(Hostname) - 4))
+ Else If Pos('.local', LowerCase(Hostname)) > 0 Then
+  ResolveHostname := '192.168.1.' + IntToStr(100 + (Length(Hostname) mod 50))
+ Else If Pos('.dev', LowerCase(Hostname)) > 0 Then
+  ResolveHostname := '10.0.0.' + IntToStr(10 + (Length(Hostname) mod 200))
+ Else If Pos('.test', LowerCase(Hostname)) > 0 Then
+  ResolveHostname := '172.16.0.' + IntToStr(1 + (Length(Hostname) mod 254))
  Else If Pos('.', Hostname) = 0 Then
-  ResolveHostname := '192.168.1.100'; { IP par défaut pour noms simples }
+  { Nom simple sans domaine - adresse locale }
+  ResolveHostname := '192.168.1.' + IntToStr(100 + (Length(Hostname) mod 50))
+ Else
+  { Domaine inconnu - générer IP basée sur le hash du nom }
+  ResolveHostname := '203.0.113.' + IntToStr(1 + (Length(Hostname) mod 254));
 End;
 
 { Parser une spécification d'hôte (utilisateur@hôte:port) }
