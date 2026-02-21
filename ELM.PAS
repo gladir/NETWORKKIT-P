@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande elm (Electronic Mail))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description:  Commande elm (Electronic Mail))
 }
 
 Program ELM;
@@ -123,7 +124,7 @@ Var
  MessageCount: Integer;
  MailStats: TMailStats;
  ElmInterface: TElmInterface;
- 
+
  { Commandes et états }
  QuitRequested: Boolean;
  DataChanged: Boolean;
@@ -169,7 +170,7 @@ Begin
   BeepOnNewMail := True;
   CheckInterval := 5;
  End;
- 
+
  { Initialiser l'interface }
  With ElmInterface Do Begin
   CurrentFolder := 'INBOX';
@@ -187,7 +188,7 @@ Begin
   HelpVisible := False;
   PromptVisible := True;
  End;
- 
+
  { Initialiser les variables globales }
  MessageCount := 0;
  QuitRequested := False;
@@ -224,7 +225,7 @@ Begin
   IsReplied := False;
   IsForwarded := False;
   IsFlagged := True;
-  
+
   { Corps du message }
   MessageBody.Add('Cher utilisateur,');
   MessageBody.Add('');
@@ -235,7 +236,7 @@ Begin
   MessageBody.Add('');
   MessageBody.Add('Cordialement,');
   MessageBody.Add('L''équipe système');
-  
+
   { En-têtes }
   Headers.Add('From: admin@company.com (System Administrator)');
   Headers.Add('To: ' + ElmConfig.UserEmail);
@@ -246,7 +247,7 @@ Begin
   Headers.Add('Content-Type: text/plain; charset=UTF-8');
  End;
  Inc(MessageCount);
- 
+
  { Message 2: Message lu avec réponse }
  With MailMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
@@ -271,7 +272,7 @@ Begin
   IsReplied := True;
   IsForwarded := False;
   IsFlagged := False;
-  
+
   { Corps du message }
   MessageBody.Add('Bonjour,');
   MessageBody.Add('');
@@ -280,10 +281,10 @@ Begin
   MessageBody.Add('');
   MessageBody.Add('À lundi,');
   MessageBody.Add('Jean');
-  
+
   { Pièce jointe }
   Attachments[0] := 'agenda-reunion.pdf';
-  
+
   { En-têtes }
   Headers.Add('From: colleague@company.com (Jean Dupont)');
   Headers.Add('To: ' + ElmConfig.UserEmail);
@@ -292,7 +293,7 @@ Begin
   Headers.Add('Message-ID: <meeting-2026021901@company.com>');
  End;
  Inc(MessageCount);
- 
+
  { Message 3: Newsletter }
  With MailMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
@@ -317,7 +318,7 @@ Begin
   IsReplied := False;
   IsForwarded := True;
   IsFlagged := False;
-  
+
   { Corps du message }
   MessageBody.Add('=== NEWSLETTER TECHSITE ===');
   MessageBody.Add('');
@@ -326,7 +327,7 @@ Begin
   MessageBody.Add('3. Outils de développement Open Source');
   MessageBody.Add('');
   MessageBody.Add('Lire la suite sur notre site web...');
-  
+
   { En-têtes }
   Headers.Add('From: newsletter@techsite.com (TechSite Newsletter)');
   Headers.Add('To: ' + ElmConfig.UserEmail);
@@ -336,7 +337,7 @@ Begin
   Headers.Add('List-Unsubscribe: <mailto:unsubscribe@techsite.com>');
  End;
  Inc(MessageCount);
- 
+
  { Message 4: Spam supprimé }
  With MailMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
@@ -361,13 +362,13 @@ Begin
   IsReplied := False;
   IsForwarded := False;
   IsFlagged := False;
-  
+
   { Corps du message }
   MessageBody.Add('OFFRE EXCEPTIONNELLE !!!!');
   MessageBody.Add('Cliquez ici pour gagner 1000€ !');
   MessageBody.Add('');
   MessageBody.Add('[Message identifié comme spam]');
-  
+
   { En-têtes }
   Headers.Add('From: promo@spam.example (Promotion Spéciale)');
   Headers.Add('To: ' + ElmConfig.UserEmail);
@@ -376,7 +377,7 @@ Begin
   Headers.Add('X-Spam-Score: 9.5');
  End;
  Inc(MessageCount);
- 
+
  { Message 5: Brouillon }
  With MailMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
@@ -401,14 +402,14 @@ Begin
   IsReplied := False;
   IsForwarded := False;
   IsFlagged := False;
-  
+
   { Corps du message }
   MessageBody.Add('Salut,');
   MessageBody.Add('');
   MessageBody.Add('Es-tu libre samedi soir pour un dîner ?');
   MessageBody.Add('');
   MessageBody.Add('[Brouillon - à terminer]');
-  
+
   { En-têtes }
   Headers.Add('From: ' + ElmConfig.UserEmail + ' (' + ElmConfig.FullName + ')');
   Headers.Add('To: friend@example.com (Mon ami)');
@@ -426,26 +427,26 @@ Begin
  FillChar(MailStats, SizeOf(MailStats), 0);
  MailStats.OldestMessage := Now;
  MailStats.NewestMessage := 0;
- 
+
  For I := 0 To MessageCount - 1 Do Begin
   With MailMessages[I] Do Begin
    Inc(MailStats.TotalMessages);
    MailStats.TotalSize := MailStats.TotalSize + Size;
-   
+
    If Status = 'new' Then Inc(MailStats.NewMessages);
    If IsRead Then Inc(MailStats.ReadMessages) Else Inc(MailStats.UnreadMessages);
    If IsDeleted Then Inc(MailStats.DeletedMessages);
    If IsReplied Then Inc(MailStats.RepliedMessages);
    If IsForwarded Then Inc(MailStats.ForwardedMessages);
    If IsFlagged Then Inc(MailStats.FlaggedMessages);
-   
+
    If DateReceived < MailStats.OldestMessage Then
     MailStats.OldestMessage := DateReceived;
    If DateReceived > MailStats.NewestMessage Then
     MailStats.NewestMessage := DateReceived;
   End;
  End;
- 
+
  MailStats.LastCheck := Now;
 End;
 
@@ -453,7 +454,7 @@ End;
 Procedure DisplayElmHeader;
 Begin
  WriteLn('ELM 1.00 [NETWORKKIT-P]                      ', FormatDateTime('dd/mm/yyyy hh:nn', Now));
- WriteLn('Dossier: ', ElmInterface.CurrentFolder, '  Messages: ', MessageCount, 
+ WriteLn('Dossier: ', ElmInterface.CurrentFolder, '  Messages: ', MessageCount,
          '  Nouveaux: ', MailStats.NewMessages);
  WriteLn(StringOfChar('=', 78));
 End;
@@ -470,10 +471,10 @@ Var
 Begin
  WriteLn('  # St Pri  De                  Sujet                           Date       Taille');
  WriteLn(StringOfChar('-', 78));
- 
+
  For I := ElmInterface.PageStart - 1 To ElmInterface.PageEnd - 1 Do Begin
   If I >= MessageCount Then Break;
-  
+
   With MailMessages[I] Do Begin
    { Caractère de statut }
    If IsDeleted Then StatusChar := 'D'
@@ -482,7 +483,7 @@ Begin
    Else If IsForwarded Then StatusChar := 'F'
    Else If IsRead Then StatusChar := ' '
    Else StatusChar := 'U';
-   
+
    { Caractère de priorité }
    Case Priority Of
     1: PriorityChar := '!';
@@ -490,25 +491,25 @@ Begin
    Else
     PriorityChar := ' ';
    End;
-   
+
    { Formatage des champs }
    FromDisplay := Copy(FromName + '                   ', 1, 19);
    SubjectDisplay := Copy(Subject + '                               ', 1, 31);
    DateDisplay := FormatDateTime('dd/mm/yy', DateReceived);
-   
+
    { Indicateur de message actuel }
    If I + 1 = ElmInterface.CurrentMessage Then
     Write('>')
    Else
     Write(' ');
-   
+
    WriteLn(I + 1:3, ' ', StatusChar, '  ', PriorityChar, '  ',
            FromDisplay, ' ', SubjectDisplay, ' ', DateDisplay, Size:8);
   End;
  End;
- 
+
  WriteLn(StringOfChar('-', 78));
- WriteLn('Message ', ElmInterface.CurrentMessage, ' de ', MessageCount, 
+ WriteLn('Message ', ElmInterface.CurrentMessage, ' de ', MessageCount,
          ' (Page ', (ElmInterface.PageStart div ElmConfig.PageSize) + 1, ')');
 End;
 
@@ -521,7 +522,7 @@ Begin
   WriteLn('Message non trouvé');
   Exit;
  End;
- 
+
  With MailMessages[MessageIndex] Do Begin
   WriteLn(StringOfChar('=', 78));
   WriteLn('Message ', MessageID, ' de ', MessageCount, ' (', Status, ')');
@@ -539,7 +540,7 @@ Begin
   End;
   WriteLn('Taille  : ', Size, ' octets (', Lines, ' lignes)');
   WriteLn(StringOfChar('-', 78));
-  
+
   { Afficher le corps du message }
   If MessageBody <> nil Then Begin
    For I := 0 To MessageBody.Count - 1 Do
@@ -547,9 +548,9 @@ Begin
   End Else Begin
    WriteLn('[Corps du message non disponible]');
   End;
-  
+
   WriteLn(StringOfChar('=', 78));
-  
+
   { Marquer comme lu }
   If not IsRead Then Begin
    IsRead := True;
@@ -570,19 +571,19 @@ Begin
   WriteLn('Message non trouvé');
   Exit;
  End;
- 
+
  With MailMessages[MessageIndex] Do Begin
   WriteLn(StringOfChar('=', 78));
   WriteLn('En-têtes du message ', MessageID);
   WriteLn(StringOfChar('-', 78));
-  
+
   If Headers <> nil Then Begin
    For I := 0 To Headers.Count - 1 Do
     WriteLn(Headers[I]);
   End Else Begin
    WriteLn('[En-têtes non disponibles]');
   End;
-  
+
   WriteLn(StringOfChar('=', 78));
  End;
 End;
@@ -591,12 +592,12 @@ End;
 Function DeleteMessage(MessageIndex: Integer): Boolean;
 Begin
  DeleteMessage := False;
- 
+
  If (MessageIndex < 0) or (MessageIndex >= MessageCount) Then Begin
   LastErrorMessage := 'Message non trouvé';
   Exit;
  End;
- 
+
  With MailMessages[MessageIndex] Do Begin
   If IsDeleted Then Begin
    { Restaurer le message }
@@ -611,13 +612,13 @@ Begin
     { En simulation, on accepte }
     WriteLn('o');
    End;
-   
+
    IsDeleted := True;
    Status := 'deleted';
    Inc(MailStats.DeletedMessages);
    LastErrorMessage := 'Message marqué pour suppression';
   End;
-  
+
   DataChanged := True;
   DeleteMessage := True;
  End;
@@ -630,19 +631,19 @@ Var
  I: Integer;
 Begin
  ReplyToMessage := False;
- 
+
  If (MessageIndex < 0) or (MessageIndex >= MessageCount) Then Begin
   LastErrorMessage := 'Message non trouvé';
   Exit;
  End;
- 
+
  With MailMessages[MessageIndex] Do Begin
   { Préparer le sujet de réponse }
   If Copy(UpperCase(Subject), 1, 3) = 'RE:' Then
    ReplySubject := Subject
   Else
    ReplySubject := ElmConfig.ReplyPrefix + Subject;
-  
+
   WriteLn(StringOfChar('=', 78));
   WriteLn('Réponse au message de ', FromName);
   WriteLn('Sujet: ', ReplySubject);
@@ -653,7 +654,7 @@ Begin
   WriteLn;
   WriteLn('Corps du message:');
   WriteLn('> Message original du ', FormatDateTime('dd/mm/yyyy', DateSent), ':');
-  
+
   { Citer le message original }
   If MessageBody <> nil Then Begin
    For I := 0 To MessageBody.Count - 1 Do Begin
@@ -663,13 +664,13 @@ Begin
    If MessageBody.Count > 5 Then
     WriteLn('> [...]');
   End;
-  
+
   WriteLn;
   WriteLn('Votre réponse:');
   WriteLn('[Tapez votre réponse ici]');
   WriteLn;
   WriteLn('Réponse envoyée avec succès !');
-  
+
   { Marquer comme ayant reçu une réponse }
   IsReplied := True;
   Inc(MailStats.RepliedMessages);
@@ -685,19 +686,19 @@ Var
  I: Integer;
 Begin
  ForwardMessage := False;
- 
+
  If (MessageIndex < 0) or (MessageIndex >= MessageCount) Then Begin
   LastErrorMessage := 'Message non trouvé';
   Exit;
  End;
- 
+
  With MailMessages[MessageIndex] Do Begin
   { Préparer le sujet de transfert }
   If Copy(UpperCase(Subject), 1, 3) = 'FW:' Then
    ForwardSubject := Subject
   Else
    ForwardSubject := ElmConfig.ForwardPrefix + Subject;
-  
+
   WriteLn(StringOfChar('=', 78));
   WriteLn('Transfert du message de ', FromName);
   WriteLn('Sujet: ', ForwardSubject);
@@ -712,17 +713,17 @@ Begin
   WriteLn('Date: ', FormatDateTime('dd/mm/yyyy hh:nn', DateSent));
   WriteLn('Sujet: ', Subject);
   WriteLn;
-  
+
   { Inclure le message original }
   If MessageBody <> nil Then Begin
    For I := 0 To MessageBody.Count - 1 Do
     WriteLn(MessageBody[I]);
   End;
-  
+
   WriteLn('--- Fin du message transféré ---');
   WriteLn;
   WriteLn('Message transféré avec succès !');
-  
+
   { Marquer comme transféré }
   IsForwarded := True;
   Inc(MailStats.ForwardedMessages);
@@ -735,7 +736,7 @@ End;
 Function ComposeNewMessage: Boolean;
 Begin
  ComposeNewMessage := False;
- 
+
  WriteLn(StringOfChar('=', 78));
  WriteLn('Nouveau message');
  WriteLn(StringOfChar('-', 78));
@@ -751,11 +752,11 @@ Begin
  WriteLn('-- ');
  WriteLn('[Signature automatique]');
  WriteLn;
- 
+
  Write('Envoyer ce message ? (o/N) ');
  { En simulation, on accepte }
  WriteLn('o');
- 
+
  WriteLn('Message envoyé avec succès !');
  ComposeNewMessage := True;
 End;
@@ -767,10 +768,10 @@ Var
 Begin
  Found := 0;
  Pattern := LowerCase(Pattern);
- 
+
  WriteLn('Recherche de "', Pattern, '"...');
  WriteLn;
- 
+
  For I := 0 To MessageCount - 1 Do Begin
   With MailMessages[I] Do Begin
    If (Pos(Pattern, LowerCase(Subject)) > 0) or
@@ -782,7 +783,7 @@ Begin
    End;
   End;
  End;
- 
+
  WriteLn;
  WriteLn(Found, ' message(s) trouvé(s)');
  SearchMessages := Found;
@@ -804,12 +805,12 @@ Begin
  WriteLn('Transférés          : ', MailStats.ForwardedMessages);
  WriteLn('Marqués             : ', MailStats.FlaggedMessages);
  WriteLn('Taille totale       : ', MailStats.TotalSize, ' octets');
- 
+
  If MailStats.TotalMessages > 0 Then Begin
   WriteLn('Message plus ancien : ', FormatDateTime('dd/mm/yyyy hh:nn', MailStats.OldestMessage));
   WriteLn('Message plus récent : ', FormatDateTime('dd/mm/yyyy hh:nn', MailStats.NewestMessage));
  End;
- 
+
  WriteLn('Dernière vérif.     : ', FormatDateTime('dd/mm/yyyy hh:nn', MailStats.LastCheck));
  WriteLn(StringOfChar('=', 78));
 End;
@@ -896,38 +897,38 @@ Begin
  WriteLn('Simulation d''interface interactive');
  WriteLn('Commandes simulées automatiquement:');
  WriteLn;
- 
+
  { Simulation de navigation }
  WriteLn('> Liste des messages');
  DisplayElmHeader;
  DisplayMessageList;
  WriteLn;
- 
+
  { Simulation de lecture d''un message }
  WriteLn('> Lecture du message 1 (ESPACE)');
  DisplayMessage(0);
  WriteLn;
- 
+
  { Simulation d''aide }
  WriteLn('> Affichage de l''aide (?)');
  DisplayElmHelp;
  WriteLn;
- 
+
  { Simulation de statistiques }
  WriteLn('> Affichage des statistiques (S)');
  DisplayMailStats;
  WriteLn;
- 
+
  { Simulation de composition }
  WriteLn('> Composition d''un nouveau message (c)');
  ComposeNewMessage;
  WriteLn;
- 
+
  { Simulation de recherche }
  WriteLn('> Recherche de "système" (/)');
  SearchMessages('système');
  WriteLn;
- 
+
  WriteLn('=== Fin de simulation ===');
 End;
 
@@ -939,11 +940,11 @@ Var
  Action: String;
 Begin
  Action := 'interactive';
- 
+
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
+
   If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--version') Then Begin
    Action := 'version';
   End
@@ -965,14 +966,14 @@ Begin
   Else If Copy(Param, 1, 1) <> '-' Then Begin
    { Paramètre non reconnu }
   End;
-  
+
   Inc(I);
  End;
- 
+
  { Créer les messages d'exemple }
  CreateSampleMessages;
  UpdateMailStats;
- 
+
  { Exécuter l'action }
  Case Action Of
   'version': Begin
@@ -980,7 +981,7 @@ Begin
    WriteLn('NETWORKKIT-P Implementation');
    WriteLn('Compatible avec ELM standard Unix/Linux');
   End;
-  
+
   'stats': DisplayMailStats;
   'config': DisplayElmConfig;
   'list': Begin
@@ -1003,16 +1004,16 @@ Begin
  WriteLn('======================================================');
  WriteLn;
  WriteLn('Dossier: INBOX  Messages: 5  Nouveaux: 1');
- WriteLn(StringOfChar('=', 50));
+ WriteLn('======================================================');
  WriteLn;
  WriteLn('  # St Pri  De                  Sujet');
- WriteLn(StringOfChar('-', 50));
+ WriteLn('------------------------------------------------------');
  WriteLn('> 1 N  !  System Admin        Maintenance système');
  WriteLn('  2 R     Jean Dupont          Réunion équipe lundi');
  WriteLn('  3 R     TechSite Newsletter  Actualités tech');
  WriteLn('  4 D     Promotion Spéciale   Offre exceptionnelle');
  WriteLn('  5       [Brouillon]          Invitation dîner');
- WriteLn(StringOfChar('-', 50));
+ WriteLn('------------------------------------------------------');
  WriteLn('Message 1 de 5 (Page 1)');
  WriteLn;
  WriteLn('Commandes: r)épondre d)upprimer c)omposer q)uitter ?');
@@ -1022,7 +1023,7 @@ End;
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('ELM : Electronic Mail Reader');
+  WriteLn('ELM : Cette commande permet de lancer le ELM (Electronic Mail Reader).');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  ELM [options]');
