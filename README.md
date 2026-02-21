@@ -19,12 +19,24 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet d'afficher des informations sur les utilisateurs connectés ou à distance.</td>
 	</tr>
 	<tr>
+		<td><b>FTP.PAS</b></td>
+		<td>Cette commande permet de lancer un client FTP en ligne de commande.</td>
+	</tr>
+	<tr>
+		<td><b>GOPHER.PAS</b></td>
+		<td>Cette commande permet de lancer un client Gopher en ligne de commande.</td>
+	</tr>
+	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
 		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
 	</tr>	
 	<tr>
 		<td><b>ISEMAIL.PAS</b></td>
 		<td>Cette commande permet de vérifier si le courriel est un courriel valide.</td>
+	</tr>
+	<tr>
+		<td><b>NETBIOS.PAS</b></td>
+		<td>Cette commande permet d'afficher des informations NetBIOS.</td>
 	</tr>
 	<tr>
 		<td><b>WHOAMI.PAS</b></td>
