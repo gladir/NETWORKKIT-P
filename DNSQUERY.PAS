@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande dnsquery (DNS Query Tool))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande dnsquery (DNS Query Tool))
 }
 
 Program DNSQUERY;
@@ -21,7 +22,7 @@ Type
   DNS_A = 1,       { Adresse IPv4 }
   DNS_NS = 2,      { Serveur de noms }
   DNS_CNAME = 5,   { Nom canonique }
-  DNS_SOA = 6,     { Start of Authority }
+  DNS_SOA = 6,     { DÇbut de l'autoritÇ (Start of Authority) }
   DNS_PTR = 12,    { Pointeur }
   DNS_MX = 15,     { Mail Exchange }
   DNS_TXT = 16,    { Texte }
@@ -32,22 +33,22 @@ Type
 
  { Structure pour un enregistrement DNS }
  TDNSRecord = Record
-  Name: String[255];         { Nom de domaine }
+  Name: String[255];          { Nom de domaine }
   RecordType: TDNSRecordType; { Type d'enregistrement }
-  RecordClass: Word;         { Classe (g√©n√©ralement IN=1) }
-  TTL: LongInt;              { Time To Live }
-  DataLength: Word;          { Longueur des donn√©es }
-  Data: String[255];         { Donn√©es de l'enregistrement }
+  RecordClass: Word;          { Classe (gÇnÇralement IN=1) }
+  TTL: LongInt;               { Time To Live }
+  DataLength: Word;           { Longueur des donnÇes }
+  Data: String[255];          { DonnÇes de l'enregistrement }
  End;
 
- { Structure pour une r√©ponse DNS compl√®te }
+ { Structure pour une rÇponse DNS compläte }
  TDNSResponse = Record
-  QueryName: String[255];    { Nom interrog√© }
-  QueryType: TDNSRecordType; { Type interrog√© }
-  AnswerCount: Integer;      { Nombre de r√©ponses }
-  AuthorityCount: Integer;   { Nombre d'autorit√©s }
-  AdditionalCount: Integer;  { Nombre d'enregistrements additionnels }
-  Answers: Array[0..31] of TDNSRecord; { R√©ponses }
+  QueryName: String[255];              { Nom interrogÇ }
+  QueryType: TDNSRecordType;           { Type interrogÇ }
+  AnswerCount: Integer;                { Nombre de rÇponses }
+  AuthorityCount: Integer;             { Nombre d'autoritÇs }
+  AdditionalCount: Integer;            { Nombre d'enregistrements additionnels }
+  Answers: Array[0..31] of TDNSRecord; { RÇponses }
  End;
 
 Var
@@ -84,9 +85,8 @@ Begin
  End;
 End;
 
-{ Convertir un type DNS en cha√Æne }
-Function DNSTypeToString(RecType: TDNSRecordType): String;
-Begin
+{ Convertir un type DNS en chaåne }
+Function DNSTypeToString(RecType: TDNSRecordType):String;Begin
  Case RecType Of
   DNS_A: DNSTypeToString := 'A';
   DNS_NS: DNSTypeToString := 'NS';
@@ -98,50 +98,47 @@ Begin
   DNS_AAAA: DNSTypeToString := 'AAAA';
   DNS_SRV: DNSTypeToString := 'SRV';
   DNS_ANY: DNSTypeToString := 'ANY';
- Else
-  DNSTypeToString := 'UNKNOWN';
+  Else DNSTypeToString := 'UNKNOWN';
  End;
 End;
 
-{ Convertir une cha√Æne en type DNS }
-Function StringToDNSType(TypeStr: String): TDNSRecordType;
+ { Convertir une chaåne en type DNS }
+Function StringToDNSType(TypeStr:String):TDNSRecordType;
 Var
- S: String;
+ S:String;
 Begin
- S := UpperCase(TypeStr);
- If S = 'A' Then StringToDNSType := DNS_A
- Else If S = 'NS' Then StringToDNSType := DNS_NS
- Else If S = 'CNAME' Then StringToDNSType := DNS_CNAME
- Else If S = 'SOA' Then StringToDNSType := DNS_SOA
- Else If S = 'PTR' Then StringToDNSType := DNS_PTR
- Else If S = 'MX' Then StringToDNSType := DNS_MX
- Else If S = 'TXT' Then StringToDNSType := DNS_TXT
- Else If S = 'AAAA' Then StringToDNSType := DNS_AAAA
- Else If S = 'SRV' Then StringToDNSType := DNS_SRV
- Else If S = 'ANY' Then StringToDNSType := DNS_ANY
- Else StringToDNSType := DNS_A; { Par d√©faut }
+ S:=UpperCase(TypeStr);
+ If S='A'Then StringToDNSType:=DNS_A Else
+ If S='NS'Then StringToDNSType:=DNS_NS Else
+ If S='CNAME'Then StringToDNSType:=DNS_CNAME Else
+ If S='SOA'Then StringToDNSType:=DNS_SOA Else
+ If S='PTR'Then StringToDNSType:=DNS_PTR Else
+ If S='MX'Then StringToDNSType:=DNS_MX Else
+ If S='TXT'Then StringToDNSType:=DNS_TXT Else
+ If S='AAAA'Then StringToDNSType:=DNS_AAAA Else
+ If S='SRV'Then StringToDNSType:=DNS_SRV Else
+ If S='ANY'Then StringToDNSType:=DNS_ANY
+           Else StringToDNSType:=DNS_A; { Par dÇfaut }
 End;
 
-{ R√©solution DNS r√©elle utilisant les fonctions syst√®me }
-Function ResolveDNSRecord(Name: String; RecType: TDNSRecordType; var Response: TDNSResponse): Boolean;
+ { RÇsolution DNS rÇelle utilisant les fonctions systäme }
+Function ResolveDNSRecord(Name:String;RecType:TDNSRecordType;Var Response:TDNSResponse):Boolean;
 Var
- HostEnt: PHostEnt;
- Addr: TInAddr;
- AddrStr: String;
- I: Integer;
- AddrPtr: Pointer;
+ HostEnt:PHostEnt;
+ Addr:TInAddr;
+ AddrStr:String;
+ I:Integer;
+ AddrPtr:Pointer;
 Begin
- ResolveDNSRecord := False;
- FillChar(Response, SizeOf(Response), 0);
- Response.QueryName := Name;
- Response.QueryType := RecType;
- 
+ ResolveDNSRecord:=False;
+ FillChar(Response,SizeOf(Response),0);
+ Response.QueryName:=Name;
+ Response.QueryType:=RecType;
  If Not WSAInitialized Then Begin
   If Not InitializeWinsock Then Exit;
  End;
- 
- { Pour les enregistrements A (IPv4) }
- If RecType = DNS_A Then Begin
+  { Pour les enregistrements A (IPv4) }
+ If RecType=DNS_A Then Begin
   Try
    HostEnt := gethostbyname(PChar(AnsiString(Name)));
    If (HostEnt <> nil) and (HostEnt^.h_addr_list <> nil) Then Begin
@@ -150,33 +147,31 @@ Begin
     While (AddrPtr <> nil) and (I < 32) Do Begin
      Move(AddrPtr^, Addr, 4);
      AddrStr := StrPas(inet_ntoa(Addr));
-     
      With Response.Answers[Response.AnswerCount] Do Begin
       Name := Response.QueryName;
       RecordType := DNS_A;
       RecordClass := 1; { IN }
-      TTL := 3600; { 1 heure par d√©faut }
+      TTL := 3600;      { 1 heure par dÇfaut }
       Data := AddrStr;
       DataLength := Length(Data);
      End;
      Inc(Response.AnswerCount);
      Inc(I);
-     
-     { Passer au suivant }
+      { Passer au suivant }
      Inc(PtrUInt(HostEnt^.h_addr_list), SizeOf(Pointer));
      AddrPtr := HostEnt^.h_addr_list^;
     End;
     ResolveDNSRecord := (Response.AnswerCount > 0);
    End;
   Except
-   { Erreur de r√©solution }
+   { Erreur de rÇsolution }
   End;
  End
- 
- { Pour les enregistrements PTR (r√©solution inverse) }
- Else If RecType = DNS_PTR Then Begin
+  { Pour les enregistrements PTR (rÇsolution inverse) }
+  Else
+ If RecType = DNS_PTR Then Begin
   Try
-   { Convertir l'IP en format in-addr.arpa si n√©cessaire }
+   { Convertir l'IP en format in-addr.arpa si nÇcessaire }
    If Pos('.', Name) > 0 Then Begin
     Addr.s_addr := inet_addr(PChar(AnsiString(Name)));
     HostEnt := gethostbyaddr(@Addr, 4, AF_INET);
@@ -194,12 +189,12 @@ Begin
     End;
    End;
   Except
-   { Erreur de r√©solution inverse }
+   { Erreur de rÇsolution inverse }
   End;
  End
- 
- { Pour les autres types, utiliser une simulation bas√©e sur des donn√©es communes }
- Else Begin
+  { Pour les autres types, utiliser une simulation basÇe sur des donnÇes communes }
+  Else
+ Begin
   Case RecType Of
    DNS_NS: Begin
     { Simuler des serveurs de noms pour des domaines connus }
@@ -224,7 +219,6 @@ Begin
      ResolveDNSRecord := True;
     End;
    End;
-   
    DNS_MX: Begin
     { Simuler des enregistrements MX }
     If Pos('gmail.com', LowerCase(Name)) > 0 Then Begin
@@ -240,9 +234,8 @@ Begin
      ResolveDNSRecord := True;
     End;
    End;
-   
    DNS_TXT: Begin
-    { Simuler des enregistrements TXT }
+     { Simuler des enregistrements TXT }
     With Response.Answers[0] Do Begin
      Name := Response.QueryName;
      RecordType := DNS_TXT;
@@ -258,30 +251,27 @@ Begin
  End;
 End;
 
-{ Afficher une r√©ponse DNS format√©e }
+ { Afficher une rÇponse DNS formatÇe }
 Procedure DisplayDNSResponse(const Response: TDNSResponse);
 Var
  I: Integer;
 Begin
  If Verbose Then Begin
   WriteLn;
-  WriteLn('=== REQU√äTE DNS ===');
-  WriteLn('Nom interrog√©    : ', Response.QueryName);
+  WriteLn('=== REQUETE DNS ===');
+  WriteLn('Nom interrogÇ    : ', Response.QueryName);
   WriteLn('Type d''enreg.   : ', DNSTypeToString(Response.QueryType), ' (', Ord(Response.QueryType), ')');
-  WriteLn('R√©ponses trouv√©es: ', Response.AnswerCount);
+  WriteLn('RÇponses trouvÇes: ', Response.AnswerCount);
   WriteLn;
  End;
- 
  If Response.AnswerCount = 0 Then Begin
-  WriteLn('Aucun enregistrement trouv√© pour ', Response.QueryName);
+  WriteLn('Aucun enregistrement trouvÇ pour ', Response.QueryName);
   Exit;
  End;
- 
  If Not Verbose Then Begin
-  WriteLn('R√©sultats DNS pour ', Response.QueryName, ':');
+  WriteLn('RÇsultats DNS pour ', Response.QueryName, ':');
   WriteLn;
  End;
- 
  For I := 0 To Response.AnswerCount - 1 Do Begin
   With Response.Answers[I] Do Begin
    If Verbose Then Begin
@@ -290,7 +280,7 @@ Begin
     WriteLn('Type    : ', DNSTypeToString(RecordType));
     WriteLn('Classe  : IN (', RecordClass, ')');
     WriteLn('TTL     : ', TTL, ' secondes');
-    WriteLn('Donn√©es : ', Data);
+    WriteLn('DonnÇes : ', Data);
     WriteLn;
    End Else Begin
     Write(Copy(Name + '                         ', 1, 25), ' ');
@@ -303,35 +293,32 @@ Begin
  End;
 End;
 
-{ Effectuer une requ√™te DNS compl√®te }
+{ Effectuer une requàte DNS compläte }
 Procedure PerformDNSQuery(Name: String; RecType: TDNSRecordType);
 Var
  Response: TDNSResponse;
  StartTime, EndTime: TDateTime;
  QueryTime: Double;
 Begin
- If Verbose Then
-  WriteLn('Interrogation DNS pour ', Name, ' (type ', DNSTypeToString(RecType), ')...');
- 
+ If Verbose Then WriteLn('Interrogation DNS pour ', Name, ' (type ', DNSTypeToString(RecType), ')...');
  StartTime := Now;
- 
  If ResolveDNSRecord(Name, RecType, Response) Then Begin
   EndTime := Now;
   QueryTime := (EndTime - StartTime) * 24 * 60 * 60 * 1000; { en ms }
-  
   DisplayDNSResponse(Response);
-  
   If Verbose Then Begin
    WriteLn('Temps de requ√™te: ', QueryTime:0:1, ' ms');
    WriteLn;
   End;
- End Else Begin
-  WriteLn('Erreur: Impossible de r√©soudre ', Name);
-  WriteLn('V√©rifiez le nom de domaine et la connexion r√©seau.');
+ End
+  Else
+ Begin
+  WriteLn('Erreur: Impossible de rÇsoudre ', Name);
+  WriteLn('VÇrifiez le nom de domaine et la connexion rÇseau.');
  End;
 End;
 
-{ Effectuer des requ√™tes multiples (mode --all) }
+ { Effectuer des requàtes multiples (mode --all) }
 Procedure PerformAllQueries(Name: String);
 Var
  Types: Array[0..7] of TDNSRecordType;
@@ -345,10 +332,8 @@ Begin
  Types[5] := DNS_AAAA;
  Types[6] := DNS_SRV;
  Types[7] := DNS_SOA;
- 
- WriteLn('Requ√™tes DNS compl√®tes pour ', Name, ':');
+ WriteLn('Requàtes DNS complätes pour ', Name, ':');
  WriteLn('==========================================');
- 
  For I := 0 To High(Types) Do Begin
   WriteLn;
   WriteLn('>>> Type ', DNSTypeToString(Types[I]), ' <<<');
@@ -356,7 +341,7 @@ Begin
  End;
 End;
 
-{ Validation d'un nom de domaine }
+ { Validation d'un nom de domaine }
 Function IsValidDomainName(Domain: String): Boolean;
 Var
  I: Integer;
@@ -364,18 +349,18 @@ Var
 Begin
  IsValidDomainName := False;
  HasDot := False;
- 
+
  If Length(Domain) = 0 Then Exit;
  If Domain[1] = '.' Then Exit;
  If Domain[Length(Domain)] = '.' Then Exit;
- 
+
  For I := 1 To Length(Domain) Do Begin
   If Domain[I] = '.' Then
    HasDot := True
   Else If Not (Domain[I] in ['a'..'z', 'A'..'Z', '0'..'9', '-']) Then
    Exit;
  End;
- 
+
  IsValidDomainName := HasDot or (Pos('.', Domain) = 0);
 End;
 
@@ -387,11 +372,11 @@ Var
 Begin
  IsValidIPAddress := False;
  If Length(IP) = 0 Then Exit;
- 
+
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
+
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -406,7 +391,7 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
+
  IsValidIPAddress := (Dots = 4);
 End;
 
@@ -434,11 +419,11 @@ Begin
  Verbose := False;
  ShowAll := False;
  Timeout := 5;
- 
+
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
+
   If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--verbose') Then
    Verbose := True
   Else If (LowerCase(Param) = '-a') or (LowerCase(Param) = '--all') Then
@@ -460,7 +445,7 @@ Begin
    If QueryName = '' Then
     QueryName := Param;
   End;
-  
+
   Inc(I);
  End;
 End;
@@ -472,7 +457,7 @@ Procedure ShowSimulatedDNSQuery(Name: String; RecType: String);
 Begin
  WriteLn('R√©sultats DNS pour ', Name, ' (simulation):');
  WriteLn;
- 
+
  If UpperCase(RecType) = 'A' Then Begin
   WriteLn(Copy(Name + '                         ', 1, 25), ' 300      IN   A      93.184.216.34');
  End Else If UpperCase(RecType) = 'MX' Then Begin
@@ -509,7 +494,7 @@ BEGIN
   Halt(3);
  End;
  {$ENDIF}
- 
+
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
   WriteLn('DNSQUERY : Outil de requ√™te DNS');
@@ -560,24 +545,24 @@ BEGIN
  Else Begin
   {$IFDEF FPC}
   ParseCommandLine;
-  
+
   If QueryName = '' Then Begin
    WriteLn('dnsquery: Nom de domaine ou adresse IP requis');
    WriteLn('Usage: dnsquery [options] nom_de_domaine');
    WriteLn('Utilisez dnsquery --help pour plus d''informations');
    Halt(1);
   End;
-  
+
   { Validation de l'entr√©e }
   If Not IsValidDomainName(QueryName) And Not IsValidIPAddress(QueryName) Then Begin
    WriteLn('dnsquery: "', QueryName, '" n''est pas un nom de domaine ou une adresse IP valide');
    Halt(1);
   End;
-  
+
   { R√©solution inverse automatique pour les adresses IP }
   If IsValidIPAddress(QueryName) And (QueryType = DNS_A) Then
    QueryType := DNS_PTR;
-  
+
   If ShowAll Then
    PerformAllQueries(QueryName)
   Else
@@ -589,14 +574,14 @@ BEGIN
    WriteLn('Usage: dnsquery nom_de_domaine');
    Exit;
   End;
-  
+
   If LowerCase(ParamStr(2)) = '-a' Then
    SimulateAllQueries(ParamStr(1))
   Else
    ShowSimulatedDNSQuery(ParamStr(1), 'A');
   {$ENDIF}
  End;
- 
+
  {$IFDEF FPC}
  { Nettoyer Winsock }
  CleanupWinsock;
