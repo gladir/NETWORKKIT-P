@@ -234,12 +234,12 @@ End;
 Function GetArpType(EntryType:DWORD):String;
 Begin
  Case EntryType Of
-  MIB_IPNET_TYPE_OTHER:GetArpType:='autre';
-  MIB_IPNET_TYPE_INVALID:GetArpType:='invalide';
-  MIB_IPNET_TYPE_DYNAMIC:GetArpType:='dynamique';
-  MIB_IPNET_TYPE_STATIC:GetArpType:='statique';
+  MIB_IPNET_TYPE_OTHER:GetArpType:='other';
+  MIB_IPNET_TYPE_INVALID:GetArpType:='invalid';
+  MIB_IPNET_TYPE_DYNAMIC:GetArpType:='dynamic';
+  MIB_IPNET_TYPE_STATIC:GetArpType:='static';
  Else
-  GetArpType:='inconnu';
+  GetArpType:='unknown';
  End;
 End;
 
@@ -255,26 +255,22 @@ Begin
  GetArpTable:=False;
  ArpCount:=0;
  dwSize:=0;
-
- { Premi√®re appel pour obtenir la taille }
+  { Premiäre appel pour obtenir la taille }
  dwRetVal:=GetIpNetTable(nil,dwSize,True);
  If (dwRetVal<>ERROR_INSUFFICIENT_BUFFER) and (dwRetVal<>ERROR_NO_DATA) Then Exit;
-
- { Si pas de donn√©es, table vide }
+  { Si pas de donnÇes, table vide }
  If dwRetVal=ERROR_NO_DATA Then Begin
   GetArpTable:=True;
   Exit;
  End;
-
- { Allouer la m√©moire }
+  { Allouer la mÇmoire }
  GetMem(pIpNetTable,dwSize);
  Try
-  { Obtenir la table ARP }
+   { Obtenir la table ARP }
   dwRetVal:=GetIpNetTable(pIpNetTable,dwSize,True);
   If dwRetVal=NO_ERROR Then Begin
    ArpCount:=pIpNetTable^.dwNumEntries;
    If ArpCount>256 Then ArpCount:=256;
-
    For I:=0 To ArpCount-1 Do Begin
     pRow:=@pIpNetTable^.table[I];
     With ArpTable[I] Do Begin
@@ -292,34 +288,31 @@ Begin
  End;
 End;
 
-{ Proc√©dure pour afficher la table ARP }
+ { ProcÇdure pour afficher la table ARP }
 Procedure ShowArpTable(ShowAll:Boolean);
 Var
  I:Integer;
 Begin
  WriteLn('Adresse          Type HW    Adresse HW        Indicateurs Masque     Interface');
-
  If GetArpTable Then Begin
   If ArpCount=0 Then
    WriteLn('Table ARP vide.')
   Else Begin
    For I:=0 To ArpCount-1 Do Begin
     With ArpTable[I] Do Begin
-     { Filtrer les entr√©es invalides si demand√© }
+     { Filtrer les entrÇes invalides si demandÇ }
      If ShowAll or (EntryType<>'invalid') Then Begin
       Write(IPAddress);
       While Length(IPAddress)<17 Do Begin
        Write(' ');
        IPAddress:=IPAddress+' ';
       End;
-
       Write('ether ');
       Write(LowerCase(MACAddress));
       While Length(MACAddress)<18 Do Begin
        Write(' ');
        MACAddress:=MACAddress+' ';
       End;
-
       Write('C                         ');
       WriteLn(InterfaceName);
      End;
@@ -327,23 +320,21 @@ Begin
    End;
   End;
  End Else
-  WriteLn('Erreur lors de la r√©cup√©ration de la table ARP');
+  WriteLn('Erreur lors de la rÇcupÇration de la table ARP');
 End;
 
-{ Proc√©dure pour ajouter une entr√©e ARP statique }
+{ ProcÇdure pour ajouter une entrÇe ARP statique }
 Procedure AddArpEntry(IPAddr,MACAddr:String);
 Var
  ArpEntry:MIB_IPNETROW;
  MACBytes:Array[0..5] of Byte;
  dwRetVal:DWORD;
 Begin
- WriteLn('Ajout entr√©e ARP : ',IPAddr,' -> ',MACAddr);
-
+ WriteLn('Ajout entrÇe ARP : ',IPAddr,' -> ',MACAddr);
  If Not MACToBytes(MACAddr,MACBytes) Then Begin
   WriteLn('Erreur : Adresse MAC invalide');
   Exit;
  End;
-
  FillChar(ArpEntry,SizeOf(ArpEntry),0);
  ArpEntry.dwAddr:=IPToDWORD(IPAddr);
  ArpEntry.dwPhysAddrLen:=6;
@@ -352,53 +343,43 @@ Begin
  ArpEntry.dwIndex:=1;  { Interface par d√©faut }
 
  dwRetVal:=CreateIpNetEntry(ArpEntry);
- If dwRetVal=NO_ERROR Then
-  WriteLn('Entr√©e ARP ajout√©e avec succ√®s')
- Else
-  WriteLn('Erreur lors de l''ajout de l''entr√©e ARP : ',dwRetVal);
+ If dwRetVal=NO_ERROR Then WriteLn('EntrÇe ARP ajoutÇe avec succ√®s')
+                      Else WriteLn('Erreur lors de l''ajout de l''entrÇe ARP : ',dwRetVal);
 End;
 
-{ Proc√©dure pour supprimer une entr√©e ARP }
+{ ProcÇdure pour supprimer une entrÇe ARP }
 Procedure DelArpEntry(IPAddr:String);
 Var
  ArpEntry:MIB_IPNETROW;
  dwRetVal:DWORD;
 Begin
- WriteLn('Suppression entr√©e ARP : ',IPAddr);
-
+ WriteLn('Suppression entrÇe ARP : ',IPAddr);
  FillChar(ArpEntry,SizeOf(ArpEntry),0);
  ArpEntry.dwAddr:=IPToDWORD(IPAddr);
- ArpEntry.dwIndex:=1;  { Interface par d√©faut }
-
+ ArpEntry.dwIndex:=1;  { Interface par dÇfaut }
  dwRetVal:=DeleteIpNetEntry(ArpEntry);
- If dwRetVal=NO_ERROR Then
-  WriteLn('Entr√©e ARP supprim√©e avec succ√®s')
- Else
-  WriteLn('Erreur lors de la suppression de l''entr√©e ARP : ',dwRetVal);
+ If dwRetVal=NO_ERROR Then WriteLn('EntrÇe ARP supprimÇe avec succäs')
+                      Else WriteLn('Erreur lors de la suppression de l''entrÇe ARP : ',dwRetVal);
 End;
 
-{ Proc√©dure pour vider la table ARP }
+{ ProcÇdure pour vider la table ARP }
 Procedure FlushArpTable;
 Var
  dwRetVal:DWORD;
 Begin
  WriteLn('Vidage de la table ARP...');
-
  dwRetVal:=FlushIpNetTable($FFFFFFFF);  { Toutes les interfaces }
- If dwRetVal=NO_ERROR Then
-  WriteLn('Table ARP vid√©e avec succ√®s')
- Else
-  WriteLn('Erreur lors du vidage de la table ARP : ',dwRetVal);
+ If dwRetVal=NO_ERROR Then WriteLn('Table ARP vidÇe avec succäs')
+                      Else WriteLn('Erreur lors du vidage de la table ARP : ',dwRetVal);
 End;
 
-{ Proc√©dure pour afficher une entr√©e ARP sp√©cifique }
+{ ProcÇdure pour afficher une entrÇe ARP spÇcifique }
 Procedure ShowSpecificArp(IPAddr:String);
 Var
  I:Integer;
  Found:Boolean;
 Begin
  Found:=False;
-
  If GetArpTable Then Begin
   For I:=0 To ArpCount-1 Do Begin
    If ArpTable[I].IPAddress=IPAddr Then Begin
@@ -406,50 +387,44 @@ Begin
      WriteLn('Adresse          Type HW    Adresse HW        Indicateurs Masque     Interface');
      Found:=True;
     End;
-
     With ArpTable[I] Do Begin
      Write(IPAddress,'         ether ',LowerCase(MACAddress));
      WriteLn('   C                         ',InterfaceName);
     End;
    End;
   End;
-
   If Not Found Then
-   WriteLn('Aucune entr√©e ARP trouv√©e pour ',IPAddr);
+   WriteLn('Aucune entrÇe ARP trouvÇe pour ',IPAddr);
  End;
 End;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{ Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedArp;
-Begin
- WriteLn('Adresse          Type HW    Adresse HW        Indicateurs Masque     Interface');
+ { Version Turbo Pascal - Simulation }
+Procedure ShowSimulatedArp;Begin
+ WriteLn('Adresse          Type HW    Adresse matÇriel  Indicateurs Masque     Interface');
  WriteLn('192.168.1.1      ether      00:1a:2b:3c:4d:5e   C                       eth0');
  WriteLn('192.168.1.100    ether      aa:bb:cc:dd:ee:ff   C                       eth0');
  WriteLn('192.168.1.254    ether      ff:ee:dd:cc:bb:aa   C                       eth0');
 End;
 
-Procedure SimulateAddArp(IPAddr,MACAddr:String);
-Begin
+Procedure SimulateAddArp(IPAddr,MACAddr:String);Begin
  WriteLn('Simulation ajout ARP : ',IPAddr,' -> ',MACAddr);
- WriteLn('Entr√©e ARP ajout√©e (simulation)');
+ WriteLn('EntrÇe ARP ajoutÇe (simulation)');
 End;
 
-Procedure SimulateDelArp(IPAddr:String);
-Begin
+Procedure SimulateDelArp(IPAddr:String);Begin
  WriteLn('Simulation suppression ARP : ',IPAddr);
- WriteLn('Entr√©e ARP supprim√©e (simulation)');
+ WriteLn('EntrÇe ARP supprimÇe (simulation)');
 End;
 
-Procedure SimulateFlushArp;
-Begin
+Procedure SimulateFlushArp;Begin
  WriteLn('Simulation vidage table ARP');
- WriteLn('Table ARP vid√©e (simulation)');
+ WriteLn('Table ARP vidÇe (simulation)');
 End;
 {$ENDIF}
 
-{ Proc√©dure pour analyser les param√®tres }
+ { ProcÇdure pour analyser les paramätres }
 Procedure ParseCommand;
 Var
  Cmd:String;
@@ -457,24 +432,24 @@ Var
 Begin
  If ParamCount<1 Then Begin
   {$IFDEF FPC}
-  ShowArpTable(False);
+   ShowArpTable(False);
   {$ELSE}
-  ShowSimulatedArp;
+   ShowSimulatedArp;
   {$ENDIF}
   Exit;
  End;
-
  Cmd:=UpperCase(ParamStr(1));
-
  If (Cmd='-A') or (Cmd='--ALL') Then Begin
-  { Afficher toutes les entr√©es }
+  { Afficher toutes les entrÇes }
   {$IFDEF FPC}
-  ShowArpTable(True);
+   ShowArpTable(True);
   {$ELSE}
-  ShowSimulatedArp;
+   ShowSimulatedArp;
   {$ENDIF}
- End Else If (Cmd='-S') or (Cmd='--SET') Then Begin
-  { Ajouter une entr√©e statique }
+ End
+  Else
+ If (Cmd='-S') or (Cmd='--SET') Then Begin
+  { Ajouter une entrÇe statique }
   If ParamCount>=3 Then Begin
    IPAddr:=ParamStr(2);
    MACAddr:=ParamStr(3);
@@ -483,42 +458,54 @@ Begin
    {$ELSE}
    SimulateAddArp(IPAddr,MACAddr);
    {$ENDIF}
-  End Else
-   WriteLn('Usage : ARP -s adresse_ip adresse_mac');
- End Else If (Cmd='-D') or (Cmd='--DELETE') Then Begin
-  { Supprimer une entr√©e }
+  End
+   Else
+  WriteLn('Usage : ARP -s adresse_ip adresse_mac');
+ End
+  Else
+ If (Cmd='-D')or(Cmd='--DELETE')Then Begin
+   { Supprimer une entrÇe }
   If ParamCount>=2 Then Begin
    IPAddr:=ParamStr(2);
    {$IFDEF FPC}
-   DelArpEntry(IPAddr);
+    DelArpEntry(IPAddr);
    {$ELSE}
-   SimulateDelArp(IPAddr);
+    SimulateDelArp(IPAddr);
    {$ENDIF}
-  End Else
-   WriteLn('Usage : ARP -d adresse_ip');
- End Else If (Cmd='-F') or (Cmd='--FLUSH') Then Begin
+  End
+   Else
+  WriteLn('Usage : ARP -d adresse_ip');
+ End
+  Else
+ If (Cmd='-F')or(Cmd='--FLUSH')Then Begin
   { Vider la table ARP }
   {$IFDEF FPC}
-  FlushArpTable;
+   FlushArpTable;
   {$ELSE}
-  SimulateFlushArp;
+   SimulateFlushArp;
   {$ENDIF}
- End Else If (Cmd='-N') or (Cmd='--NUMERIC') Then Begin
-  { Mode num√©rique }
+ End
+  Else
+ If (Cmd='-N')or(Cmd='--NUMERIC') Then Begin
+  { Mode numÇrique }
   {$IFDEF FPC}
-  ShowArpTable(False);
+   ShowArpTable(False);
   {$ELSE}
-  ShowSimulatedArp;
+   ShowSimulatedArp;
   {$ENDIF}
- End Else If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
-  { Afficher une entr√©e sp√©cifique }
+ End
+  Else
+ If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
+  { Afficher une entrÇe spÇcifique }
   {$IFDEF FPC}
-  ShowSpecificArp(ParamStr(1));
+   ShowSpecificArp(ParamStr(1));
   {$ELSE}
-  WriteLn('Recherche ARP pour ',ParamStr(1),' (simulation)');
-  WriteLn('192.168.1.1      ether      00:1a:2b:3c:4d:5e   C                       eth0');
+   WriteLn('Recherche ARP pour ',ParamStr(1),' (simulation)');
+   WriteLn('192.168.1.1      ether      00:1a:2b:3c:4d:5e   C                       eth0');
   {$ENDIF}
- End Else Begin
+ End
+  Else
+ Begin
   WriteLn('Option inconnue : ',Cmd);
   WriteLn('Options disponibles : -a, -s, -d, -f, -n');
  End;
