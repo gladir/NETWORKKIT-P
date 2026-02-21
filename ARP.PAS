@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande ARP (table ARP))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande ARP (table ARP))
 }
 
 Program ARP;
@@ -16,7 +17,7 @@ Program ARP;
 
 {$IFDEF FPC}
 Type
- { Structure pour une entrée ARP }
+ { Structure pour une entr�e ARP }
  TArpEntry = Record
   IPAddress:String;
   MACAddress:String;
@@ -42,7 +43,7 @@ Type
  PMIB_IPNETTABLE = ^MIB_IPNETTABLE;
 
 Const
- { Types d'entrées ARP }
+ { Types d'entr�es ARP }
  MIB_IPNET_TYPE_OTHER = 1;
  MIB_IPNET_TYPE_INVALID = 2;
  MIB_IPNET_TYPE_DYNAMIC = 3;
@@ -73,7 +74,7 @@ Function FlushIpNetTable(dwIfIndex:DWORD):DWORD;stdcall;external 'iphlpapi.dll';
 {$ENDIF}
 
 {$IFNDEF FPC}
-{ Fonctions utilitaires pour Turbo Pascal }
+ { Fonctions utilitaires pour Turbo Pascal }
 Function IntToStr(Value:LongInt):String;
 Var
  S:String;
@@ -133,7 +134,7 @@ Begin
 End;
 {$ENDIF}
 
-{ Fonction pour convertir un nombre en hexadécimal }
+ { Fonction pour convertir un nombre en hexad�cimal }
 Function IntToHex(Value:Integer;Digits:Integer):String;
 Const
  HexChars:String='0123456789ABCDEF';
@@ -150,7 +151,7 @@ Begin
 End;
 
 {$IFDEF FPC}
-{ Fonction pour convertir une adresse DWORD en chaîne IP }
+ { Fonction pour convertir une adresse DWORD en cha�ne IP }
 Function DWORDToIP(IPAddr:DWORD):String;
 Begin
  DWORDToIP:=IntToStr(IPAddr and $FF)+'.'+
@@ -159,7 +160,7 @@ Begin
            IntToStr((IPAddr shr 24) and $FF);
 End;
 
-{ Fonction pour convertir une chaîne IP en DWORD }
+ { Fonction pour convertir une cha�ne IP en DWORD }
 Function IPToDWORD(IPStr:String):DWORD;
 Var
  Parts:Array[0..3] of Byte;
@@ -170,7 +171,6 @@ Begin
  IPToDWORD:=0;
  PartIndex:=0;
  Start:=1;
- 
  For I:=1 To Length(IPStr)+1 Do Begin
   If (I>Length(IPStr)) or (IPStr[I]='.') Then Begin
    PartStr:=Copy(IPStr,Start,I-Start);
@@ -181,12 +181,10 @@ Begin
    Start:=I+1;
   End;
  End;
- 
- If PartIndex=4 Then
-  IPToDWORD:=Parts[0] or (Parts[1] shl 8) or (Parts[2] shl 16) or (Parts[3] shl 24);
+ If PartIndex=4 Then IPToDWORD:=Parts[0] or (Parts[1] shl 8) or (Parts[2] shl 16) or (Parts[3] shl 24);
 End;
 
-{ Fonction pour convertir une chaîne MAC en tableau d'octets }
+ { Fonction pour convertir une cha�ne MAC en tableau d'octets }
 Function MACToBytes(MACStr:String;Var MACBytes:Array of Byte):Boolean;
 Var
  I,ByteIndex:Integer;
@@ -197,7 +195,6 @@ Begin
  MACToBytes:=False;
  ByteIndex:=0;
  HexStr:='';
- 
  For I:=1 To Length(MACStr) Do Begin
   If MACStr[I] in ['0'..'9','A'..'F','a'..'f'] Then Begin
    HexStr:=HexStr+UpCase(MACStr[I]);
@@ -215,7 +212,7 @@ Begin
    Exit; { Caractère invalide }
   End;
  End;
- 
+
  MACToBytes:=(ByteIndex=6);
 End;
 
@@ -233,20 +230,20 @@ Begin
  FormatMAC:=MACResult;
 End;
 
-{ Fonction pour obtenir le type d'entrée ARP }
+{ Fonction pour obtenir le type d'entr�e ARP }
 Function GetArpType(EntryType:DWORD):String;
 Begin
  Case EntryType Of
-  MIB_IPNET_TYPE_OTHER:GetArpType:='other';
-  MIB_IPNET_TYPE_INVALID:GetArpType:='invalid';
-  MIB_IPNET_TYPE_DYNAMIC:GetArpType:='dynamic';
-  MIB_IPNET_TYPE_STATIC:GetArpType:='static';
+  MIB_IPNET_TYPE_OTHER:GetArpType:='autre';
+  MIB_IPNET_TYPE_INVALID:GetArpType:='invalide';
+  MIB_IPNET_TYPE_DYNAMIC:GetArpType:='dynamique';
+  MIB_IPNET_TYPE_STATIC:GetArpType:='statique';
  Else
-  GetArpType:='unknown';
+  GetArpType:='inconnu';
  End;
 End;
 
-{ Procédure pour obtenir la table ARP Windows }
+{ Proc�dure pour obtenir la table ARP Windows }
 Function GetArpTable:Boolean;
 Var
  pIpNetTable:PMIB_IPNETTABLE;
@@ -258,17 +255,17 @@ Begin
  GetArpTable:=False;
  ArpCount:=0;
  dwSize:=0;
- 
+
  { Première appel pour obtenir la taille }
  dwRetVal:=GetIpNetTable(nil,dwSize,True);
  If (dwRetVal<>ERROR_INSUFFICIENT_BUFFER) and (dwRetVal<>ERROR_NO_DATA) Then Exit;
- 
+
  { Si pas de données, table vide }
  If dwRetVal=ERROR_NO_DATA Then Begin
   GetArpTable:=True;
   Exit;
  End;
- 
+
  { Allouer la mémoire }
  GetMem(pIpNetTable,dwSize);
  Try
@@ -277,7 +274,7 @@ Begin
   If dwRetVal=NO_ERROR Then Begin
    ArpCount:=pIpNetTable^.dwNumEntries;
    If ArpCount>256 Then ArpCount:=256;
-   
+
    For I:=0 To ArpCount-1 Do Begin
     pRow:=@pIpNetTable^.table[I];
     With ArpTable[I] Do Begin
@@ -301,7 +298,7 @@ Var
  I:Integer;
 Begin
  WriteLn('Adresse          Type HW    Adresse HW        Indicateurs Masque     Interface');
- 
+
  If GetArpTable Then Begin
   If ArpCount=0 Then
    WriteLn('Table ARP vide.')
@@ -315,14 +312,14 @@ Begin
        Write(' ');
        IPAddress:=IPAddress+' ';
       End;
-      
+
       Write('ether ');
       Write(LowerCase(MACAddress));
       While Length(MACAddress)<18 Do Begin
        Write(' ');
        MACAddress:=MACAddress+' ';
       End;
-      
+
       Write('C                         ');
       WriteLn(InterfaceName);
      End;
@@ -341,19 +338,19 @@ Var
  dwRetVal:DWORD;
 Begin
  WriteLn('Ajout entrée ARP : ',IPAddr,' -> ',MACAddr);
- 
+
  If Not MACToBytes(MACAddr,MACBytes) Then Begin
   WriteLn('Erreur : Adresse MAC invalide');
   Exit;
  End;
- 
+
  FillChar(ArpEntry,SizeOf(ArpEntry),0);
  ArpEntry.dwAddr:=IPToDWORD(IPAddr);
  ArpEntry.dwPhysAddrLen:=6;
  Move(MACBytes,ArpEntry.bPhysAddr,6);
  ArpEntry.dwType:=MIB_IPNET_TYPE_STATIC;
  ArpEntry.dwIndex:=1;  { Interface par défaut }
- 
+
  dwRetVal:=CreateIpNetEntry(ArpEntry);
  If dwRetVal=NO_ERROR Then
   WriteLn('Entrée ARP ajoutée avec succès')
@@ -368,11 +365,11 @@ Var
  dwRetVal:DWORD;
 Begin
  WriteLn('Suppression entrée ARP : ',IPAddr);
- 
+
  FillChar(ArpEntry,SizeOf(ArpEntry),0);
  ArpEntry.dwAddr:=IPToDWORD(IPAddr);
  ArpEntry.dwIndex:=1;  { Interface par défaut }
- 
+
  dwRetVal:=DeleteIpNetEntry(ArpEntry);
  If dwRetVal=NO_ERROR Then
   WriteLn('Entrée ARP supprimée avec succès')
@@ -386,7 +383,7 @@ Var
  dwRetVal:DWORD;
 Begin
  WriteLn('Vidage de la table ARP...');
- 
+
  dwRetVal:=FlushIpNetTable($FFFFFFFF);  { Toutes les interfaces }
  If dwRetVal=NO_ERROR Then
   WriteLn('Table ARP vidée avec succès')
@@ -401,7 +398,7 @@ Var
  Found:Boolean;
 Begin
  Found:=False;
- 
+
  If GetArpTable Then Begin
   For I:=0 To ArpCount-1 Do Begin
    If ArpTable[I].IPAddress=IPAddr Then Begin
@@ -409,14 +406,14 @@ Begin
      WriteLn('Adresse          Type HW    Adresse HW        Indicateurs Masque     Interface');
      Found:=True;
     End;
-    
+
     With ArpTable[I] Do Begin
      Write(IPAddress,'         ether ',LowerCase(MACAddress));
      WriteLn('   C                         ',InterfaceName);
     End;
    End;
   End;
-  
+
   If Not Found Then
    WriteLn('Aucune entrée ARP trouvée pour ',IPAddr);
  End;
@@ -466,9 +463,9 @@ Begin
   {$ENDIF}
   Exit;
  End;
- 
+
  Cmd:=UpperCase(ParamStr(1));
- 
+
  If (Cmd='-A') or (Cmd='--ALL') Then Begin
   { Afficher toutes les entrées }
   {$IFDEF FPC}
@@ -530,7 +527,7 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('ARP : Manipulation de la table ARP (Address Resolution Protocol)');
+  WriteLn('ARP : Cette commande permet d''effectuer la manipulation de la table ARP (Address Resolution Protocol)');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  ARP                    Afficher la table ARP');
@@ -558,7 +555,7 @@ BEGIN
   WriteLn('ARP 1.00 - Table ARP, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('Écrit par Sylvain Maltais');
+  WriteLn('�crit par Sylvain Maltais');
  End
   Else
  Begin
