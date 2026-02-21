@@ -641,76 +641,81 @@ Begin
   End;
  End;
  {$IFDEF FPC}
- Case Action Of
-  'list': Begin
+  If Action='list'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
    ListMIDIPorts(ShowDetails);
-  End;
-  'list-input': Begin
+  End
+   Else
+  If Action='list-input'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
    WriteLn('Ports d''entr‚e MIDI:');
    ListMIDIPorts(False);
-  End;
-  'list-output': Begin
+  End
+   Else
+  If Action='list-output'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
    WriteLn('Ports de sortie MIDI:');
    ListMIDIPorts(False);
-  End;
-  'connect': Begin
+  End
+   Else
+  If Action='connect'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
    If (SenderClient <> 0) and (ReceiverClient <> 0) Then
     ConnectPorts(SenderClient, SenderPort, ReceiverClient, ReceiverPort)
    Else
     WriteLn('Erreur: Sp‚cifiez les ports ‚metteur et r‚cepteur (client:port)');
-  End;
-  'disconnect': Begin
+  End
+   Else
+  If Action='disconnect'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
    If (SenderClient <> 0) and (ReceiverClient <> 0) Then
     DisconnectPorts(SenderClient, SenderPort, ReceiverClient, ReceiverPort)
    Else
     WriteLn('Erreur: Sp‚cifiez les ports ‚metteur et r‚cepteur (client:port)');
-  End;
-  'remove-all': Begin
+  End
+   Else
+  If Action='remove-all'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
    If SenderClient <> 0 Then
     DisconnectAllFromPort(SenderClient, SenderPort)
    Else
     WriteLn('Erreur: Sp‚cifiez le port (client:port)');
-  End;
-  'connections': Begin
+  End
+   Else
+  If Action='connections'Then Begin
+   If PortCount = 0 Then CreateSamplePorts;
+   If ConnectionCount = 0 Then CreateSampleConnections;
+   ListConnections;
+  End
+   Else
+  If Action='stats'Then Begin
+   If PortCount = 0 Then CreateSamplePorts;
+   If ConnectionCount = 0 Then CreateSampleConnections;
+   ShowMIDIStats;
+  End
+   Else
+  Begin
    If PortCount = 0 Then CreateSamplePorts;
    If ConnectionCount = 0 Then CreateSampleConnections;
    ListConnections;
   End;
-  'stats': Begin
-   If PortCount = 0 Then CreateSamplePorts;
-   If ConnectionCount = 0 Then CreateSampleConnections;
-   ShowMIDIStats;
-  End;
- Else Begin
-  If PortCount = 0 Then CreateSamplePorts;
-  If ConnectionCount = 0 Then CreateSampleConnections;
-  ListConnections;
- End;
- End;
  {$ELSE}
- Case Action Of
-  'list': ShowSimulatedPorts;
-  'list-input': Begin
+  If Action='list'Then ShowSimulatedPorts Else
+  If Action='list-input'Then Begin
    WriteLn('Ports d''entr‚e MIDI (simulation):');
    ShowSimulatedPorts;
-  End;
-  'list-output': Begin
+  End
+   Else
+  If Action='list-output'Then Begin
    WriteLn('Ports de sortie MIDI (simulation):');
    ShowSimulatedPorts;
-  End;
-  'connect': SimulateMIDIConnect;
-  'disconnect': SimulateMIDIDisconnect;
-  'remove-all': WriteLn('Toutes les connexions supprim‚es (simulation)');
-  'stats': ShowSimulatedStats;
- Else
-  ShowSimulatedConnections;
- End;
+  End
+   Else
+  If Action='connect'Then SimulateMIDIConnect Else
+  If Action='disconnect'Then SimulateMIDIDisconnect Else
+  If Action='remove-all'THen WriteLn('Toutes les connexions supprim‚es (simulation)') Else
+  If Action='stats'Then ShowSimulatedStats
+                   Else ShowSimulatedConnections;
  {$ENDIF}
 End;
 
