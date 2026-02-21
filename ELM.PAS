@@ -17,31 +17,31 @@ Program ELM;
 
 {$IFDEF FPC}
 Type
- { Structure d'un message √©lectronique }
+ { Structure d'un message Çlectronique }
  TMailMessage = Record
-  MessageID: Integer;         { ID unique du message }
-  FromAddr: String[255];      { Adresse exp√©diteur }
-  FromName: String[255];      { Nom exp√©diteur }
-  ToAddr: String[255];        { Adresse destinataire }
-  ToName: String[255];        { Nom destinataire }
-  Subject: String[255];       { Sujet }
-  DateSent: TDateTime;        { Date d'envoi }
-  DateReceived: TDateTime;    { Date de r√©ception }
-  Priority: Integer;          { Priorit√© (1=haute, 2=normale, 3=basse) }
-  Status: String[32];         { √âtat (new, read, replied, forwarded, deleted) }
-  Size: LongInt;              { Taille en octets }
-  Lines: Integer;             { Nombre de lignes }
-  ContentType: String[64];    { Type de contenu }
-  Encoding: String[32];       { Encodage }
-  MessageBody: TStringList;   { Corps du message }
-  Headers: TStringList;       { En-t√™tes compl√®tes }
-  Attachments: Array[0..15] of String[255]; { Pi√®ces jointes }
-  AttachmentCount: Integer;   { Nombre de pi√®ces jointes }
-  IsRead: Boolean;            { Message lu }
-  IsDeleted: Boolean;         { Message supprim√© }
-  IsReplied: Boolean;         { R√©ponse envoy√©e }
-  IsForwarded: Boolean;       { Message transf√©r√© }
-  IsFlagged: Boolean;         { Message marqu√© }
+  MessageID: Integer;                       { ID unique du message }
+  FromAddr: String[255];                    { Adresse expÇditeur }
+  FromName: String[255];                    { Nom expÇditeur }
+  ToAddr: String[255];                      { Adresse destinataire }
+  ToName: String[255];                      { Nom destinataire }
+  Subject: String[255];                     { Sujet }
+  DateSent: TDateTime;                      { Date d'envoi }
+  DateReceived: TDateTime;                  { Date de rÇception }
+  Priority: Integer;                        { PrioritÇ (1=haute, 2=normale, 3=basse) }
+  Status: String[32];                       { êtat (new, read, replied, forwarded, deleted) }
+  Size: LongInt;                            { Taille en octets }
+  Lines: Integer;                           { Nombre de lignes }
+  ContentType: String[64];                  { Type de contenu }
+  Encoding: String[32];                     { Encodage }
+  MessageBody: TStringList;                 { Corps du message }
+  Headers: TStringList;                     { Entàtes complätes }
+  Attachments: Array[0..15] of String[255]; { Piäces jointes }
+  AttachmentCount: Integer;                 { Nombre de piäces jointes }
+  IsRead: Boolean;                          { Message lu }
+  IsDeleted: Boolean;                       { Message supprimÇ }
+  IsReplied: Boolean;                       { RÇponse envoyÇe }
+  IsForwarded: Boolean;                     { Message transfÇrÇ }
+  IsFlagged: Boolean;                       { Message marquÇ }
  End;
 
  { Configuration de ELM }

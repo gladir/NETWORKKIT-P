@@ -913,6 +913,7 @@ BEGIN
   WriteLn('Note: Moniteur de trafic réseau temps réel avec interface colorée.');
   WriteLn('Fournit analyse détaillée du trafic TCP/UDP/ICMP sur interfaces réseau.');
   WriteLn('Compatible avec iptraf original de Linux.');
+  Exit;
  End
  Else If ParamStr(1) = '--version' Then Begin
   WriteLn('iptraf (NETWORKKIT-P) 1.0');
@@ -920,6 +921,7 @@ BEGIN
   WriteLn('Compatible with Linux iptraf');
   WriteLn;
   WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+  Exit;
  End
  Else Begin
   {$IFDEF FPC}
