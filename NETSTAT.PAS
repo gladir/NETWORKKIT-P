@@ -124,6 +124,32 @@ Function GetTcpTable(pTcpTable:PMIB_TCPTABLE;Var pdwSize:DWORD;bOrder:BOOL):DWOR
 Function GetUdpTable(pUdpTable:PMIB_UDPTABLE;Var pdwSize:DWORD;bOrder:BOOL):DWORD;stdcall;external 'iphlpapi.dll';
 Function GetTcpStatistics(pStats:PMIB_TCPSTATS):DWORD;stdcall;external 'iphlpapi.dll';
 Function GetUdpStatistics(pStats:PMIB_UDPSTATS):DWORD;stdcall;external 'iphlpapi.dll';
+
+{ Procédure d'initialisation des structures }
+Procedure InitializeStructures;
+Var
+ I:Integer;
+Begin
+ TCPCount:=0;
+ UDPCount:=0;
+ For I:=0 To 511 Do Begin
+  With TCPConnections[I] Do Begin
+   LocalAddr:='';
+   LocalPort:=0;
+   RemoteAddr:='';
+   RemotePort:=0;
+   State:='';
+   ProcessID:=0;
+   ProcessName:='';
+  End;
+  With UDPConnections[I] Do Begin
+   LocalAddr:='';
+   LocalPort:=0;
+   ProcessID:=0;
+   ProcessName:='';
+  End;
+ End;
+End;
 {$ENDIF}
 
 {$IFNDEF FPC}
@@ -263,35 +289,47 @@ Begin
  TCPCount:=0;
  dwSize:=0;
  
- { Première appel pour obtenir la taille }
- dwRetVal:=GetTcpTable(nil,dwSize,True);
- If dwRetVal<>ERROR_INSUFFICIENT_BUFFER Then Exit;
- 
- { Allouer la mémoire }
- GetMem(pTcpTable,dwSize);
  Try
-  { Obtenir la table TCP }
-  dwRetVal:=GetTcpTable(pTcpTable,dwSize,True);
-  If dwRetVal=NO_ERROR Then Begin
-   TCPCount:=pTcpTable^.dwNumEntries;
-   If TCPCount>512 Then TCPCount:=512;
-   
-   For I:=0 To TCPCount-1 Do Begin
-    pRow:=@pTcpTable^.table[I];
-    With TCPConnections[I] Do Begin
-     LocalAddr:=DWORDToIP(pRow^.dwLocalAddr);
-     LocalPort:=NetworkToHostPort(pRow^.dwLocalPort);
-     RemoteAddr:=DWORDToIP(pRow^.dwRemoteAddr);
-     RemotePort:=NetworkToHostPort(pRow^.dwRemotePort);
-     State:=GetTCPState(pRow^.dwState);
-     ProcessID:=0;  { Non disponible dans cette version }
-     ProcessName:='';
+  { Première appel pour obtenir la taille }
+  dwRetVal:=GetTcpTable(nil,dwSize,True);
+  If dwRetVal<>ERROR_INSUFFICIENT_BUFFER Then Exit;
+  
+  { Vérifier la taille minimum }
+  If dwSize<SizeOf(MIB_TCPTABLE) Then Exit;
+  
+  { Allouer la mémoire }
+  GetMem(pTcpTable,dwSize);
+  Try
+   { Obtenir la table TCP }
+   dwRetVal:=GetTcpTable(pTcpTable,dwSize,True);
+   If dwRetVal=NO_ERROR Then Begin
+    TCPCount:=pTcpTable^.dwNumEntries;
+    If TCPCount>512 Then TCPCount:=512;
+    
+    For I:=0 To TCPCount-1 Do Begin
+     Try
+      pRow:=@pTcpTable^.table[I];
+      With TCPConnections[I] Do Begin
+       LocalAddr:=DWORDToIP(pRow^.dwLocalAddr);
+       LocalPort:=NetworkToHostPort(pRow^.dwLocalPort);
+       RemoteAddr:=DWORDToIP(pRow^.dwRemoteAddr);
+       RemotePort:=NetworkToHostPort(pRow^.dwRemotePort);
+       State:=GetTCPState(pRow^.dwState);
+       ProcessID:=0;  { Non disponible dans cette version }
+       ProcessName:='';
+      End;
+     Except
+      { Ignorer l'erreur et continuer }
+     End;
     End;
+    GetTCPConnections:=True;
    End;
-   GetTCPConnections:=True;
+  Finally
+   FreeMem(pTcpTable,dwSize);
   End;
- Finally
-  FreeMem(pTcpTable);
+ Except
+  { Gérer les erreurs d'allocation mémoire }
+  GetTCPConnections:=False;
  End;
 End;
 
@@ -308,32 +346,44 @@ Begin
  UDPCount:=0;
  dwSize:=0;
  
- { Première appel pour obtenir la taille }
- dwRetVal:=GetUdpTable(nil,dwSize,True);
- If dwRetVal<>ERROR_INSUFFICIENT_BUFFER Then Exit;
- 
- { Allouer la mémoire }
- GetMem(pUdpTable,dwSize);
  Try
-  { Obtenir la table UDP }
-  dwRetVal:=GetUdpTable(pUdpTable,dwSize,True);
-  If dwRetVal=NO_ERROR Then Begin
-   UDPCount:=pUdpTable^.dwNumEntries;
-   If UDPCount>512 Then UDPCount:=512;
-   
-   For I:=0 To UDPCount-1 Do Begin
-    pRow:=@pUdpTable^.table[I];
-    With UDPConnections[I] Do Begin
-     LocalAddr:=DWORDToIP(pRow^.dwLocalAddr);
-     LocalPort:=NetworkToHostPort(pRow^.dwLocalPort);
-     ProcessID:=0;  { Non disponible dans cette version }
-     ProcessName:='';
+  { Première appel pour obtenir la taille }
+  dwRetVal:=GetUdpTable(nil,dwSize,True);
+  If dwRetVal<>ERROR_INSUFFICIENT_BUFFER Then Exit;
+  
+  { Vérifier la taille minimum }
+  If dwSize<SizeOf(MIB_UDPTABLE) Then Exit;
+  
+  { Allouer la mémoire }
+  GetMem(pUdpTable,dwSize);
+  Try
+   { Obtenir la table UDP }
+   dwRetVal:=GetUdpTable(pUdpTable,dwSize,True);
+   If dwRetVal=NO_ERROR Then Begin
+    UDPCount:=pUdpTable^.dwNumEntries;
+    If UDPCount>512 Then UDPCount:=512;
+    
+    For I:=0 To UDPCount-1 Do Begin
+     Try
+      pRow:=@pUdpTable^.table[I];
+      With UDPConnections[I] Do Begin
+       LocalAddr:=DWORDToIP(pRow^.dwLocalAddr);
+       LocalPort:=NetworkToHostPort(pRow^.dwLocalPort);
+       ProcessID:=0;  { Non disponible dans cette version }
+       ProcessName:='';
+      End;
+     Except
+      { Ignorer l'erreur et continuer }
+     End;
     End;
+    GetUDPConnections:=True;
    End;
-   GetUDPConnections:=True;
+  Finally
+   FreeMem(pUdpTable,dwSize);
   End;
- Finally
-  FreeMem(pUdpTable);
+ Except
+  { Gérer les erreurs d'allocation mémoire }
+  GetUDPConnections:=False;
  End;
 End;
 
@@ -451,37 +501,66 @@ End;
 { Procédure pour afficher les statistiques protocoles }
 Procedure ShowProtocolStats;
 Var
- TCPStats:MIB_TCPSTATS;
- UDPStats:MIB_UDPSTATS;
+ pTCPStats:PMIB_TCPSTATS;
+ pUDPStats:PMIB_UDPSTATS;
+ dwRetVal:DWORD;
 Begin
  WriteLn('Statistiques des protocoles :');
  WriteLn;
  
- { Statistiques TCP }
- If GetTcpStatistics(@TCPStats)=NO_ERROR Then Begin
-  WriteLn('TCP:');
-  WriteLn('    ',TCPStats.dwActiveOpens,' connexions actives ouvertes');
-  WriteLn('    ',TCPStats.dwPassiveOpens,' connexions passives ouvertes');
-  WriteLn('    ',TCPStats.dwAttemptFails,' tentatives de connexion échouées');
-  WriteLn('    ',TCPStats.dwEstabResets,' connexions établies réinitialisées');
-  WriteLn('    ',TCPStats.dwCurrEstab,' connexions actuellement établies');
-  WriteLn('    ',TCPStats.dwInSegs,' segments reçus');
-  WriteLn('    ',TCPStats.dwOutSegs,' segments envoyés');
-  WriteLn('    ',TCPStats.dwRetransSegs,' segments retransmis');
-  WriteLn('    ',TCPStats.dwInErrs,' segments reçus en erreur');
-  WriteLn('    ',TCPStats.dwOutRsts,' segments reset envoyés');
-  WriteLn;
- End;
- 
- { Statistiques UDP }
- If GetUdpStatistics(@UDPStats)=NO_ERROR Then Begin
-  WriteLn('UDP:');
-  WriteLn('    ',UDPStats.dwInDatagrams,' datagrammes reçus');
-  WriteLn('    ',UDPStats.dwOutDatagrams,' datagrammes envoyés');
-  WriteLn('    ',UDPStats.dwNoPorts,' datagrammes vers ports fermés');
-  WriteLn('    ',UDPStats.dwInErrors,' erreurs de réception');
-  WriteLn('    ',UDPStats.dwNumAddrs,' adresses UDP en écoute');
-  WriteLn;
+ Try
+  { Allouer mémoire pour les statistiques TCP }
+  GetMem(pTCPStats,SizeOf(MIB_TCPSTATS));
+  Try
+   FillChar(pTCPStats^,SizeOf(MIB_TCPSTATS),0);
+   dwRetVal:=GetTcpStatistics(pTCPStats);
+   If dwRetVal=NO_ERROR Then Begin
+    WriteLn('TCP:');
+    WriteLn('    ',pTCPStats^.dwActiveOpens,' connexions actives ouvertes');
+    WriteLn('    ',pTCPStats^.dwPassiveOpens,' connexions passives ouvertes');
+    WriteLn('    ',pTCPStats^.dwAttemptFails,' tentatives de connexion échouées');
+    WriteLn('    ',pTCPStats^.dwEstabResets,' connexions établies réinitialisées');
+    WriteLn('    ',pTCPStats^.dwCurrEstab,' connexions actuellement établies');
+    WriteLn('    ',pTCPStats^.dwInSegs,' segments reçus');
+    WriteLn('    ',pTCPStats^.dwOutSegs,' segments envoyés');
+    WriteLn('    ',pTCPStats^.dwRetransSegs,' segments retransmis');
+    WriteLn('    ',pTCPStats^.dwInErrs,' segments reçus en erreur');
+    WriteLn('    ',pTCPStats^.dwOutRsts,' segments reset envoyés');
+    WriteLn;
+   End Else Begin
+    WriteLn('Erreur lors de la récupération des statistiques TCP (Code: ',dwRetVal,')');
+    WriteLn;
+   End;
+  Finally
+   FreeMem(pTCPStats,SizeOf(MIB_TCPSTATS));
+  End;
+  
+  { Allouer mémoire pour les statistiques UDP }
+  GetMem(pUDPStats,SizeOf(MIB_UDPSTATS));
+  Try
+   FillChar(pUDPStats^,SizeOf(MIB_UDPSTATS),0);
+   dwRetVal:=GetUdpStatistics(pUDPStats);
+   If dwRetVal=NO_ERROR Then Begin
+    WriteLn('UDP:');
+    WriteLn('    ',pUDPStats^.dwInDatagrams,' datagrammes reçus');
+    WriteLn('    ',pUDPStats^.dwOutDatagrams,' datagrammes envoyés');
+    WriteLn('    ',pUDPStats^.dwNoPorts,' datagrammes vers ports fermés');
+    WriteLn('    ',pUDPStats^.dwInErrors,' erreurs de réception');
+    WriteLn('    ',pUDPStats^.dwNumAddrs,' adresses UDP en écoute');
+    WriteLn;
+   End Else Begin
+    WriteLn('Erreur lors de la récupération des statistiques UDP (Code: ',dwRetVal,')');
+    WriteLn;
+   End;
+  Finally
+   FreeMem(pUDPStats,SizeOf(MIB_UDPSTATS));
+  End;
+  
+ Except
+  On E:Exception Do Begin
+   WriteLn('Erreur lors de la récupération des statistiques réseau: ',E.Message);
+   WriteLn;
+  End;
  End;
 End;
 
@@ -671,43 +750,57 @@ Begin
 End;
 
 BEGIN
- If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
-   (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('NETSTAT : Affichage des connexions réseau et statistiques');
-  WriteLn;
-  WriteLn('Syntaxe :');
-  WriteLn('  NETSTAT [options]');
-  WriteLn;
-  WriteLn('Options :');
-  WriteLn('  -t, --tcp              Afficher les connexions TCP seulement');
-  WriteLn('  -u, --udp              Afficher les connexions UDP seulement');
-  WriteLn('  -l, --listening        Afficher les ports en écoute seulement');
-  WriteLn('  -e, --established      Afficher les connexions établies seulement');
-  WriteLn('  -a, --all              Afficher toutes les connexions');
-  WriteLn('  -r, --route            Afficher la table de routage');
-  WriteLn('  -i, --interfaces       Afficher les statistiques d''interface');
-  WriteLn('  -s, --statistics       Afficher les statistiques par protocole');
-  WriteLn('  -n, --numeric          Affichage numérique (pas de résolution)');
-  WriteLn;
-  WriteLn('Exemples :');
-  WriteLn('  NETSTAT                # Toutes les connexions TCP et UDP');
-  WriteLn('  NETSTAT -t             # Connexions TCP seulement');
-  WriteLn('  NETSTAT -l             # Ports en écoute');
-  WriteLn('  NETSTAT -s             # Statistiques protocoles');
-  WriteLn('  NETSTAT -r             # Table de routage');
-  WriteLn('  NETSTAT -i             # Statistiques interfaces');
-  WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (données réelles)');
- End
-  Else
- If ParamStr(1)='--version'Then Begin
-  WriteLn('NETSTAT 1.00 - Statistiques réseau, NETWORKKIT-P, corail');
-  WriteLn('Licence MIT');
-  WriteLn;
-  WriteLn('Écrit par Sylvain Maltais');
- End
-  Else
- Begin
-  ParseCommand;
+ Try
+  { Initialiser les structures }
+  InitializeStructures;
+  
+  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
+    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
+   WriteLn('NETSTAT : Affichage des connexions réseau et statistiques');
+   WriteLn;
+   WriteLn('Syntaxe :');
+   WriteLn('  NETSTAT [options]');
+   WriteLn;
+   WriteLn('Options :');
+   WriteLn('  -t, --tcp              Afficher les connexions TCP seulement');
+   WriteLn('  -u, --udp              Afficher les connexions UDP seulement');
+   WriteLn('  -l, --listening        Afficher les ports en écoute seulement');
+   WriteLn('  -e, --established      Afficher les connexions établies seulement');
+   WriteLn('  -a, --all              Afficher toutes les connexions');
+   WriteLn('  -r, --route            Afficher la table de routage');
+   WriteLn('  -i, --interfaces       Afficher les statistiques d''interface');
+   WriteLn('  -s, --statistics       Afficher les statistiques par protocole');
+   WriteLn('  -n, --numeric          Affichage numérique (pas de résolution)');
+   WriteLn;
+   WriteLn('Exemples :');
+   WriteLn('  NETSTAT                # Toutes les connexions TCP et UDP');
+   WriteLn('  NETSTAT -t             # Connexions TCP seulement');
+   WriteLn('  NETSTAT -l             # Ports en écoute');
+   WriteLn('  NETSTAT -s             # Statistiques protocoles');
+   WriteLn('  NETSTAT -r             # Table de routage');
+   WriteLn('  NETSTAT -i             # Statistiques interfaces');
+   WriteLn;
+   WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (données réelles)');
+  End
+   Else
+  If ParamStr(1)='--version'Then Begin
+   WriteLn('NETSTAT 1.00 - Statistiques réseau, NETWORKKIT-P, corail');
+   WriteLn('Licence MIT');
+   WriteLn;
+   WriteLn('Écrit par Sylvain Maltais');
+  End
+   Else
+  Begin
+   ParseCommand;
+  End;
+  
+  { Sortie propre }
+  Halt(0);
+  
+ Except
+  On E:Exception Do Begin
+   WriteLn('Erreur lors de l''exécution: ',E.Message);
+   Halt(1);
+  End;
  End;
 END.
