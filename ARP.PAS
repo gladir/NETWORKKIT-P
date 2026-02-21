@@ -514,28 +514,29 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('ARP : Cette commande permet d''effectuer la manipulation de la table ARP (Address Resolution Protocol)');
+  WriteLn('ARP : Cette commande permet d''effectuer la manipulation de la table ARP (Address ',
+                 'Resolution Protocol)');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  ARP                    Afficher la table ARP');
-  WriteLn('  ARP -a                 Afficher toutes les entr√©es');
-  WriteLn('  ARP -s ip mac          Ajouter une entr√©e statique');
-  WriteLn('  ARP -d ip              Supprimer une entr√©e');
+  WriteLn('  ARP -a                 Afficher toutes les entrÇes');
+  WriteLn('  ARP -s ip mac          Ajouter une entrÇe statique');
+  WriteLn('  ARP -d ip              Supprimer une entrÇe');
   WriteLn('  ARP -f                 Vider la table ARP');
-  WriteLn('  ARP -n                 Mode num√©rique');
-  WriteLn('  ARP adresse_ip         Afficher une entr√©e sp√©cifique');
+  WriteLn('  ARP -n                 Mode numÇrique');
+  WriteLn('  ARP adresse_ip         Afficher une entrÇe spÇcifique');
   WriteLn;
-  WriteLn('Param√®tres :');
+  WriteLn('Paramätres :');
   WriteLn('  ip          Adresse IP');
   WriteLn('  mac         Adresse MAC (format: xx:xx:xx:xx:xx:xx)');
   WriteLn;
   WriteLn('Exemples :');
-  WriteLn('  ARP                              # Afficher la table');
-  WriteLn('  ARP -s 192.168.1.100 aa:bb:cc:dd:ee:ff  # Ajouter entr√©e');
-  WriteLn('  ARP -d 192.168.1.100             # Supprimer entr√©e');
-  WriteLn('  ARP 192.168.1.1                  # Rechercher IP');
+  WriteLn('  ARP                                     # Afficher la table');
+  WriteLn('  ARP -s 192.168.1.100 aa:bb:cc:dd:ee:ff  # Ajouter entrÇe');
+  WriteLn('  ARP -d 192.168.1.100                    # Supprimer entrÇe');
+  WriteLn('  ARP 192.168.1.1                         # Rechercher IP');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (table r√©elle)');
+  WriteLn('NB: Compatible Turbo Pascal (simulation) et Free Pascal (table rÇelle)');
  End
   Else
  If ParamStr(1)='--version'Then Begin
