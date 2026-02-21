@@ -329,39 +329,39 @@ BEGIN
  If ParamCount>=1 Then Begin
   ParseParameters;
   {$IFDEF FPC}
-  If TargetHost='' Then TargetHost:=ParamStr(1);
-  WriteLn('Ping ICMP - NETWORKKIT-P');
-  WriteLn;
-   { Initialiser Winsock }
-  If WSAStartup($0202,WSAData)<>0 Then Begin
-   WriteLn('Erreur d''initialisation Winsock');
-   Halt(1);
-  End;
-   { R‚soudre l'adresse IP }
-  WriteLn('R‚solution de ',TargetHost,'...');
-  TargetIP:=ResolveHost(TargetHost);
-  If TargetIP='' Then Begin
-   WriteLn('Impossible de rÃ©soudre ',TargetHost);
-   WSACleanup;
-   Halt(1);
-  End;
-   { Cr‚er un socket RAW ICMP }
-  Socket:=Winsock.socket(AF_INET,SOCK_RAW,IPPROTO_ICMP);
-  If Socket=INVALID_SOCKET Then Begin
-   WriteLn('Erreur : Impossible de cr‚er un socket ICMP');
-   WriteLn('(N‚cessite des privilŠges administrateur)');
-   WSACleanup;
-   Halt(1);
-  End;
-  Try
-   DoPing;
-  Finally
-   closesocket(Socket);
-   WSACleanup;
-  End;
+   If TargetHost='' Then TargetHost:=ParamStr(1);
+   WriteLn('Ping ICMP - NETWORKKIT-P');
+   WriteLn;
+    { Initialiser Winsock }
+   If WSAStartup($0202,WSAData)<>0 Then Begin
+    WriteLn('Erreur d''initialisation Winsock');
+    Halt(1);
+   End;
+    { R‚soudre l'adresse IP }
+   WriteLn('R‚solution de ',TargetHost,'...');
+   TargetIP:=ResolveHost(TargetHost);
+   If TargetIP='' Then Begin
+    WriteLn('Impossible de r‚soudre ',TargetHost);
+    WSACleanup;
+    Halt(1);
+   End;
+    { Cr‚er un socket RAW ICMP }
+   Socket:=Winsock.socket(AF_INET,SOCK_RAW,IPPROTO_ICMP);
+   If Socket=INVALID_SOCKET Then Begin
+    WriteLn('Erreur : Impossible de cr‚er un socket ICMP');
+    WriteLn('(N‚cessite des privilŠges administrateur)');
+    WSACleanup;
+    Halt(1);
+   End;
+   Try
+    DoPing;
+   Finally
+    closesocket(Socket);
+    WSACleanup;
+   End;
   {$ELSE}
-  Randomize;
-  DoSimulatedPing;
+   Randomize;
+   DoSimulatedPing;
   {$ENDIF}
  End
   Else
