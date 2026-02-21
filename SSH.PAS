@@ -1065,8 +1065,15 @@ Begin
    Action := 'list';
   End Else If (LowerCase(Param) = '-p') and (I < ParamCount) Then Begin
    Inc(I);
-   Port := StrToInt(ParamStr(I));
-   If Port = 0 Then Port := DEFAULT_SSH_PORT;
+   Try
+    Port := StrToInt(ParamStr(I));
+    If Port = 0 Then Port := DEFAULT_SSH_PORT;
+   Except
+    WriteLn('ssh: Port invalide "', ParamStr(I), '"');
+    WriteLn('Usage: ssh -p PORT hostname [commande]');
+    WriteLn('Exemple: ssh -p 2222 example.com');
+    Exit;
+   End;
   End Else If (LowerCase(Param) = '-i') and (I < ParamCount) Then Begin
    Inc(I);
    KeyFile := ParamStr(I);
@@ -1197,7 +1204,7 @@ BEGIN
   WriteLn;
   WriteLn('Fichiers de configuration :');
   WriteLn('  ~/.ssh/config         Configuration utilisateur');
-  WriteLn('  ~/.ssh/id_rsa         Clé privée RSA par défaut');
+  WriteLn('  ~/.ssh/id_rsa         Clef privée RSA par défaut');
   WriteLn('  ~/.ssh/known_hosts    Empreintes des hôtes connus');
   WriteLn;
   WriteLn('Note: SSH permet des connexions sécurisées et chiffrées vers');
