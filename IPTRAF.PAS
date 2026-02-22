@@ -10,7 +10,7 @@ Program IPTRAF;
 {$IFDEF FPC}
  {$mode objfpc}
  {$IFDEF WINDOWS}
-  Uses SysUtils, Classes, StrUtils, DateUtils, WinSock, Windows, Crt;
+  Uses SysUtils, Classes, StrUtils, DateUtils, WinSock, Windows, Crt, PtcCrt;
  {$ELSE}
   Uses SysUtils, Classes, StrUtils, DateUtils, Sockets, NetDB, Crt;
  {$ENDIF}
@@ -826,8 +826,10 @@ End;
 {$ENDIF}
 
 BEGIN
+ WriteLn('DEBUG: Starting program, checking parameters');
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
+  WriteLn('DEBUG: Showing help');
   WriteLn('IPTRAF : Console-based network statistics utility');
   WriteLn;
   WriteLn('Syntaxe :');
@@ -916,6 +918,7 @@ BEGIN
   Exit;
  End
  Else If ParamStr(1) = '--version' Then Begin
+  WriteLn('DEBUG: Showing version');
   WriteLn('iptraf (NETWORKKIT-P) 1.0');
   WriteLn('Console-based network traffic monitor');
   WriteLn('Compatible with Linux iptraf');
@@ -924,6 +927,7 @@ BEGIN
   Exit;
  End
  Else Begin
+  WriteLn('DEBUG: Starting interactive mode');
   {$IFDEF FPC}
   If not InitializeNetwork Then Begin
    WriteLn('Error: Cannot initialize network subsystem');
