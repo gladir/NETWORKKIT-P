@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande findsmb (Find SMB/CIFS servers))
+  @abstract(Target: Turbo Pascal 7, Free Pascal
+  @description: Commande findsmb (Recherche les serveurs SMB/CIFS))
 }
 
 Program FINDSMB;
@@ -20,49 +21,49 @@ Program FINDSMB;
 
 {$IFDEF FPC}
 Type
- { Structure d'un serveur SMB d√©couvert }
+ { Structure d'un serveur SMB dÇcouvert }
  TSMBServer = Record
-  IPAddress: String[16];      { Adresse IP }
-  NetBIOSName: String[16];    { Nom NetBIOS }
-  WorkGroup: String[16];      { Groupe de travail }
-  ServerType: String[32];     { Type de serveur }
-  Comment: String[255];       { Commentaire/Description }
-  OSVersion: String[64];      { Version OS }
-  IsActive: Boolean;          { Serveur actif }
-  ResponseTime: Integer;      { Temps de r√©ponse (ms) }
-  LastSeen: TDateTime;        { Derni√®re d√©tection }
+  IPAddress: String[16];                { Adresse IP }
+  NetBIOSName: String[16];              { Nom NetBIOS }
+  WorkGroup: String[16];                { Groupe de travail }
+  ServerType: String[32];               { Type de serveur }
+  Comment: String[255];                 { Commentaire/Description }
+  OSVersion: String[64];                { Version OS }
+  IsActive: Boolean;                    { Serveur actif }
+  ResponseTime: Integer;                { Temps de rÇponse (ms) }
+  LastSeen: TDateTime;                  { Derniäre dÇtection }
   Services: Array[0..15] of String[32]; { Services disponibles }
-  ServiceCount: Integer;      { Nombre de services }
+  ServiceCount: Integer;                { Nombre de services }
  End;
 
  { Configuration findsmb }
  TFindSMBConfig = Record
-  NetworkRange: String[32];   { Plage r√©seau (ex: 192.168.1.0/24) }
-  TimeoutMS: Integer;         { Timeout en millisecondes }
-  MaxThreads: Integer;        { Nombre max de threads }
-  ShowDetails: Boolean;       { Afficher d√©tails }
-  ShowServices: Boolean;      { Afficher services }
-  ShowInactive: Boolean;      { Afficher serveurs inactifs }
-  OutputFormat: String[16];   { Format sortie (text, csv, xml) }
-  VerboseMode: Boolean;       { Mode verbeux }
-  QuietMode: Boolean;         { Mode silencieux }
-  ResolveDNS: Boolean;        { R√©soudre noms DNS }
-  UseNetBIOS: Boolean;        { Utiliser NetBIOS }
-  UseBroadcast: Boolean;      { Utiliser broadcast }
-  ScanPorts: Array[0..7] of Word; { Ports √† scanner }
-  PortCount: Integer;         { Nombre de ports }
+  NetworkRange: String[32];       { Plage rÇseau (exemple: 192.168.1.0/24) }
+  TimeoutMS: Integer;             { DÇpassement de dÇlai en millisecondes }
+  MaxThreads: Integer;            { Nombre max de processus lÇgers }
+  ShowDetails: Boolean;           { Afficher dÇtails }
+  ShowServices: Boolean;          { Afficher services }
+  ShowInactive: Boolean;          { Afficher serveurs inactifs }
+  OutputFormat: String[16];       { Format sortie (text, csv, xml) }
+  VerboseMode: Boolean;           { Mode verbeux }
+  QuietMode: Boolean;             { Mode silencieux }
+  ResolveDNS: Boolean;            { RÇsoudre noms DNS }
+  UseNetBIOS: Boolean;            { Utiliser NetBIOS }
+  UseBroadcast: Boolean;          { Utiliser par diffusion }
+  ScanPorts: Array[0..7] of Word; { Ports Ö balayer }
+  PortCount: Integer;             { Nombre de ports }
  End;
 
- { Statistiques de scan }
+ { Statistiques de balayage }
  TScanStats = Record
-  ServersFound: Integer;      { Serveurs trouv√©s }
+  ServersFound: Integer;      { Serveurs trouvÇs }
   ActiveServers: Integer;     { Serveurs actifs }
-  TotalScanned: Integer;      { Total d'IPs scann√©es }
-  ScanStartTime: TDateTime;   { D√©but du scan }
-  ScanEndTime: TDateTime;     { Fin du scan }
+  TotalScanned: Integer;      { Total d'IPs balayÇes }
+  ScanStartTime: TDateTime;   { DÇbut du balayage }
+  ScanEndTime: TDateTime;     { Fin du balayage }
   TotalTime: Integer;         { Temps total (ms) }
-  FastestResponse: Integer;   { R√©ponse la plus rapide }
-  SlowestResponse: Integer;   { R√©ponse la plus lente }
+  FastestResponse: Integer;   { RÇponse la plus rapide }
+  SlowestResponse: Integer;   { RÇponse la plus lente }
  End;
 
 Var
@@ -72,9 +73,9 @@ Var
  FindSMBConfig: TFindSMBConfig;
  ScanStats: TScanStats;
 
-{ === FONCTIONS R√âSEAU R√âELLES === }
+{ === FONCTIONS RêSEAU RêELLES === }
 
-{ Initialiser WinSock (Windows uniquement) }
+ { Initialiser WinSock (Windows uniquement) }
 Function InitializeNetwork: Boolean;
 {$IFDEF WINDOWS}
 Var
@@ -84,21 +85,20 @@ Begin
  InitializeNetwork := True;
  {$IFDEF WINDOWS}
  If WSAStartup($0202, WSAData) <> 0 Then Begin
-  WriteLn('Error: Cannot initialize WinSock');
+  WriteLn('Erreur: Impossible d''initialiser WinSock');
   InitializeNetwork := False;
  End;
  {$ENDIF}
 End;
 
-{ Nettoyer r√©seau }
-Procedure CleanupNetwork;
-Begin
+ { Nettoyer rÇseau }
+Procedure CleanupNetwork;Begin
  {$IFDEF WINDOWS}
- WSACleanup;
+  WSACleanup;
  {$ENDIF}
 End;
 
-{ Convertir cha√Æne IP en entier }
+ { Convertir chaåne IP en entier }
 Function IPStringToInt(IPStr: String): LongWord;
 Var
  Parts: Array[0..3] of Byte;
@@ -109,7 +109,6 @@ Begin
  PartIndex := 0;
  IPStr := IPStr + '.';
  Part := '';
- 
  For I := 1 To Length(IPStr) Do Begin
   If IPStr[I] = '.' Then Begin
    If PartIndex > 3 Then Exit;
@@ -120,73 +119,67 @@ Begin
    Part := Part + IPStr[I];
   End;
  End;
- 
  If PartIndex = 4 Then
-  IPStringToInt := (LongWord(Parts[0]) shl 24) or 
-                   (LongWord(Parts[1]) shl 16) or 
-                   (LongWord(Parts[2]) shl 8) or 
+  IPStringToInt := (LongWord(Parts[0]) shl 24) or
+                   (LongWord(Parts[1]) shl 16) or
+                   (LongWord(Parts[2]) shl 8) or
                    LongWord(Parts[3]);
 End;
 
-{ Convertir entier en cha√Æne IP }
-Function IPIntToString(IP: LongWord): String;
-Begin
+ { Convertir entier en chaåne IP }
+Function IPIntToString(IP: LongWord): String;Begin
  IPIntToString := IntToStr((IP shr 24) and $FF) + '.' +
                   IntToStr((IP shr 16) and $FF) + '.' +
                   IntToStr((IP shr 8) and $FF) + '.' +
                   IntToStr(IP and $FF);
 End;
 
-{ Ping simple pour tester la connectivit√© }
+ { Ping simple pour tester la connectivitÇ }
 Function SimplePing(IPAddress: String; TimeoutMS: Integer): Integer;
 Var
  Socket: TSocket;
  ServerAddr: TSockAddrIn;
  StartTime, EndTime: TDateTime;
  {$IFDEF WINDOWS}
- HostEnt: PHostEnt;
+  HostEnt: PHostEnt;
  {$ENDIF}
 Begin
  SimplePing := -1;
- 
- { Cr√©er socket }
+  { CrÇer socket }
  Socket := WinSock.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
  If Socket = INVALID_SOCKET Then Exit;
- 
  Try
-  { Configurer timeout }
+   { Configurer le dÇpassement de dÇlai }
   setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, @TimeoutMS, SizeOf(TimeoutMS));
   setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, @TimeoutMS, SizeOf(TimeoutMS));
-  
-  { R√©soudre adresse }
+   { RÇsoudre adresse }
   {$IFDEF WINDOWS}
   HostEnt := gethostbyname(@IPAddress[1]);
   If HostEnt = nil Then Begin
    { Essayer comme IP directe }
    ServerAddr.sin_addr.S_addr := inet_addr(@IPAddress[1]);
    If ServerAddr.sin_addr.S_addr = INADDR_NONE Then Exit;
-  End Else Begin
+  End
+   Else
+  Begin
    ServerAddr.sin_addr.S_addr := PInAddr(HostEnt^.h_addr_list^)^.S_addr;
   End;
   {$ENDIF}
-  
-  { Pr√©parer adresse }
+   { PrÇparer adresse }
   ServerAddr.sin_family := AF_INET;
   ServerAddr.sin_port := htons(139); { Port NetBIOS }
-  
-  { Tenter connexion }
+   { Tenter connexion }
   StartTime := Now;
   If connect(Socket, @ServerAddr, SizeOf(ServerAddr)) = 0 Then Begin
    EndTime := Now;
    SimplePing := Round((EndTime - StartTime) * 24 * 60 * 60 * 1000);
   End;
-  
  Finally
   closesocket(Socket);
  End;
 End;
 
-{ Scanner un port sp√©cifique }
+ { Balayaer un port spÇcifique }
 Function ScanPort(IPAddress: String; Port: Word; TimeoutMS: Integer): Boolean;
 Var
  Socket: TSocket;
@@ -196,177 +189,148 @@ Var
  {$ENDIF}
 Begin
  ScanPort := False;
- 
  Socket := WinSock.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
  If Socket = INVALID_SOCKET Then Exit;
- 
  Try
-  { Configurer timeout }
+   { Configurer un dÇpassement de dÇlai }
   setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, @TimeoutMS, SizeOf(TimeoutMS));
   setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, @TimeoutMS, SizeOf(TimeoutMS));
-  
-  { R√©soudre adresse }
+   { RÇsoudre l'adresse }
   {$IFDEF WINDOWS}
-  HostEnt := gethostbyname(@IPAddress[1]);
-  If HostEnt = nil Then Begin
-   ServerAddr.sin_addr.S_addr := inet_addr(@IPAddress[1]);
-   If ServerAddr.sin_addr.S_addr = INADDR_NONE Then Exit;
-  End Else Begin
-   ServerAddr.sin_addr.S_addr := PInAddr(HostEnt^.h_addr_list^)^.S_addr;
-  End;
+   HostEnt := gethostbyname(@IPAddress[1]);
+   If HostEnt = nil Then Begin
+    ServerAddr.sin_addr.S_addr := inet_addr(@IPAddress[1]);
+    If ServerAddr.sin_addr.S_addr = INADDR_NONE Then Exit;
+   End
+    Else
+   Begin
+    ServerAddr.sin_addr.S_addr := PInAddr(HostEnt^.h_addr_list^)^.S_addr;
+   End;
   {$ENDIF}
-  
   ServerAddr.sin_family := AF_INET;
   ServerAddr.sin_port := htons(Port);
-  
-  { Tenter connexion }
+   { Tenter une connexion }
   ScanPort := connect(Socket, @ServerAddr, SizeOf(ServerAddr)) = 0;
-  
  Finally
   closesocket(Socket);
  End;
 End;
 
-{ Obtenir le nom NetBIOS d'un serveur }
-Function GetNetBIOSName(IPAddress: String): String;
-Begin
- { Simplification pour cette version - retourner nom g√©n√©rique }
+ { Obtenir le nom NetBIOS d'un serveur }
+Function GetNetBIOSName(IPAddress:String):String;Begin
+ { Simplification pour cette version - retourner nom gÇnÇrique }
  GetNetBIOSName := 'SMB-Server';
 End;
 
-{ D√©tecter services SMB sur un serveur }
-Function DetectSMBServices(IPAddress: String; Var Server: TSMBServer): Boolean;
-Begin
+ { DÇtecter services SMB sur un serveur }
+Function DetectSMBServices(IPAddress:String;Var Server:TSMBServer):Boolean;Begin
  DetectSMBServices := False;
  Server.ServiceCount := 0;
- 
- { Scanner ports SMB/CIFS courants }
+  { Balayer les ports SMB/CIFS courants }
  If ScanPort(IPAddress, 139, FindSMBConfig.TimeoutMS) Then Begin
   Server.Services[Server.ServiceCount] := 'NetBIOS-SSN';
   Inc(Server.ServiceCount);
   DetectSMBServices := True;
  End;
- 
  If ScanPort(IPAddress, 445, FindSMBConfig.TimeoutMS) Then Begin
   Server.Services[Server.ServiceCount] := 'Microsoft-DS';
   Inc(Server.ServiceCount);
   DetectSMBServices := True;
  End;
- 
  If ScanPort(IPAddress, 137, FindSMBConfig.TimeoutMS) Then Begin
   Server.Services[Server.ServiceCount] := 'NetBIOS-NS';
   Inc(Server.ServiceCount);
   DetectSMBServices := True;
  End;
- 
  If ScanPort(IPAddress, 138, FindSMBConfig.TimeoutMS) Then Begin
   Server.Services[Server.ServiceCount] := 'NetBIOS-DGM';
   Inc(Server.ServiceCount);
   DetectSMBServices := True;
  End;
- 
  If ScanPort(IPAddress, 135, FindSMBConfig.TimeoutMS) Then Begin
   Server.Services[Server.ServiceCount] := 'RPC-Endpoint';
   Inc(Server.ServiceCount);
  End;
 End;
 
-{ Scanner une adresse IP pour services SMB }
+ { Balayer une adresse IP pour services SMB }
 Function ScanIPForSMB(IPAddress: String): Boolean;
 Var
  Server: TSMBServer;
  PingTime: Integer;
 Begin
  ScanIPForSMB := False;
- 
  Inc(ScanStats.TotalScanned);
- 
- If FindSMBConfig.VerboseMode Then
-  WriteLn('Scanning ', IPAddress, '...');
- 
- { Test de connectivit√© }
+ If FindSMBConfig.VerboseMode Then WriteLn('Balayage ', IPAddress, '...');
+  { Test de connectivitÇ }
  PingTime := SimplePing(IPAddress, FindSMBConfig.TimeoutMS);
- 
  If PingTime >= 0 Then Begin
-  { Initialiser structure serveur }
+   { Initialiser structure serveur }
   FillChar(Server, SizeOf(Server), 0);
   Server.IPAddress := IPAddress;
   Server.IsActive := True;
   Server.ResponseTime := PingTime;
   Server.LastSeen := Now;
-  
-  { D√©tecter services SMB }
+   { DÇtecter services SMB }
   If DetectSMBServices(IPAddress, Server) Then Begin
-   { Obtenir nom NetBIOS si demand√© }
+   { Obtenir nom NetBIOS si demandÇ }
    If FindSMBConfig.UseNetBIOS Then Begin
     Server.NetBIOSName := GetNetBIOSName(IPAddress);
-    If Server.NetBIOSName = '' Then
-     Server.NetBIOSName := 'Unknown';
-   End Else Begin
+    If Server.NetBIOSName = '' Then Server.NetBIOSName := 'Unknown';
+   End
+    Else
+   Begin
     Server.NetBIOSName := 'N/A';
    End;
-   
-   { Informations par d√©faut }
+    { Informations par dÇfaut }
    Server.WorkGroup := 'WORKGROUP';
    Server.ServerType := 'SMB Server';
-   Server.Comment := 'SMB/CIFS server detected';
+   Server.Comment := 'Serveur SMB/CIFS dÇtectÇ';
    Server.OSVersion := 'Unknown';
-   
-   { Ajouter √† la liste }
+    { Ajouter Ö la liste }
    If ServerCount < High(SMBServers) Then Begin
     SMBServers[ServerCount] := Server;
     Inc(ServerCount);
     Inc(ScanStats.ServersFound);
     Inc(ScanStats.ActiveServers);
     ScanIPForSMB := True;
-    
-    { Statistiques temps de r√©ponse }
-    If (ScanStats.FastestResponse = 0) or (PingTime < ScanStats.FastestResponse) Then
-     ScanStats.FastestResponse := PingTime;
-    If PingTime > ScanStats.SlowestResponse Then
-     ScanStats.SlowestResponse := PingTime;
+     { Statistiques temps de rÇponse }
+    If (ScanStats.FastestResponse = 0)or(PingTime < ScanStats.FastestResponse)Then ScanStats.FastestResponse := PingTime;
+    If PingTime > ScanStats.SlowestResponse Then ScanStats.SlowestResponse := PingTime;
    End;
   End;
  End;
 End;
 
-{ Scanner une plage d'adresses IP }
+{ Balayer une plage d'adresses IP }
 Function ScanIPRange(StartIP, EndIP: String): Integer;
 Var
  StartNum, EndNum, CurrentNum: LongWord;
  CurrentIP: String;
 Begin
  Result := 0;
- 
  StartNum := IPStringToInt(StartIP);
  EndNum := IPStringToInt(EndIP);
- 
  If StartNum > EndNum Then Begin
-  WriteLn('Error: Invalid IP range');
+  WriteLn('Erreur: Plage IP invalide');
   Exit;
  End;
- 
  CurrentNum := StartNum;
  While CurrentNum <= EndNum Do Begin
   CurrentIP := IPIntToString(CurrentNum);
-  
-  If ScanIPForSMB(CurrentIP) Then
-   Inc(Result);
-   
+  If ScanIPForSMB(CurrentIP) Then Inc(Result);
   Inc(CurrentNum);
-  
-  { Affichage progr√®s }
+   { Affichage progräs }
   If not FindSMBConfig.QuietMode and (CurrentNum mod 10 = 0) Then Begin
    Write('.');
    If CurrentNum mod 100 = 0 Then WriteLn;
   End;
  End;
- 
  If not FindSMBConfig.QuietMode Then WriteLn;
 End;
 
-{ Parser une plage r√©seau CIDR }
-Function ParseNetworkRange(NetworkRange: String; Var StartIP, EndIP: String): Boolean;
+{ Analyser une plage rÇseau CIDR }
+Function ParseNetworkRange(NetworkRange:String;Var StartIP,EndIP:String):Boolean;
 Var
  SlashPos: Integer;
  BaseIP: String;
@@ -374,7 +338,6 @@ Var
  BaseNum, MaskNum, NetworkNum, BroadcastNum: LongWord;
 Begin
  ParseNetworkRange := False;
- 
  SlashPos := Pos('/', NetworkRange);
  If SlashPos = 0 Then Begin
   { Pas de masque - traiter comme IP unique }
@@ -383,45 +346,31 @@ Begin
   ParseNetworkRange := True;
   Exit;
  End;
- 
  BaseIP := Copy(NetworkRange, 1, SlashPos - 1);
  Netmask := StrToIntDef(Copy(NetworkRange, SlashPos + 1, Length(NetworkRange)), 24);
- 
  If (Netmask < 0) or (Netmask > 32) Then Exit;
- 
  BaseNum := IPStringToInt(BaseIP);
  If BaseNum = 0 Then Exit;
- 
- { Calculer masque de r√©seau }
- If Netmask = 32 Then
-  MaskNum := $FFFFFFFF
- Else
-  MaskNum := not ((1 shl (32 - Netmask)) - 1);
- 
- { Calculer adresse r√©seau et broadcast }
+  { Calculer masque de rÇseau }
+ If Netmask = 32 Then MaskNum := $FFFFFFFF
+                 Else MaskNum := not ((1 shl (32 - Netmask)) - 1);
+  { Calculer l'adresse rÇseau et la diffusion }
  NetworkNum := BaseNum and MaskNum;
  BroadcastNum := NetworkNum or (not MaskNum);
- 
  StartIP := IPIntToString(NetworkNum + 1);
  EndIP := IPIntToString(BroadcastNum - 1);
- 
  ParseNetworkRange := True;
 End;
 
-{ D√©couverte par broadcast NetBIOS }
-Function DiscoverByBroadcast: Integer;
-Begin
+ { DÇcouverte par diffusion NetBIOS }
+Function DiscoverByBroadcast:Integer;Begin
  Result := 0;
- 
  If not FindSMBConfig.UseBroadcast Then Exit;
- 
- If FindSMBConfig.VerboseMode Then
-  WriteLn('NetBIOS broadcast discovery not implemented in this version');
+ If FindSMBConfig.VerboseMode Then WriteLn('DÇcouverte de diffusion NetBIOS non implementÇ dans cette version');
 End;
 
-{ Initialiser configuration par d√©faut }
-Procedure InitializeFindSMBConfig;
-Begin
+{ Initialiser configuration par dÇfaut }
+Procedure InitializeFindSMBConfig;Begin
  With FindSMBConfig Do Begin
   NetworkRange := '192.168.1.0/24';
   TimeoutMS := 1000;
@@ -435,46 +384,37 @@ Begin
   ResolveDNS := False;
   UseNetBIOS := True;
   UseBroadcast := True;
-  
-  { Ports SMB par d√©faut }
+   { Ports SMB par dÇfaut }
   ScanPorts[0] := 139; { NetBIOS Session Service }
   ScanPorts[1] := 445; { Microsoft-DS }
   ScanPorts[2] := 137; { NetBIOS Name Service }
   ScanPorts[3] := 138; { NetBIOS Datagram Service }
   PortCount := 4;
  End;
- 
- { Initialiser statistiques }
+  { Initialiser statistiques }
  FillChar(ScanStats, SizeOf(ScanStats), 0);
  ScanStats.ScanStartTime := Now;
- 
  ServerCount := 0;
 End;
 
-{ Afficher les r√©sultats du scan }
+ { Afficher les rÇsultats du balayage }
 Procedure DisplayResults;
 Var
  I, J: Integer;
 Begin
  If FindSMBConfig.QuietMode Then Exit;
- 
  WriteLn;
  WriteLn('SMB Server Discovery Results');
  WriteLn(StringOfChar('=', 50));
- 
  If ServerCount = 0 Then Begin
-  WriteLn('No SMB servers found');
+  WriteLn('Pas de serveur SMB trouvÇ');
   Exit;
  End;
- 
  For I := 0 To ServerCount - 1 Do Begin
   With SMBServers[I] Do Begin
    WriteLn('Server #', I + 1);
    WriteLn('  IP Address: ', IPAddress);
-   
-   If FindSMBConfig.UseNetBIOS and (NetBIOSName <> '') Then
-    WriteLn('  NetBIOS Name: ', NetBIOSName);
-   
+   If FindSMBConfig.UseNetBIOS and (NetBIOSName <> '') Then WriteLn('  NetBIOS Name: ', NetBIOSName);
    If FindSMBConfig.ShowDetails Then Begin
     WriteLn('  Workgroup: ', WorkGroup);
     WriteLn('  Server Type: ', ServerType);
@@ -482,7 +422,6 @@ Begin
     WriteLn('  Response Time: ', ResponseTime, ' ms');
     WriteLn('  Last Seen: ', FormatDateTime('yyyy-mm-dd hh:nn:ss', LastSeen));
    End;
-   
    If FindSMBConfig.ShowServices and (ServiceCount > 0) Then Begin
     Write('  Services: ');
     For J := 0 To ServiceCount - 1 Do Begin
@@ -491,7 +430,7 @@ Begin
     End;
     WriteLn;
    End;
-   
+
    WriteLn;
   End;
  End;
@@ -501,24 +440,24 @@ End;
 Procedure DisplayStatistics;
 Begin
  If FindSMBConfig.QuietMode Then Exit;
- 
+
  ScanStats.ScanEndTime := Now;
  ScanStats.TotalTime := Round((ScanStats.ScanEndTime - ScanStats.ScanStartTime) * 24 * 60 * 60 * 1000);
- 
+
  WriteLn('Scan Statistics');
  WriteLn(StringOfChar('-', 30));
  WriteLn('Total IPs scanned: ', ScanStats.TotalScanned);
  WriteLn('SMB servers found: ', ScanStats.ServersFound);
  WriteLn('Active servers: ', ScanStats.ActiveServers);
  WriteLn('Total scan time: ', ScanStats.TotalTime, ' ms');
- 
+
  If ScanStats.FastestResponse > 0 Then
   WriteLn('Fastest response: ', ScanStats.FastestResponse, ' ms');
  If ScanStats.SlowestResponse > 0 Then
   WriteLn('Slowest response: ', ScanStats.SlowestResponse, ' ms');
 End;
 
-{ Exporter r√©sultats en CSV }
+{ Exporter rÇsultats en CSV }
 Procedure ExportToCSV(FileName: String);
 Var
  F: TextFile;
@@ -526,32 +465,26 @@ Var
 Begin
  AssignFile(F, FileName);
  Rewrite(F);
- 
  Try
   { En-t√™tes CSV }
   WriteLn(F, 'IP,NetBIOS_Name,Workgroup,Server_Type,Response_Time,Services');
-  
   For I := 0 To ServerCount - 1 Do Begin
    With SMBServers[I] Do Begin
     Write(F, IPAddress, ',', NetBIOSName, ',', WorkGroup, ',', ServerType, ',', ResponseTime, ',"');
-    
     For J := 0 To ServiceCount - 1 Do Begin
      Write(F, Services[J]);
      If J < ServiceCount - 1 Then Write(F, ';');
     End;
-    
     WriteLn(F, '"');
    End;
   End;
-  
-  WriteLn('Results exported to ', FileName);
-  
+  WriteLn('RÇsultat d''exportation vers ', FileName);
  Finally
   CloseFile(F);
  End;
 End;
 
-{ Analyser les arguments de ligne de commande }
+ { Analyser les arguments de ligne de commande }
 Procedure ParseCommandLine;
 Var
  I: Integer;
@@ -560,11 +493,10 @@ Begin
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--version') Then Begin
    WriteLn('findsmb (NETWORKKIT-P) 1.0');
-   WriteLn('SMB/CIFS server discovery tool');
-   WriteLn('Compatible with Samba findsmb');
+   WriteLn('Outil de dÇcouerte de serveur SMB/CIFS');
+   WriteLn('Compatible avec Samba findsmb');
    Halt;
   End
   Else If (LowerCase(Param) = '-h') or (LowerCase(Param) = '--help') Then Begin
@@ -577,58 +509,65 @@ Begin
    If I <= ParamCount Then
     FindSMBConfig.NetworkRange := ParamStr(I)
    Else Begin
-    WriteLn('Option -r requires network range argument');
+    WriteLn('Option -r requäre un argument de plage rÇseau');
     Halt(1);
    End;
   End
-  Else If LowerCase(Param) = '-t' Then Begin
-   { Timeout }
+   Else
+  If LowerCase(Param) = '-t' Then Begin
+   { DÇpassement de dÇlai }
    Inc(I);
    If I <= ParamCount Then
     FindSMBConfig.TimeoutMS := StrToIntDef(ParamStr(I), 1000)
    Else Begin
-    WriteLn('Option -t requires timeout argument');
+    WriteLn('Option -t requäre un argument de dÇpassement de dÇlai');
     Halt(1);
    End;
   End
-  Else If LowerCase(Param) = '-verbose' Then Begin
+   Else
+  If LowerCase(Param) = '-verbose' Then Begin
    FindSMBConfig.VerboseMode := True;
   End
-  Else If LowerCase(Param) = '-quiet' Then Begin
+   Else
+  If LowerCase(Param) = '-quiet' Then Begin
    FindSMBConfig.QuietMode := True;
   End
-  Else If LowerCase(Param) = '-details' Then Begin
+   Else
+  If LowerCase(Param) = '-details' Then Begin
    FindSMBConfig.ShowDetails := True;
   End
-  Else If LowerCase(Param) = '-services' Then Begin
+   Else
+  If LowerCase(Param) = '-services' Then Begin
    FindSMBConfig.ShowServices := True;
   End
-  Else If LowerCase(Param) = '-no-netbios' Then Begin
+   Else
+  If LowerCase(Param) = '-no-netbios' Then Begin
    FindSMBConfig.UseNetBIOS := False;
   End
-  Else If LowerCase(Param) = '-no-broadcast' Then Begin
+   Else
+  If LowerCase(Param) = '-no-broadcast' Then Begin
    FindSMBConfig.UseBroadcast := False;
   End
-  Else If LowerCase(Param) = '-csv' Then Begin
+   Else
+  If LowerCase(Param) = '-csv' Then Begin
    { Export CSV }
    Inc(I);
    If I <= ParamCount Then
     FindSMBConfig.OutputFormat := 'csv'
    Else Begin
-    WriteLn('Option -csv requires filename argument');
+    WriteLn('Option -csv requäres un paramätre de nom de fichier');
     Halt(1);
    End;
   End
   Else If Copy(Param, 1, 1) <> '-' Then Begin
-   { Argument positionnel - range r√©seau }
+   { Argument positionnel - range de rÇseau }
    FindSMBConfig.NetworkRange := Param;
   End;
-  
   Inc(I);
  End;
 End;
 
-{ Fonction principale de scan }
+{ Fonction principale de balayage }
 Procedure RunSMBDiscovery;
 Var
  StartIP, EndIP: String;
@@ -636,42 +575,34 @@ Var
 Begin
  If not FindSMBConfig.QuietMode Then Begin
   WriteLn('FindSMB - SMB/CIFS Server Discovery');
-  WriteLn('Scanning network range: ', FindSMBConfig.NetworkRange);
+  WriteLn('Balayage des plages rÇseaux : ', FindSMBConfig.NetworkRange);
   WriteLn;
  End;
- 
- { Initialiser r√©seau }
+  { Initialiser rÇseau }
  If not InitializeNetwork Then Begin
-  WriteLn('Failed to initialize network');
+  WriteLn('Echec d''initialisation rÇseau');
   Halt(1);
  End;
- 
  Try
-  { D√©couverte par broadcast si activ√©e }
-  If FindSMBConfig.UseBroadcast Then
-   DiscoverByBroadcast;
-  
-  { Parser la plage r√©seau }
+  { DÇcouverte par broadcast si activÇe }
+  If FindSMBConfig.UseBroadcast Then DiscoverByBroadcast;
+   { Analyseer la plage rÇseau }
   If ParseNetworkRange(FindSMBConfig.NetworkRange, StartIP, EndIP) Then Begin
    If not FindSMBConfig.QuietMode Then
-    WriteLn('Scanning IP range: ', StartIP, ' - ', EndIP);
-   
-   { Scanner la plage }
+    WriteLn('Balayage de plage IP: ', StartIP, ' - ', EndIP);
+    { Balayage de plage }
    ServersFound := ScanIPRange(StartIP, EndIP);
-   
-   { Afficher r√©sultats }
+    { Afficher rÇsultats }
    DisplayResults;
    DisplayStatistics;
-   
-   { Export CSV si demand√© }
-   If FindSMBConfig.OutputFormat = 'csv' Then
-    ExportToCSV('findsmb_results.csv');
-   
-  End Else Begin
-   WriteLn('Error: Invalid network range format');
+    { Export CSV si demandÇ }
+   If FindSMBConfig.OutputFormat='csv' Then ExportToCSV('findsmb_results.csv');
+  End
+   Else
+  Begin
+   WriteLn('Erreur: Format de plage rÇseau invalide');
    Halt(1);
   End;
-  
  Finally
   CleanupNetwork;
  End;
@@ -680,42 +611,41 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedFindSMB;
-Begin
+Procedure ShowSimulatedFindSMB;Begin
  WriteLn('FINDSMB [NETWORKKIT-P] SMB Server Discovery (simulation)');
  WriteLn('========================================================');
  WriteLn;
- WriteLn('Scanning network range: 192.168.1.0/24');
- WriteLn('Scanning IP range: 192.168.1.1 - 192.168.1.254');
+ WriteLn('Balayage de plage rÇseau: 192.168.1.0/24');
+ WriteLn('Balayage de plage IP: 192.168.1.1 - 192.168.1.254');
  WriteLn;
- WriteLn('SMB Server Discovery Results');
- WriteLn('============================');
+ WriteLn('RÇsultat SMB Server Discovery');
+ WriteLn('=============================');
  WriteLn;
- WriteLn('Server #1');
- WriteLn('  IP Address: 192.168.1.100');
- WriteLn('  NetBIOS Name: FILESERVER');
- WriteLn('  Workgroup: OFFICE');
+ WriteLn('Serveur #1');
+ WriteLn('  Adresse IP: 192.168.1.100');
+ WriteLn('  Nom NetBIOS: FILESERVER');
+ WriteLn('  Groupe de travail: OFFICE');
  WriteLn('  Services: NetBIOS-SSN, Microsoft-DS');
  WriteLn;
- WriteLn('Server #2');
- WriteLn('  IP Address: 192.168.1.150');
- WriteLn('  NetBIOS Name: NAS-STORAGE');
- WriteLn('  Workgroup: WORKGROUP');
+ WriteLn('Serveur #2');
+ WriteLn('  Adresse IP: 192.168.1.150');
+ WriteLn('  Nom NetBIOS: NAS-STORAGE');
+ WriteLn('  Groupe de travail: WORKGROUP');
  WriteLn('  Services: NetBIOS-SSN, Microsoft-DS, NetBIOS-NS');
  WriteLn;
- WriteLn('Scan Statistics');
- WriteLn('---------------');
- WriteLn('Total IPs scanned: 254');
- WriteLn('SMB servers found: 2');
- WriteLn('Active servers: 2');
- WriteLn('Total scan time: 12560 ms');
+ WriteLn('Statistiques de balayage');
+ WriteLn('------------------------');
+ WriteLn('Total des IPs balayÇ: 254');
+ WriteLn('Serveurs SMB trouvÇ: 2');
+ WriteLn('Serveurs actif: 2');
+ WriteLn('Temps total de balayage: 12560 ms');
 End;
 {$ENDIF}
 
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('FINDSMB : Find SMB/CIFS servers on network');
+  WriteLn('FINDSMB : Cette commande permet de rechercher des serveurs SMB/CIFS dans le rÇseau');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  FINDSMB [options] [network_range]');
@@ -723,52 +653,52 @@ BEGIN
   WriteLn('Options :');
   WriteLn('  -h, --help            Afficher cette aide');
   WriteLn('  -v, --version         Afficher la version');
-  WriteLn('  -r RANGE              Plage r√©seau (ex: 192.168.1.0/24)');
-  WriteLn('  -t TIMEOUT            Timeout en millisecondes (d√©faut: 1000)');
+  WriteLn('  -r RANGE              Plage rÇseau (exemple: 192.168.1.0/24)');
+  WriteLn('  -t TIMEOUT            DÇpassement de dÇlai en millisecondes (dÇfaut: 1000)');
   WriteLn('  -verbose              Mode verbeux');
   WriteLn('  -quiet                Mode silencieux');
-  WriteLn('  -details              Afficher informations d√©taill√©es');
-  WriteLn('  -services             Afficher les services d√©tect√©s');
-  WriteLn('  -no-netbios           D√©sactiver requ√™tes NetBIOS');
-  WriteLn('  -no-broadcast         D√©sactiver d√©couverte par broadcast');
-  WriteLn('  -csv FICHIER          Exporter r√©sultats en CSV');
+  WriteLn('  -details              Afficher informations dÇtaillÇes');
+  WriteLn('  -services             Afficher les services dÇtectÇs');
+  WriteLn('  -no-netbios           DÇsactiver requàtes NetBIOS');
+  WriteLn('  -no-broadcast         DÇsactiver dÇcouverte par broadcast');
+  WriteLn('  -csv FICHIER          Exporter rÇsultats en CSV');
   WriteLn;
-  WriteLn('Formats de plage r√©seau :');
-  WriteLn('  192.168.1.0/24        R√©seau complet avec masque CIDR');
+  WriteLn('Formats de plage rÇseau :');
+  WriteLn('  192.168.1.0/24        RÇseau complet avec masque CIDR');
   WriteLn('  192.168.1.100         Adresse IP unique');
-  WriteLn('  10.0.0.0/16           Grand r√©seau (65534 adresses)');
-  WriteLn('  172.16.0.0/12         R√©seau priv√© classe B');
+  WriteLn('  10.0.0.0/16           Grand rÇseau (65534 adresses)');
+  WriteLn('  172.16.0.0/12         RÇseau privÇ classe B');
   WriteLn;
-  WriteLn('Ports scann√©s :');
+  WriteLn('Ports balayÇs :');
   WriteLn('  139                   NetBIOS Session Service');
   WriteLn('  445                   Microsoft Directory Services (SMB over TCP)');
   WriteLn('  137                   NetBIOS Name Service');
   WriteLn('  138                   NetBIOS Datagram Service');
   WriteLn('  135                   RPC Endpoint Mapper');
   WriteLn;
-  WriteLn('Types de d√©couverte :');
-  WriteLn('  Port Scanning         Test de connectivit√© TCP sur ports SMB');
-  WriteLn('  NetBIOS Queries       Requ√™tes nom NetBIOS (port 137/UDP)');
-  WriteLn('  Broadcast Discovery   D√©couverte par broadcast NetBIOS');
+  WriteLn('Types de dÇcouverte :');
+  WriteLn('  Port Scanning         Test de connectivitÇ TCP sur ports SMB');
+  WriteLn('  NetBIOS Queries       Requàtes nom NetBIOS (port 137/UDP)');
+  WriteLn('  Broadcast Discovery   DÇcouverte par diffusion NetBIOS');
   WriteLn;
-  WriteLn('Informations d√©tect√©es :');
-  WriteLn('  ‚Ä¢ Adresse IP du serveur');
-  WriteLn('  ‚Ä¢ Nom NetBIOS (si disponible)');
-  WriteLn('  ‚Ä¢ Groupe de travail/domaine');
-  WriteLn('  ‚Ä¢ Services SMB actifs');
-  WriteLn('  ‚Ä¢ Temps de r√©ponse');
-  WriteLn('  ‚Ä¢ Type de serveur');
+  WriteLn('Informations dÇtectÇes :');
+  WriteLn('  ˛ Adresse IP du serveur');
+  WriteLn('  ˛ Nom NetBIOS (si disponible)');
+  WriteLn('  ˛ Groupe de travail/domaine');
+  WriteLn('  ˛ Services SMB actifs');
+  WriteLn('  ˛ Temps de rÇponse');
+  WriteLn('  ˛ Type de serveur');
   WriteLn;
   WriteLn('Exemples :');
-  WriteLn('  FINDSMB                           # Scanner r√©seau local par d√©faut');
-  WriteLn('  FINDSMB 192.168.1.0/24           # Scanner r√©seau sp√©cifique');
-  WriteLn('  FINDSMB -r 10.0.0.0/8 -t 2000    # Grand r√©seau avec timeout √©tendu');
-  WriteLn('  FINDSMB -verbose -details         # Scan d√©taill√© avec informations');
+  WriteLn('  FINDSMB                            # Balayage rÇseau local par dÇfaut');
+  WriteLn('  FINDSMB 192.168.1.0/24             # Balayage rÇseau spÇcifique');
+  WriteLn('  FINDSMB -r 10.0.0.0/8 -t 2000      # Grand rÇseau avec dÇpassement de dÇlai Çtendu');
+  WriteLn('  FINDSMB -verbose -details          # Balayage dÇtaillÇ avec informations');
   WriteLn('  FINDSMB -services -csv results.csv # Export avec services');
-  WriteLn('  FINDSMB 172.16.1.100             # Scanner une IP sp√©cifique');
-  WriteLn('  FINDSMB -no-netbios -quiet        # Scan rapide sans NetBIOS');
+  WriteLn('  FINDSMB 172.16.1.100               # Balaye une IP spÇcifique');
+  WriteLn('  FINDSMB -no-netbios -quiet         # Scan rapide sans NetBIOS');
   WriteLn;
-  WriteLn('Format de sortie par d√©faut :');
+  WriteLn('Format de sortie par dÇfaut :');
   WriteLn('  Server #1');
   WriteLn('    IP Address: 192.168.1.100');
   WriteLn('    NetBIOS Name: FILESERVER');
@@ -776,27 +706,28 @@ BEGIN
   WriteLn('    Services: NetBIOS-SSN, Microsoft-DS');
   WriteLn;
   WriteLn('Variables d''environnement :');
-  WriteLn('  FINDSMB_TIMEOUT       Timeout par d√©faut (ms)');
-  WriteLn('  FINDSMB_RANGE         Plage r√©seau par d√©faut');
+  WriteLn('  FINDSMB_TIMEOUT       Timeout par dÇfaut (ms)');
+  WriteLn('  FINDSMB_RANGE         Plage rÇseau par dÇfaut');
   WriteLn;
   WriteLn('Codes de retour :');
-  WriteLn('  0                     Scan termin√© avec succ√®s');
-  WriteLn('  1                     Erreur dans les param√®tres');
-  WriteLn('  2                     Erreur r√©seau');
-  WriteLn('  3                     Aucun serveur trouv√©');
+  WriteLn('  0                     Balayage terminÇ avec succäs');
+  WriteLn('  1                     Erreur dans les paramätres');
+  WriteLn('  2                     Erreur rÇseau');
+  WriteLn('  3                     Aucun serveur trouvÇ');
   WriteLn;
-  WriteLn('Note: Outil de d√©couverte de serveurs SMB/CIFS sur le r√©seau local.');
-  WriteLn('Compatible avec findsmb de Samba. Utilise des techniques de scan');
-  WriteLn('de ports et des requ√™tes NetBIOS pour identifier les serveurs.');
+  WriteLn('Note: Outil de dÇcouverte de serveurs SMB/CIFS sur le rÇseau local.');
+  WriteLn('Compatible avec findsmb de Samba. Utilise des techniques de balayage');
+  WriteLn('de ports et des requàtes NetBIOS pour identifier les serveurs.');
  End
  Else If ParamStr(1) = '--version' Then Begin
-  WriteLn('findsmb (NETWORKKIT-P) 1.0');
-  WriteLn('SMB/CIFS server discovery tool');
-  WriteLn('Compatible with Samba findsmb command');
+  WriteLn('findsmb 1.0 - Clone Pascal pour NETWORKIT-P, Linux, Corail');
+  WriteLn('Outils de dÇcouverte de serveur SMB/CIFS');
+  WriteLn('Compatible avec la commande Samba findsmb');
   WriteLn;
-  WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+  WriteLn('êcrit par Sylvain Maltais for NETWORKKIT-P');
  End
- Else Begin
+  Else
+ Begin
   {$IFDEF FPC}
   InitializeFindSMBConfig;
   ParseCommandLine;
