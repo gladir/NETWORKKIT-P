@@ -10,9 +10,9 @@ Program NE2000;
 
 {$IFDEF FPC}
  {$mode objfpc}
- Uses SysUtils;
+ Uses SysUtils,DOS;
 {$ELSE} 
- Uses Crt;
+ Uses Crt,DOS;
 {$ENDIF}
 
 { Registres NE2000 }
@@ -93,6 +93,8 @@ Type
 Var
  NE2000Config: TNE2000Config;
  OldInt21: Pointer;      { Ancien gestionnaire INT 21h }
+ Language:(_French,_English,_Germany,_Italian,_Spain,_Albanian,_Portuguese,_Swedish,_Danish,_Japanese);
+ TmpLanguage:String;
 
 {$IFDEF FPC}
 { === SIMULATION DES FONCTIONS POUR FREE PASCAL === }
@@ -100,6 +102,17 @@ Var
 {$ENDIF}
 
 { === FONCTIONS DE COMPATIBILITÉ === }
+
+{ Fonction StrToUpper pour compatibilité }
+Function StrToUpper(S:String):String;
+Var
+ I:Byte;
+Begin
+ For I:=1 to Length(S) do Begin
+  If S[I] in['a'..'z'] Then S[I]:=Chr(Ord(S[I])-32);
+ End;
+ StrToUpper:=S;
+End;
 
 { Fonction IntToHex pour compatibilité Turbo Pascal }
 {$IFNDEF FPC}
@@ -383,12 +396,93 @@ End;
 
 { === FONCTIONS UTILITAIRES === }
 
+{ Messages multilingues }
+Function GetMsg_CardDetected: String;
+Begin
+ Case Language of
+  _English:   GetMsg_CardDetected := 'NE2000 card detected successfully!';
+  _Germany:   GetMsg_CardDetected := 'NE2000-Karte erfolgreich erkannt!';
+  _Italian:   GetMsg_CardDetected := 'Scheda NE2000 rilevata con successo!';
+  _Spain:     GetMsg_CardDetected := '¡Tarjeta NE2000 detectada exitosamente!';
+  _Albanian:  GetMsg_CardDetected := 'Karta NE2000 u zbulua me sukses!';
+  _Portuguese:GetMsg_CardDetected := 'Placa NE2000 detectada com sucesso!';
+  _Swedish:   GetMsg_CardDetected := 'NE2000-kort upptäckt framgångsrikt!';
+  _Danish:    GetMsg_CardDetected := 'NE2000-kort opdaget succesfuldt!';
+  _Japanese:  GetMsg_CardDetected := 'NE2000 kaado ga seikou ni kenshutsu saremashita!';
+  Else        GetMsg_CardDetected := 'Carte NE2000 détectée avec succès!';
+ End;
+End;
+
+Function GetMsg_CardNotDetected: String;
+Begin
+ Case Language of
+  _English:   GetMsg_CardNotDetected := 'ERROR: No NE2000 card detected at address $';
+  _Germany:   GetMsg_CardNotDetected := 'FEHLER: Keine NE2000-Karte an Adresse $ erkannt';
+  _Italian:   GetMsg_CardNotDetected := 'ERRORE: Nessuna scheda NE2000 rilevata all''indirizzo $';
+  _Spain:     GetMsg_CardNotDetected := 'ERROR: No se detectó tarjeta NE2000 en dirección $';
+  _Albanian:  GetMsg_CardNotDetected := 'GABIM: Asnjë kartë NE2000 nuk u zbulua në adresën $';
+  _Portuguese:GetMsg_CardNotDetected := 'ERRO: Nenhuma placa NE2000 detectada no endereço $';
+  _Swedish:   GetMsg_CardNotDetected := 'FEL: Inget NE2000-kort upptäckt på adress $';
+  _Danish:    GetMsg_CardNotDetected := 'FEJL: Intet NE2000-kort opdaget på adresse $';
+  _Japanese:  GetMsg_CardNotDetected := 'ERAAH: Adoresu $ ni NE2000 kaado ga kenshutsu saremasen deshita';
+  Else        GetMsg_CardNotDetected := 'ERREUR: Aucune carte NE2000 détectée à l''adresse $';
+ End;
+End;
+
+Function GetMsg_DriverInstallSuccess: String;
+Begin
+ Case Language of
+  _English:   GetMsg_DriverInstallSuccess := 'NE2000 packet driver installed successfully!';
+  _Germany:   GetMsg_DriverInstallSuccess := 'NE2000 Packet-Treiber erfolgreich installiert!';
+  _Italian:   GetMsg_DriverInstallSuccess := 'Driver pacchetti NE2000 installato con successo!';
+  _Spain:     GetMsg_DriverInstallSuccess := '¡Driver de paquetes NE2000 instalado exitosamente!';
+  _Albanian:  GetMsg_DriverInstallSuccess := 'Drajveri i paketave NE2000 u instalua me sukses!';
+  _Portuguese:GetMsg_DriverInstallSuccess := 'Driver de pacotes NE2000 instalado com sucesso!';
+  _Swedish:   GetMsg_DriverInstallSuccess := 'NE2000 paketdrivrutin installerad framgångsrikt!';
+  _Danish:    GetMsg_DriverInstallSuccess := 'NE2000 pakkedriver installeret succesfuldt!';
+  _Japanese:  GetMsg_DriverInstallSuccess := 'NE2000 paketto doraibaa ga seikou ni insutooru saremashita!';
+  Else        GetMsg_DriverInstallSuccess := 'Driver packet NE2000 installé avec succès!';
+ End;
+End;
+
+Function GetMsg_MACAddress: String;
+Begin
+ Case Language of
+  _English:   GetMsg_MACAddress := 'MAC Address: ';
+  _Germany:   GetMsg_MACAddress := 'MAC-Adresse: ';
+  _Italian:   GetMsg_MACAddress := 'Indirizzo MAC: ';
+  _Spain:     GetMsg_MACAddress := 'Dirección MAC: ';
+  _Albanian:  GetMsg_MACAddress := 'Adresa MAC: ';
+  _Portuguese:GetMsg_MACAddress := 'Endereço MAC: ';
+  _Swedish:   GetMsg_MACAddress := 'MAC-adress: ';
+  _Danish:    GetMsg_MACAddress := 'MAC-adresse: ';
+  _Japanese:  GetMsg_MACAddress := 'MAC adoresu: ';
+  Else        GetMsg_MACAddress := 'Adresse MAC: ';
+ End;
+End;
+
+Function GetMsg_CardStatus: String;
+Begin
+ Case Language of
+  _English:   GetMsg_CardStatus := 'NE2000 card status:';
+  _Germany:   GetMsg_CardStatus := 'NE2000-Karten Status:';
+  _Italian:   GetMsg_CardStatus := 'Stato scheda NE2000:';
+  _Spain:     GetMsg_CardStatus := 'Estado de tarjeta NE2000:';
+  _Albanian:  GetMsg_CardStatus := 'Gjendja e kartës NE2000:';
+  _Portuguese:GetMsg_CardStatus := 'Status da placa NE2000:';
+  _Swedish:   GetMsg_CardStatus := 'NE2000-kort status:';
+  _Danish:    GetMsg_CardStatus := 'NE2000-kort status:';
+  _Japanese:  GetMsg_CardStatus := 'NE2000 kaado no suteetasu:';
+  Else        GetMsg_CardStatus := 'État de la carte NE2000:';
+ End;
+End;
+
 { Afficher l'adresse MAC }
 Procedure DisplayMACAddress;
 Var
  I: Integer;
 Begin
- Write('Adresse MAC: ');
+ Write(GetMsg_MACAddress);
  For I := 0 To 5 Do Begin
   Write(IntToHex(NE2000Config.MACAddress[I], 2));
   If I < 5 Then Write('-');
@@ -401,7 +495,7 @@ Procedure DisplayCardStatus;
 Var
  CR, ISR, TSR: Byte;
 Begin
- WriteLn('État de la carte NE2000:');
+ WriteLn(GetMsg_CardStatus);
  WriteLn('------------------------');
  
  CR := ReadNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR);
@@ -525,11 +619,11 @@ Begin
  { Détecter la carte }
  WriteLn('Détection de la carte NE2000...');
  If not DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-  WriteLn('ERREUR: Aucune carte NE2000 détectée à l''adresse $', IntToHex(NE2000Config.IOBaseAddr, 4));
+  WriteLn(GetMsg_CardNotDetected, IntToHex(NE2000Config.IOBaseAddr, 4));
   Exit;
  End;
  
- WriteLn('Carte NE2000 détectée avec succès!');
+ WriteLn(GetMsg_CardDetected);
  NE2000Config.IsDetected := True;
  DisplayMACAddress;
  WriteLn;
@@ -560,7 +654,7 @@ Begin
  NE2000Config.IsInstalled := True;
  
  WriteLn;
- WriteLn('Driver packet NE2000 installé avec succès!');
+ WriteLn(GetMsg_DriverInstallSuccess);
  WriteLn('Le driver est maintenant prêt à être utilisé par les applications réseau.');
  
  InstallDriver := True;
@@ -621,9 +715,31 @@ Const
  DriverName: PChar = 'NE2000 Packet Driver';
 
 BEGIN
+{ Initialiser la langue }
+ Language:=_French;
+ TmpLanguage:=GetEnv('LANGUAGE');
+ If TmpLanguage<>''Then Begin
+  If TmpLanguage[1]='"'Then TmpLanguage:=Copy(TmpLanguage,2,255);
+  If StrToUpper(Copy(TmpLanguage,1,2))='EN'Then Language:=_English Else
+  If StrToUpper(Copy(TmpLanguage,1,2))='GR'Then Language:=_Germany Else
+  If StrToUpper(Copy(TmpLanguage,1,2))='IT'Then Language:=_Italian Else
+  If StrToUpper(Copy(TmpLanguage,1,2))='SP'Then Language:=_Spain Else
+  If(StrToUpper(Copy(TmpLanguage,1,2))='SQ')or
+    (StrToUpper(Copy(TmpLanguage,1,3))='ALB')Then Language:=_Albanian Else
+  If(StrToUpper(Copy(TmpLanguage,1,2))='PT')or
+    (StrToUpper(Copy(TmpLanguage,1,3))='PRT')Then Language:=_Portuguese Else
+  If(StrToUpper(Copy(TmpLanguage,1,2))='SE')or
+    (StrToUpper(Copy(TmpLanguage,1,3))='SWE')Then Language:=_Swedish Else
+  If(StrToUpper(Copy(TmpLanguage,1,2))='DK')or
+    (StrToUpper(Copy(TmpLanguage,1,3))='DNK')Then Language:=_Danish Else
+  If(StrToUpper(Copy(TmpLanguage,1,2))='JP')or
+    (StrToUpper(Copy(TmpLanguage,1,3))='JPN')Then Language:=_Japanese;
+ End;
+ 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('NE2000 : Driver de paquet pour cartes Ethernet NE2000 compatibles ISA');
+  WriteLn('NE2000 : Cette commande permet de lancer un pilote de paquet pour cartes Ethernet NE2000 ',
+                   'compatibles ISA.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
@@ -644,7 +760,7 @@ BEGIN
   WriteLn('  NE2000 61 5 280           # IRQ 5, adresse $280');
   WriteLn('  NE2000 62 11 320          # IRQ 11, adresse $320');
   WriteLn;
-  WriteLn('Adresses I/O courantes :');
+  WriteLn('Adresses d''entrée/sorties courantes :');
   WriteLn('  280h, 300h, 320h, 340h, 360h');
   WriteLn;
   WriteLn('IRQ courantes :');
@@ -698,12 +814,12 @@ BEGIN
   WriteLn;
   
   If DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-   WriteLn('Carte NE2000 détectée avec succès!');
+   WriteLn(GetMsg_CardDetected);
    NE2000Config.IsDetected := True;
    DisplayMACAddress;
    DisplayCardStatus;
   End Else Begin
-   WriteLn('Aucune carte NE2000 détectée à l''adresse $', IntToHex(NE2000Config.IOBaseAddr, 4));
+   WriteLn(GetMsg_CardNotDetected, IntToHex(NE2000Config.IOBaseAddr, 4));
    WriteLn('Essayez d''autres adresses I/O courantes: $280, $320, $340, $360');
    Halt(2);
   End;
