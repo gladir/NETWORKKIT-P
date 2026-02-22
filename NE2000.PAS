@@ -11,6 +11,8 @@ Program NE2000;
 {$IFDEF FPC}
  {$mode objfpc}
  Uses SysUtils;
+{$ELSE} 
+ Uses Crt;
 {$ENDIF}
 
 { Registres NE2000 }
@@ -94,11 +96,29 @@ Var
 
 {$IFDEF FPC}
 { === SIMULATION DES FONCTIONS POUR FREE PASCAL === }
-
-{ Simulation d'accès aux ports (non-fonctionnel en Windows moderne) }
-Var
  SimulatedPort: Array[0..65535] of Byte;
+{$ENDIF}
 
+{ === FONCTIONS DE COMPATIBILITÉ === }
+
+{ Fonction IntToHex pour compatibilité Turbo Pascal }
+{$IFNDEF FPC}
+Function IntToHex(Value: Word; Digits: Integer): String;
+Const
+ HexChars: String[16] = '0123456789ABCDEF';
+Var
+ Result: String;
+ I: Integer;
+Begin
+ Result := '';
+ For I := Digits - 1 DownTo 0 Do Begin
+  Result := Result + HexChars[((Value shr (I * 4)) and $F) + 1];
+ End;
+ IntToHex := Result;
+End;
+{$ENDIF}
+
+{$IFDEF FPC}
 { Fonction Port simulée pour lecture }
 Function ReadPort(PortAddr: Word): Byte;
 Begin
@@ -127,11 +147,8 @@ Begin
   { Attendre };
 End;
 
-{$ENDIF}
-
-{$IFNDEF FPC}
+{$ELSE}
 { === VERSION TURBO PASCAL AVEC ACCÈS PORTS RÉELS === }
-Uses DOS;
 
 { Fonction Port pour lecture - Turbo Pascal natif }
 Function ReadPort(PortAddr: Word): Byte;
@@ -152,25 +169,25 @@ End;
 { Lire un octet du registre NE2000 }
 Function ReadNE2000Reg(BaseAddr: Word; RegOffset: Byte): Byte;
 Begin
- ReadNE2000Reg := Port[BaseAddr + RegOffset];
+ ReadNE2000Reg := ReadPort(BaseAddr + RegOffset);
 End;
 
 { Écrire un octet dans le registre NE2000 }
 Procedure WriteNE2000Reg(BaseAddr: Word; RegOffset: Byte; Value: Byte);
 Begin
- Port[BaseAddr + RegOffset] := Value;
+ WritePort(BaseAddr + RegOffset, Value);
 End;
 
 { Lire données du port I/O NE2000 }
 Function ReadNE2000Data(BaseAddr: Word): Byte;
 Begin
- ReadNE2000Data := Port[BaseAddr + NE2000_IOPORT];
+ ReadNE2000Data := ReadPort(BaseAddr + NE2000_IOPORT);
 End;
 
 { Écrire données vers le port I/O NE2000 }
 Procedure WriteNE2000Data(BaseAddr: Word; Value: Byte);
 Begin
- Port[BaseAddr + NE2000_IOPORT] := Value;
+ WritePort(BaseAddr + NE2000_IOPORT, Value);
 End;
 
 { === DÉTECTION ET INITIALISATION === }
@@ -181,13 +198,13 @@ Var
  ResetValue: Byte;
 Begin
  { Lecture du port de réinitialisation pour déclencher le reset }
- ResetValue := Port[BaseAddr + NE2000_RESET];
+ ResetValue := ReadPort(BaseAddr + NE2000_RESET);
  
  { Attendre un peu pour la réinitialisation }
  Delay(10);
  
  { Écrire la valeur lue pour compléter la réinitialisation }
- Port[BaseAddr + NE2000_RESET] := ResetValue;
+ WritePort(BaseAddr + NE2000_RESET, ResetValue);
  
  { Attendre la fin de la réinitialisation }
  Delay(100);
@@ -198,7 +215,6 @@ Function DetectNE2000(BaseAddr: Word): Boolean;
 Var
  TestValue, ReadValue: Byte;
  I: Integer;
- SavedValue: Byte;
 Begin
  DetectNE2000 := False;
  
@@ -307,10 +323,10 @@ Begin
  
  { Acquitter l'interruption matérielle }
  If NE2000Config.HardwareInt >= 8 Then Begin
-  Port[$A0] := $20;  { EOI vers contrôleur esclave }
-  Port[$20] := $20;  { EOI vers contrôleur maître }
+  WritePort($A0, $20);  { EOI vers contrôleur esclave }
+  WritePort($20, $20);  { EOI vers contrôleur maître }
  End Else Begin
-  Port[$20] := $20;  { EOI vers contrôleur maître }
+  WritePort($20, $20);  { EOI vers contrôleur maître }
  End;
 End;
 {$F-}
@@ -333,11 +349,15 @@ End;
 Procedure PacketDriverHandler;
 Begin
  { Interface simplifiée du packet driver }
- { En réalité, il faudrait implémenter toutes les fonctions }
- { du packet driver selon la spécification }
+ { Version simplifiée sans assembleur pour compatibilité }
+ { En réalité, un vrai driver packet aurait besoin d'assembleur }
  
+ {$IFDEF FPC}
+ { Version Free Pascal - simulation }
+ { Pas d'assembleur inline complexe }
+ {$ELSE}
+ { Version Turbo Pascal avec assembleur }
  ASM
-  { Vérifier fonction demandée dans AH }
   CMP AH, 1     { Fonction 1: Driver Info }
   JE @DriverInfo
   CMP AH, 2     { Fonction 2: Access Type }
@@ -345,21 +365,19 @@ Begin
   JMP @Exit
   
 @DriverInfo:
-  { Retourner informations sur le driver }
   MOV AL, 1     { Version }
   MOV BX, 1     { Type: Ethernet }
   MOV CX, 0     { Numéro }
-  MOV DX, OFFSET DriverName
   CLC           { Succès }
   JMP @Exit
 
 @AccessType:
-  { Configuration du type d'accès }
   CLC           { Succès pour l'instant }
   JMP @Exit
 
 @Exit:
  END;
+ {$ENDIF}
 End;
 {$F-}
 
@@ -447,6 +465,8 @@ End;
 
 { Analyser les paramètres de ligne de commande }
 Function ParseCommandLine: Boolean;
+Var
+ ErrorCode: Integer;
 Begin
  ParseCommandLine := True;
  
@@ -462,8 +482,8 @@ Begin
  { Analyser les paramètres }
  If ParamCount >= 1 Then Begin
   { Premier paramètre: interruption logicielle }
-  Val('$' + ParamStr(1), NE2000Config.SoftwareInt, Word(Result));
-  If Result <> 0 Then Begin
+  Val('$' + ParamStr(1), NE2000Config.SoftwareInt, ErrorCode);
+  If ErrorCode <> 0 Then Begin
    WriteLn('Erreur: Interruption logicielle invalide: ', ParamStr(1));
    ParseCommandLine := False;
    Exit;
@@ -472,8 +492,8 @@ Begin
  
  If ParamCount >= 2 Then Begin
   { Deuxième paramètre: IRQ matérielle }
-  Val(ParamStr(2), NE2000Config.HardwareInt, Word(Result));
-  If Result <> 0 Then Begin
+  Val(ParamStr(2), NE2000Config.HardwareInt, ErrorCode);
+  If ErrorCode <> 0 Then Begin
    WriteLn('Erreur: IRQ invalide: ', ParamStr(2));
    ParseCommandLine := False;
    Exit;
@@ -482,8 +502,8 @@ Begin
  
  If ParamCount >= 3 Then Begin
   { Troisième paramètre: adresse I/O }
-  Val('$' + ParamStr(3), NE2000Config.IOBaseAddr, Word(Result));
-  If Result <> 0 Then Begin
+  Val('$' + ParamStr(3), NE2000Config.IOBaseAddr, ErrorCode);
+  If ErrorCode <> 0 Then Begin
    WriteLn('Erreur: Adresse I/O invalide: ', ParamStr(3));
    ParseCommandLine := False;
    Exit;
@@ -655,7 +675,7 @@ BEGIN
   WriteLn('Driver de paquet pour cartes Ethernet NE2000');
   WriteLn('Compatible avec ne2000.com de Novell');
   WriteLn;
-  WriteLn('Écrit par Sylvain Maltais pour NETWORKKIT-P');
+  WriteLn('Écrit par Sylvain Maltais pour NETWORKKIT-P, Corail');
  End
  Else If (ParamStr(1) = '-i') or (ParamStr(1) = '/i') Then Begin
   ShowDriverInfo;
@@ -664,19 +684,28 @@ BEGIN
   UninstallDriver;
  End
  Else If (ParamStr(1) = '-t') or (ParamStr(1) = '/t') Then Begin
-  If ParseCommandLine Then Begin
-   WriteLn('Test de détection NE2000...');
-   If DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-    WriteLn('Carte NE2000 détectée avec succès!');
-    NE2000Config.IsDetected := True;
-    DisplayMACAddress;
-    DisplayCardStatus;
-   End Else Begin
-    WriteLn('Aucune carte NE2000 détectée à l''adresse $', IntToHex(NE2000Config.IOBaseAddr, 4));
-    Halt(2);
-   End;
+  { Initialiser configuration par défaut pour le test }
+  With NE2000Config Do Begin
+   SoftwareInt := DEFAULT_SOFT_INT;
+   HardwareInt := DEFAULT_HARD_INT;
+   IOBaseAddr := DEFAULT_IO_BASE;
+   IsDetected := False;
+   IsInstalled := False;
+  End;
+  
+  WriteLn('Test de détection NE2000...');
+  WriteLn('Configuration de test: IRQ ', NE2000Config.HardwareInt, ', Adresse I/O $', IntToHex(NE2000Config.IOBaseAddr, 4));
+  WriteLn;
+  
+  If DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
+   WriteLn('Carte NE2000 détectée avec succès!');
+   NE2000Config.IsDetected := True;
+   DisplayMACAddress;
+   DisplayCardStatus;
   End Else Begin
-   Halt(1);
+   WriteLn('Aucune carte NE2000 détectée à l''adresse $', IntToHex(NE2000Config.IOBaseAddr, 4));
+   WriteLn('Essayez d''autres adresses I/O courantes: $280, $320, $340, $360');
+   Halt(2);
   End;
  End
  Else Begin

@@ -69,6 +69,12 @@ Les données de recherche volumineuses sont intégrées directement dans le code
 - `IPNetRangeList:Array[0..1074]of IPNetRange` - Plages IP vers mappage d'organisation
 - Utilise des chaînes PChar pour économiser la mémoire dans les grands ensembles de données
 
+### Support multi-langue
+- Vérifier la variable d'environnement `LANGUAGE`
+- Support : Français (par défaut), Anglais (`EN`), Allemand (`GR`), Italien (`IT`), Espagnol (`SP`), Albanais (`SQ`/`ALB`), Portugais (`PT`/`PRT`), Suédois (`SE`/`SWE`), Danois (`DK`/`DNK`), Japonais (`JP`/`JPN` - écrit en rōmaji)
+- Utiliser un type énuméré : `Language:(_French,_English,_Germany,_Italian,_Spain,_Albanian,_Portuguese,_Swedish,_Danish,_Japanese);`
+
+
 ## Compilation et construction
 
 ### Commandes de compilation
