@@ -397,70 +397,6 @@ End;
 { === FONCTIONS UTILITAIRES === }
 
 { Messages multilingues }
-Function GetMsg_CardDetected: String;
-Begin
- Case Language of
-  _English:   GetMsg_CardDetected := 'NE2000 card detected successfully!';
-  _Germany:   GetMsg_CardDetected := 'NE2000-Karte erfolgreich erkannt!';
-  _Italian:   GetMsg_CardDetected := 'Scheda NE2000 rilevata con successo!';
-  _Spain:     GetMsg_CardDetected := '¡Tarjeta NE2000 detectada exitosamente!';
-  _Albanian:  GetMsg_CardDetected := 'Karta NE2000 u zbulua me sukses!';
-  _Portuguese:GetMsg_CardDetected := 'Placa NE2000 detectada com sucesso!';
-  _Swedish:   GetMsg_CardDetected := 'NE2000-kort upptäckt framgångsrikt!';
-  _Danish:    GetMsg_CardDetected := 'NE2000-kort opdaget succesfuldt!';
-  _Japanese:  GetMsg_CardDetected := 'NE2000 kaado ga seikou ni kenshutsu saremashita!';
-  Else        GetMsg_CardDetected := 'Carte NE2000 détectée avec succès!';
- End;
-End;
-
-Function GetMsg_CardNotDetected: String;
-Begin
- Case Language of
-  _English:   GetMsg_CardNotDetected := 'ERROR: No NE2000 card detected at address $';
-  _Germany:   GetMsg_CardNotDetected := 'FEHLER: Keine NE2000-Karte an Adresse $ erkannt';
-  _Italian:   GetMsg_CardNotDetected := 'ERRORE: Nessuna scheda NE2000 rilevata all''indirizzo $';
-  _Spain:     GetMsg_CardNotDetected := 'ERROR: No se detectó tarjeta NE2000 en dirección $';
-  _Albanian:  GetMsg_CardNotDetected := 'GABIM: Asnjë kartë NE2000 nuk u zbulua në adresën $';
-  _Portuguese:GetMsg_CardNotDetected := 'ERRO: Nenhuma placa NE2000 detectada no endereço $';
-  _Swedish:   GetMsg_CardNotDetected := 'FEL: Inget NE2000-kort upptäckt på adress $';
-  _Danish:    GetMsg_CardNotDetected := 'FEJL: Intet NE2000-kort opdaget på adresse $';
-  _Japanese:  GetMsg_CardNotDetected := 'ERAAH: Adoresu $ ni NE2000 kaado ga kenshutsu saremasen deshita';
-  Else        GetMsg_CardNotDetected := 'ERREUR: Aucune carte NE2000 détectée à l''adresse $';
- End;
-End;
-
-Function GetMsg_DriverInstallSuccess: String;
-Begin
- Case Language of
-  _English:   GetMsg_DriverInstallSuccess := 'NE2000 packet driver installed successfully!';
-  _Germany:   GetMsg_DriverInstallSuccess := 'NE2000 Packet-Treiber erfolgreich installiert!';
-  _Italian:   GetMsg_DriverInstallSuccess := 'Driver pacchetti NE2000 installato con successo!';
-  _Spain:     GetMsg_DriverInstallSuccess := '¡Driver de paquetes NE2000 instalado exitosamente!';
-  _Albanian:  GetMsg_DriverInstallSuccess := 'Drajveri i paketave NE2000 u instalua me sukses!';
-  _Portuguese:GetMsg_DriverInstallSuccess := 'Driver de pacotes NE2000 instalado com sucesso!';
-  _Swedish:   GetMsg_DriverInstallSuccess := 'NE2000 paketdrivrutin installerad framgångsrikt!';
-  _Danish:    GetMsg_DriverInstallSuccess := 'NE2000 pakkedriver installeret succesfuldt!';
-  _Japanese:  GetMsg_DriverInstallSuccess := 'NE2000 paketto doraibaa ga seikou ni insutooru saremashita!';
-  Else        GetMsg_DriverInstallSuccess := 'Driver packet NE2000 installé avec succès!';
- End;
-End;
-
-Function GetMsg_MACAddress: String;
-Begin
- Case Language of
-  _English:   GetMsg_MACAddress := 'MAC Address: ';
-  _Germany:   GetMsg_MACAddress := 'MAC-Adresse: ';
-  _Italian:   GetMsg_MACAddress := 'Indirizzo MAC: ';
-  _Spain:     GetMsg_MACAddress := 'Dirección MAC: ';
-  _Albanian:  GetMsg_MACAddress := 'Adresa MAC: ';
-  _Portuguese:GetMsg_MACAddress := 'Endereço MAC: ';
-  _Swedish:   GetMsg_MACAddress := 'MAC-adress: ';
-  _Danish:    GetMsg_MACAddress := 'MAC-adresse: ';
-  _Japanese:  GetMsg_MACAddress := 'MAC adoresu: ';
-  Else        GetMsg_MACAddress := 'Adresse MAC: ';
- End;
-End;
-
 
 
 { Afficher l'adresse MAC }
@@ -468,7 +404,19 @@ Procedure DisplayMACAddress;
 Var
  I: Integer;
 Begin
- Write(GetMsg_MACAddress);
+ { Affichage multilingue du label MAC Address }
+ Case Language of
+  _English:   Write('MAC Address: ');
+  _Germany:   Write('MAC-Adresse: ');
+  _Italian:   Write('Indirizzo MAC: ');
+  _Spain:     Write('Dirección MAC: ');
+  _Albanian:  Write('Adresa MAC: ');
+  _Portuguese:Write('Endereço MAC: ');
+  _Swedish:   Write('MAC-adress: ');
+  _Danish:    Write('MAC-adresse: ');
+  _Japanese:  Write('MAC adoresu: ');
+  Else        Write('Adresse MAC: ');
+ End;
  For I := 0 To 5 Do Begin
   Write(IntToHex(NE2000Config.MACAddress[I], 2));
   If I < 5 Then Write('-');
@@ -617,11 +565,36 @@ Begin
  { Détecter la carte }
  WriteLn('Détection de la carte NE2000...');
  If not DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-  WriteLn(GetMsg_CardNotDetected, IntToHex(NE2000Config.IOBaseAddr, 4));
+  { Affichage multilingue de l'erreur de détection }
+  Case Language of
+   _English:   Write('ERROR: No NE2000 card detected at address $');
+   _Germany:   Write('FEHLER: Keine NE2000-Karte an Adresse $ erkannt ');
+   _Italian:   Write('ERRORE: Nessuna scheda NE2000 rilevata all''indirizzo $');
+   _Spain:     Write('ERROR: No se detectó tarjeta NE2000 en dirección $');
+   _Albanian:  Write('GABIM: Asnjë kartë NE2000 nuk u zbulua në adresën $');
+   _Portuguese:Write('ERRO: Nenhuma placa NE2000 detectada no endereço $');
+   _Swedish:   Write('FEL: Inget NE2000-kort upptäckt på adress $');
+   _Danish:    Write('FEJL: Intet NE2000-kort opdaget på adresse $');
+   _Japanese:  Write('ERAAH: Adoresu $ ni NE2000 kaado ga kenshutsu saremasen deshita ');
+   Else        Write('ERREUR: Aucune carte NE2000 détectée à l''adresse $');
+  End;
+  WriteLn(IntToHex(NE2000Config.IOBaseAddr, 4));
   Exit;
  End;
  
- WriteLn(GetMsg_CardDetected);
+ { Affichage multilingue du succès de détection }
+ Case Language of
+  _English:   WriteLn('NE2000 card detected successfully!');
+  _Germany:   WriteLn('NE2000-Karte erfolgreich erkannt!');
+  _Italian:   WriteLn('Scheda NE2000 rilevata con successo!');
+  _Spain:     WriteLn('¡Tarjeta NE2000 detectada exitosamente!');
+  _Albanian:  WriteLn('Karta NE2000 u zbulua me sukses!');
+  _Portuguese:WriteLn('Placa NE2000 detectada com sucesso!');
+  _Swedish:   WriteLn('NE2000-kort upptäckt framgångsrikt!');
+  _Danish:    WriteLn('NE2000-kort opdaget succesfuldt!');
+  _Japanese:  WriteLn('NE2000 kaado ga seikou ni kenshutsu saremashita!');
+  Else        WriteLn('Carte NE2000 détectée avec succès!');
+ End;
  NE2000Config.IsDetected := True;
  DisplayMACAddress;
  WriteLn;
@@ -652,7 +625,19 @@ Begin
  NE2000Config.IsInstalled := True;
  
  WriteLn;
- WriteLn(GetMsg_DriverInstallSuccess);
+ { Affichage multilingue du succès d'installation }
+ Case Language of
+  _English:   WriteLn('NE2000 packet driver installed successfully!');
+  _Germany:   WriteLn('NE2000 Packet-Treiber erfolgreich installiert!');
+  _Italian:   WriteLn('Driver pacchetti NE2000 installato con successo!');
+  _Spain:     WriteLn('¡Driver de paquetes NE2000 instalado exitosamente!');
+  _Albanian:  WriteLn('Drajveri i paketave NE2000 u instalua me sukses!');
+  _Portuguese:WriteLn('Driver de pacotes NE2000 instalado com sucesso!');
+  _Swedish:   WriteLn('NE2000 paketdrivrutin installerad framgångsrikt!');
+  _Danish:    WriteLn('NE2000 pakkedriver installeret succesfuldt!');
+  _Japanese:  WriteLn('NE2000 paketto doraibaa ga seikou ni insutooru saremashita!');
+  Else        WriteLn('Driver packet NE2000 installé avec succès!');
+ End;
  WriteLn('Le driver est maintenant prêt à être utilisé par les applications réseau.');
  
  InstallDriver := True;
@@ -1023,12 +1008,37 @@ If (ParamStr(1) = '-u') or (ParamStr(1) = '/u') Then Begin
   WriteLn;
   
   If DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-   WriteLn(GetMsg_CardDetected);
+   { Affichage multilingue du succès de détection dans le test }
+   Case Language of
+    _English:   WriteLn('NE2000 card detected successfully!');
+    _Germany:   WriteLn('NE2000-Karte erfolgreich erkannt!');
+    _Italian:   WriteLn('Scheda NE2000 rilevata con successo!');
+    _Spain:     WriteLn('¡Tarjeta NE2000 detectada exitosamente!');
+    _Albanian:  WriteLn('Karta NE2000 u zbulua me sukses!');
+    _Portuguese:WriteLn('Placa NE2000 detectada com sucesso!');
+    _Swedish:   WriteLn('NE2000-kort upptäckt framgångsrikt!');
+    _Danish:    WriteLn('NE2000-kort opdaget succesfuldt!');
+    _Japanese:  WriteLn('NE2000 kaado ga seikou ni kenshutsu saremashita!');
+    Else        WriteLn('Carte NE2000 détectée avec succès!');
+   End;
    NE2000Config.IsDetected := True;
    DisplayMACAddress;
    DisplayCardStatus;
   End Else Begin
-   WriteLn(GetMsg_CardNotDetected, IntToHex(NE2000Config.IOBaseAddr, 4));
+   { Affichage multilingue de l'erreur de détection dans le test }
+   Case Language of
+    _English:   Write('ERROR: No NE2000 card detected at address $');
+    _Germany:   Write('FEHLER: Keine NE2000-Karte an Adresse $ erkannt ');
+    _Italian:   Write('ERRORE: Nessuna scheda NE2000 rilevata all''indirizzo $');
+    _Spain:     Write('ERROR: No se detectó tarjeta NE2000 en dirección $');
+    _Albanian:  Write('GABIM: Asnjë kartë NE2000 nuk u zbulua në adresën $');
+    _Portuguese:Write('ERRO: Nenhuma placa NE2000 detectada no endereço $');
+    _Swedish:   Write('FEL: Inget NE2000-kort upptäckt på adress $');
+    _Danish:    Write('FEJL: Intet NE2000-kort opdaget på adresse $');
+    _Japanese:  Write('ERAAH: Adoresu $ ni NE2000 kaado ga kenshutsu saremasen deshita ');
+    Else        Write('ERREUR: Aucune carte NE2000 détectée à l''adresse $');
+   End;
+   WriteLn(IntToHex(NE2000Config.IOBaseAddr, 4));
    WriteLn('Essayez d''autres adresses I/O courantes: $280, $320, $340, $360');
    Halt(2);
   End;
