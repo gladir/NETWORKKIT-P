@@ -192,8 +192,7 @@ End;
 
 {$IFDEF FPC}
  { Fonction pour convertir un type d'interface en nom }
-Function GetInterfaceTypeName(InterfaceType:DWORD):String;
-Begin
+Function GetInterfaceTypeName(InterfaceType:DWORD):String;Begin
  Case InterfaceType Of
   MIB_IF_TYPE_OTHER:GetInterfaceTypeName:='Other';
   MIB_IF_TYPE_ETHERNET_CSMACD:GetInterfaceTypeName:='Ethernet';
@@ -203,8 +202,7 @@ Begin
   MIB_IF_TYPE_SOFTWARE_LOOPBACK:GetInterfaceTypeName:='Loopback';
   MIB_IF_TYPE_ATM:GetInterfaceTypeName:='ATM';
   MIB_IF_TYPE_IEEE80211:GetInterfaceTypeName:='IEEE 802.11';
- Else
-  GetInterfaceTypeName:='Unknown ('+IntToStr(InterfaceType)+')';
+  Else GetInterfaceTypeName:='Unknown ('+IntToStr(InterfaceType)+')';
  End;
 End;
 
@@ -222,7 +220,7 @@ Begin
  FormatMAC:=MACResult;
 End;
 
- { Fonction pour calculer l'adresse de broadcast }
+ { Fonction pour calculer l'adresse de diffusion }
 Function CalculateBroadcast(IPAddr,NetMask:String):String;
 Var
  IP,Mask:Array[0..3] of Byte;
@@ -265,10 +263,10 @@ End;
 
  { Fonction pour formater les octets en unitÇs lisibles }
 Function FormatBytes(Bytes:DWORD):String;Begin
- If Bytes<1024 Then FormatBytes:=IntToStr(Bytes)+' B' Else
- If Bytes<1048576 Then FormatBytes:=IntToStr(Bytes div 1024)+' KB' Else
- If Bytes<1073741824 Then FormatBytes:=IntToStr(Bytes div 1048576)+' MB'
-                     Else FormatBytes:=IntToStr(Bytes div 1073741824)+' GB';
+ If Bytes<1024 Then FormatBytes:=IntToStr(Bytes)+' O' Else
+ If Bytes<1048576 Then FormatBytes:=IntToStr(Bytes div 1024)+' Ko' Else
+ If Bytes<1073741824 Then FormatBytes:=IntToStr(Bytes div 1048576)+' Mo'
+                     Else FormatBytes:=IntToStr(Bytes div 1073741824)+' Go';
 End;
 
  { ProcÇdure pour obtenir les informations des interfaces }
@@ -286,7 +284,7 @@ Begin
   { Premiäre appel pour obtenir la taille }
  RetVal:=GetAdaptersInfo(nil,OutBufLen);
  If RetVal<>ERROR_BUFFER_OVERFLOW Then Exit;
-  { Allouer la m√©moire }
+  { Allouer la mÇmoire }
  GetMem(pAdapterInfo,OutBufLen);
  Try
    { Obtenir les informations des adaptateurs }
@@ -346,7 +344,7 @@ Var
  FlagsStr:String;
 Begin
  With InterfaceList[Index] Do Begin
-  { Ne pas afficher les interfaces DOWN sauf si demand√© }
+  { Ne pas afficher les interfaces DOWN sauf si demandÇ }
   If (Not ShowAll) and (Status='DOWN') and (IPAddress='0.0.0.0') Then Exit;
    { Nom de l'interface et drapeaux }
   Write(Name);
@@ -362,18 +360,18 @@ Begin
    { Configuration IP }
   If IPAddress<>'0.0.0.0' Then Begin
    Write('        inet ',IPAddress);
-   If NetMask<>'0.0.0.0' Then Write('  netmask ',NetMask);
-   If Broadcast<>'0.0.0.0' Then Write('  broadcast ',Broadcast);
+   If NetMask<>'0.0.0.0' Then Write('  masque rÇseau ',NetMask);
+   If Broadcast<>'0.0.0.0' Then Write('  diffusion ',Broadcast);
    WriteLn;
   End;
    { Adresse MAC }
   If (MACAddress<>'')and(MACAddress<>'00:00:00:00:00:00')Then WriteLn('        ether ',MACAddress);
    { Statistiques }
-  WriteLn('        RX packets ',PacketsReceived,'  bytes ',BytesReceived,' (',FormatBytes(BytesReceived),')');
-  WriteLn('        RX errors ',ErrorsReceived,'  dropped 0  overruns 0  frame 0');
-  WriteLn('        TX packets ',PacketsTransmitted,'  bytes ',BytesTransmitted,
+  WriteLn('        RX paquets ',PacketsReceived,'  octets ',BytesReceived,' (',FormatBytes(BytesReceived),')');
+  WriteLn('        RX erreurs ',ErrorsReceived,'  paquet perdue 0  exÇcuter 0  trame 0');
+  WriteLn('        TX paquets ',PacketsTransmitted,'  bytes ',BytesTransmitted,
           ' (',FormatBytes(BytesTransmitted),')');
-  WriteLn('        TX errors ',ErrorsTransmitted,'  dropped 0  overruns 0  carrier 0');
+  WriteLn('        TX erreurs ',ErrorsTransmitted,'  paquet perdue 0  exÇcuter 0  opÇrateur 0');
   WriteLn('        collisions 0');
   WriteLn;
  End;
@@ -455,19 +453,19 @@ Procedure ShowSimulatedInterfaces;Begin
  WriteLn('        Ethernet');
  WriteLn('        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255');
  WriteLn('        ether 00:1a:2b:3c:4d:5e');
- WriteLn('        RX packets 1234  bytes 567890 (554 KB)');
- WriteLn('        RX errors 0  dropped 0  overruns 0  frame 0');
- WriteLn('        TX packets 987  bytes 123456 (120 KB)');
- WriteLn('        TX errors 0  dropped 0  overruns 0  carrier 0');
+ WriteLn('        RX paquets 1234  octets 567890 (554 Ko)');
+ WriteLn('        RX erreurs 0  paquets perdues 0  exÇcutions 0  trame 0');
+ WriteLn('        TX paquets 987  octets 123456 (120 Ko)');
+ WriteLn('        TX erreurs 0  paquets perdues 0  exÇcutions 0  porteuse 0');
  WriteLn('        collisions 0');
  WriteLn;
  WriteLn('lo: flags=<UP,RUNNING,LOOPBACK> mtu 65536');
  WriteLn('        Loopback');
  WriteLn('        inet 127.0.0.1  netmask 255.0.0.0');
- WriteLn('        RX packets 8  bytes 640 (640 B)');
- WriteLn('        RX errors 0  dropped 0  overruns 0  frame 0');
- WriteLn('        TX packets 8  bytes 640 (640 B)');
- WriteLn('        TX errors 0  dropped 0  overruns 0  carrier 0');
+ WriteLn('        RX paquets 8  octets 640 (640 O)');
+ WriteLn('        RX erreurs 0  paquet perdue 0  exÇcutions 0  trame 0');
+ WriteLn('        TX packets 8  octets 640 (640 O)');
+ WriteLn('        TX erreurs 0  paquet perdue 0  exÇcutions 0  porteuse 0');
  WriteLn('        collisions 0');
 End;
 
@@ -512,17 +510,17 @@ Begin
  If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
   { Interface spÇcifique }
   {$IFDEF FPC}
-  ShowSpecificInterface(ParamStr(1));
+   ShowSpecificInterface(ParamStr(1));
   {$ELSE}
-  WriteLn('eth0: flags=<UP,RUNNING,BROADCAST,DHCP,MULTICAST> mtu 1500');
-  WriteLn('        Ethernet');
-  WriteLn('        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255');
-  WriteLn('        ether 00:1a:2b:3c:4d:5e');
-  WriteLn('        RX packets 1234  bytes 567890 (554 KB)');
-  WriteLn('        RX errors 0  dropped 0  overruns 0  frame 0');
-  WriteLn('        TX packets 987  bytes 123456 (120 KB)');
-  WriteLn('        TX errors 0  dropped 0  overruns 0  carrier 0');
-  WriteLn('        collisions 0');
+   WriteLn('eth0: flags=<UP,RUNNING,BROADCAST,DHCP,MULTICAST> mtu 1500');
+   WriteLn('        Ethernet');
+   WriteLn('        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255');
+   WriteLn('        ether 00:1a:2b:3c:4d:5e');
+   WriteLn('        RX paquets 1234  octets 567890 (554 Ko)');
+   WriteLn('        RX erreurs 0  pertes 0  exÇcutions 0  trame 0');
+   WriteLn('        TX paquets 987  octets 123456 (120 Ko)');
+   WriteLn('        TX erreurs 0  paquet perdue 0  exÇcutions 0  porteuse 0');
+   WriteLn('        collisions 0');
   {$ENDIF}
  End
   Else
@@ -535,7 +533,7 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('IFCONFIG : Configuration et affichage des interfaces rÇseau');
+  WriteLn('IFCONFIG : Cette commande permet d''effectuer la configuration et l''affichage des interfaces rÇseau');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  IFCONFIG                    Afficher les interfaces actives');
@@ -544,7 +542,7 @@ BEGIN
   WriteLn('  IFCONFIG interface          Afficher une interface spÇcifique');
   WriteLn;
   WriteLn('Paramätres :');
-  WriteLn('  interface   Nom de l''interface (ex: eth0, eth1)');
+  WriteLn('  interface   Nom de l''interface (exemple: eth0, eth1)');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  IFCONFIG                    # Afficher interfaces actives');
@@ -556,7 +554,7 @@ BEGIN
  End
   Else
  If ParamStr(1)='--version'Then Begin
-  WriteLn('IFCONFIG 1.00 - Configuration interface rÇseau, NETWORKKIT-P, corail');
+  WriteLn('IFCONFIG 1.00 - Configuration interface rÇseau, NETWORKKIT-P, LINUX-0, corail');
   WriteLn('Licence MIT');
   WriteLn;
   WriteLn('êcrit par Sylvain Maltais');
