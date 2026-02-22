@@ -31,6 +31,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer le ELM (Electronic Mail Reader).</td>
 	</tr>
 	<tr>
+		<td><b>FINDSMB.PAS</b></td>
+		<td>Cette commande permet de rechercher des serveurs SMB/CIFS dans le réseau.</td>
+	</tr>
+	<tr>
 		<td><b>FINGER.PAS</b></td>
 		<td>Cette commande permet d'afficher des informations sur les utilisateurs connectés ou à distance.</td>
 	</tr>
@@ -41,6 +45,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 	<tr>
 		<td><b>GOPHER.PAS</b></td>
 		<td>Cette commande permet de lancer un client Gopher en ligne de commande.</td>
+	</tr>
+	<tr>
+		<td><b>HOSTNAME.PAS</b></td>
+		<td>Cette commande permet de retourner le nom de l'hôte.</td>
 	</tr>
 	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
