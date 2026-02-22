@@ -47,6 +47,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer un client Gopher en ligne de commande.</td>
 	</tr>
 	<tr>
+		<td><b>HOSTNAME.PAS</b></td>
+		<td>Cette commande permet de retourner le nom de l'hôte.</td>
+	</tr>
+	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
 		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
 	</tr>
