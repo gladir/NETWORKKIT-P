@@ -25,7 +25,11 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 	<tr>
 		<td><b>DNSQUERY.PAS</b></td>
 		<td>Cette commande permet de lancer l'outil de requête DNS.</td>
-	</tr>	
+	</tr>
+	<tr>
+		<td><b>ELM.PAS</b></td>
+		<td>Cette commande permet de lancer le ELM (Electronic Mail Reader).</td>
+	</tr>
 	<tr>
 		<td><b>FINGER.PAS</b></td>
 		<td>Cette commande permet d'afficher des informations sur les utilisateurs connectés ou à distance.</td>
