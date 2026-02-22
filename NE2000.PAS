@@ -461,21 +461,7 @@ Begin
  End;
 End;
 
-Function GetMsg_CardStatus: String;
-Begin
- Case Language of
-  _English:   GetMsg_CardStatus := 'NE2000 card status:';
-  _Germany:   GetMsg_CardStatus := 'NE2000-Karten Status:';
-  _Italian:   GetMsg_CardStatus := 'Stato scheda NE2000:';
-  _Spain:     GetMsg_CardStatus := 'Estado de tarjeta NE2000:';
-  _Albanian:  GetMsg_CardStatus := 'Gjendja e kartës NE2000:';
-  _Portuguese:GetMsg_CardStatus := 'Status da placa NE2000:';
-  _Swedish:   GetMsg_CardStatus := 'NE2000-kort status:';
-  _Danish:    GetMsg_CardStatus := 'NE2000-kort status:';
-  _Japanese:  GetMsg_CardStatus := 'NE2000 kaado no suteetasu:';
-  Else        GetMsg_CardStatus := 'État de la carte NE2000:';
- End;
-End;
+
 
 { Afficher l'adresse MAC }
 Procedure DisplayMACAddress;
@@ -495,7 +481,19 @@ Procedure DisplayCardStatus;
 Var
  CR, ISR, TSR: Byte;
 Begin
- WriteLn(GetMsg_CardStatus);
+ { Affichage multilingue du statut de la carte }
+ Case Language of
+  _English:   WriteLn('NE2000 card status:');
+  _Germany:   WriteLn('NE2000-Karten Status:');
+  _Italian:   WriteLn('Stato scheda NE2000:');
+  _Spain:     WriteLn('Estado de tarjeta NE2000:');
+  _Albanian:  WriteLn('Gjendja e kartës NE2000:');
+  _Portuguese:WriteLn('Status da placa NE2000:');
+  _Swedish:   WriteLn('NE2000-kort status:');
+  _Danish:    WriteLn('NE2000-kort status:');
+  _Japanese:  WriteLn('NE2000 kaado no suteetasu:');
+  Else        WriteLn('État de la carte NE2000:');
+ End;
  WriteLn('------------------------');
  
  CR := ReadNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR);
