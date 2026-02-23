@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande iptraf (IP Traffic Monitor))
+  @abstract(Target: Turbo Pascal 7, Free Pascal
+  @description: Commande iptraf (IP Traffic Monitor))
 }
 
 Program IPTRAF;
@@ -21,18 +22,18 @@ Program IPTRAF;
 
 {$IFDEF FPC}
 Type
- { Paquet réseau capturé }
+  { Paquet r�seau captur� }
  TNetworkPacket = Record
   Timestamp: TDateTime;         { Horodatage }
-  Protocol: String[8];          { Protocole (TCP, UDP, ICMP, etc) }
+  Protocol: String[8];          { Protocole (TCP, UDP, ICMP,...) }
   SourceIP: String[15];         { IP source }
   DestIP: String[15];           { IP destination }
   SourcePort: Word;             { Port source }
   DestPort: Word;               { Port destination }
   PacketSize: Word;             { Taille du paquet }
   Flags: String[8];             { Drapeaux TCP }
-  Interface_: String[16];       { Interface réseau }
-  Direction: Char;              { I=In, O=Out, B=Both }
+  Interface_: String[16];       { Interface r�seau }
+  Direction: Char;              { I=Entr�e, O=Sortie, B=Deux }
  End;
 
  { Statistiques d'interface }
@@ -45,9 +46,9 @@ Type
   BytesOut: Int64;              { Octets sortants }
   ErrorsIn: LongWord;           { Erreurs entrantes }
   ErrorsOut: LongWord;          { Erreurs sortantes }
-  DroppedIn: LongWord;          { Paquets supprimés entrants }
-  DroppedOut: LongWord;         { Paquets supprimés sortants }
-  LastUpdate: TDateTime;        { Dernière mise à jour }
+  DroppedIn: LongWord;          { Paquets supprim�s entrants }
+  DroppedOut: LongWord;         { Paquets supprim�s sortants }
+  LastUpdate: TDateTime;        { Derni�re mise � jour }
  End;
 
  { Connexion TCP active }
@@ -56,13 +57,13 @@ Type
   LocalPort: Word;              { Port local }
   RemoteIP: String[15];         { IP distante }
   RemotePort: Word;             { Port distant }
-  State: String[12];            { État connexion }
-  BytesIn: Int64;               { Octets reçus }
-  BytesOut: Int64;              { Octets envoyés }
-  PacketsIn: LongWord;          { Paquets reçus }
-  PacketsOut: LongWord;         { Paquets envoyés }
-  Duration: TDateTime;          { Durée connexion }
-  LastActivity: TDateTime;      { Dernière activité }
+  State: String[12];            { �tat connexion }
+  BytesIn: Int64;               { Octets re�us }
+  BytesOut: Int64;              { Octets envoy�s }
+  PacketsIn: LongWord;          { Paquets re�us }
+  PacketsOut: LongWord;         { Paquets envoy�s }
+  Duration: TDateTime;          { Dur�e connexion }
+  LastActivity: TDateTime;      { Derni�re activit� }
   IsActive: Boolean;            { Connexion active }
  End;
 
@@ -70,30 +71,30 @@ Type
  TProtocolStats = Record
   Name: String[8];              { Nom protocole }
   Packets: LongWord;            { Nombre paquets }
-  Bytes: Int64;                 { Octets transférés }
+  Bytes: Int64;                 { Octets transf�r�s }
   Percentage: Single;           { Pourcentage du trafic }
  End;
 
  { Configuration IPTraf }
  TIPTrafConfig = Record
-  MonitorMode: Integer;         { Mode monitoring (1-6) }
-  Interface_: String[16];       { Interface à monitorer }
-  ShowAllInterfaces: Boolean;   { Toutes les interfaces }
-  ShowPacketSize: Boolean;      { Afficher taille paquets }
-  ShowMoreInfo: Boolean;        { Plus d'informations }
-  ReverseResolve: Boolean;      { Résolution DNS inverse }
-  ServicesFile: String[255];   { Fichier services }
-  LogToFile: Boolean;           { Journalisation }
-  LogFile: String[255];         { Fichier journal }
-  RefreshInterval: Integer;     { Intervalle rafraîchissement (ms) }
-  MaxConnections: Integer;      { Nombre max connexions }
-  TimeoutSeconds: Integer;      { Timeout connexions }
-  ColorMode: Boolean;           { Mode couleur }
-  BeepOnActivity: Boolean;      { Bip sur activité }
-  Promiscuous: Boolean;         { Mode promiscuité }
+  MonitorMode: Integer;          { Mode monitoring (1-6) }
+  Interface_: String[16];        { Interface � surveiller }
+  ShowAllInterfaces: Boolean;    { Toutes les interfaces }
+  ShowPacketSize: Boolean;       { Afficher taille paquets }
+  ShowMoreInfo: Boolean;         { Plus d'informations }
+  ReverseResolve: Boolean;       { R�solution DNS inverse }
+  ServicesFile: String[255];     { Fichier services }
+  LogToFile: Boolean;            { Journalisation }
+  LogFile: String[255];          { Fichier journal }
+  RefreshInterval: Integer;      { Intervalle rafra�chissement (ms) }
+  MaxConnections: Integer;       { Nombre max connexions }
+  TimeoutSeconds: Integer;       { Timeout connexions }
+  ColorMode: Boolean;            { Mode couleur }
+  BeepOnActivity: Boolean;       { Bip sur activit� }
+  Promiscuous: Boolean;          { Mode promiscuit� }
   FilterExpression: String[255]; { Expression filtre }
-  SortBy: Integer;              { Tri par (1=IP, 2=Bytes, 3=Packets) }
-  SortDirection: Integer;       { Direction tri (1=Asc, 2=Desc) }
+  SortBy: Integer;               { Tri par (1=IP, 2=Octets, 3=Paquets) }
+  SortDirection: Integer;        { Direction tri (1=Asc, 2=Desc) }
  End;
 
 Var
@@ -117,81 +118,77 @@ Var
 
 { === FONCTIONS COULEURS ET AFFICHAGE === }
 
-{ Définir couleur de texte }
-Procedure SetTextColor(ForeColor, BackColor: Integer);
-Begin
+ { D�finir couleur de texte }
+Procedure SetTextColor(ForeColor, BackColor: Integer);Begin
  TextColor(ForeColor);
  TextBackground(BackColor);
 End;
 
-{ Dessiner bordure d'écran }
+ { Dessiner bordure d'�cran }
 Procedure DrawScreenBorder(Title: String);
 Var
  I: Integer;
 Begin
  SetTextColor(White, Blue);
  ClrScr;
- 
- { Bordure supérieure }
+  { Bordure sup�rieure }
  GotoXY(1, 1);
- Write('┌');
- For I := 2 To 79 Do Write('─');
- Write('┐');
- 
+ Write(#218);
+ For I := 2 To 79 Do Write(#196);
+ Write(#191);
+
  { Titre }
  GotoXY((80 - Length(Title)) div 2, 1);
  Write(' ', Title, ' ');
- 
- { Bordures latérales }
+
+ { Bordures lat�rales }
  For I := 2 To 24 Do Begin
   GotoXY(1, I);
-  Write('│');
+  Write(#179);
   GotoXY(80, I);
-  Write('│');
+  Write(#179);
  End;
- 
- { Bordure inférieure }
+
+ { Bordure inf�rieure }
  GotoXY(1, 25);
- Write('└');
- For I := 2 To 79 Do Write('─');
- Write('┘');
- 
+ Write(#192);
+ For I := 2 To 79 Do Write(#196);
+ Write(#217);
+
  { Instructions en bas }
  GotoXY(2, 25);
  SetTextColor(Yellow, Blue);
- Write(' [ESC]=Menu  [Q]=Quit  [F5]=Refresh ');
+ Write(' [ESC]=Menu  [Q]=Quitte  [F5]=Refra�chir ');
 End;
 
-{ Afficher ligne de séparation }
+{ Afficher ligne de s�paration }
 Procedure DrawSeparatorLine(Y: Integer; Title: String);
 Var
  I: Integer;
 Begin
  SetTextColor(White, Blue);
  GotoXY(2, Y);
- Write('├');
- For I := 3 To 79 Do Write('─');
- Write('┤');
- 
+ Write(#195);
+ For I := 3 To 79 Do Write(#196);
+ Write(#180);
+
  If Title <> '' Then Begin
   GotoXY((80 - Length(Title)) div 2, Y);
   Write(' ', Title, ' ');
  End;
 End;
 
-{ Afficher texte centré }
-Procedure WriteCenter(Y: Integer; Text: String; Color: Integer);
-Begin
+{ Afficher texte centr� }
+Procedure WriteCenter(Y: Integer; Text: String; Color: Integer);Begin
  SetTextColor(Color, Blue);
  GotoXY((80 - Length(Text)) div 2, Y);
  Write(Text);
 End;
 
-{ Formater taille en octets }
-Function FormatBytes(Bytes: Int64): String;
-Begin
+ { Formater taille en octets }
+Function FormatBytes(Bytes: Int64): String;Begin
  If Bytes < 1024 Then
-  Result := IntToStr(Bytes) + 'B'
+  Result := IntToStr(Bytes) + 'o'
  Else If Bytes < 1024 * 1024 Then
   Result := Format('%6.1fK', [Bytes / 1024])
  Else If Bytes < 1024 * 1024 * 1024 Then
@@ -200,17 +197,16 @@ Begin
   Result := Format('%6.1fG', [Bytes / (1024 * 1024 * 1024)]);
 End;
 
-{ Formater débit }
-Function FormatRate(BytesPerSec: Single): String;
-Begin
+{ Formater d�bit }
+Function FormatRate(BytesPerSec: Single): String;Begin
  If BytesPerSec < 1024 Then
-  Result := Format('%6.0f B/s', [BytesPerSec])
+  Result := Format('%6.0f o/s', [BytesPerSec])
  Else If BytesPerSec < 1024 * 1024 Then
-  Result := Format('%6.1f KB/s', [BytesPerSec / 1024])
+  Result := Format('%6.1f Ko/s', [BytesPerSec / 1024])
  Else If BytesPerSec < 1024 * 1024 * 1024 Then
-  Result := Format('%6.1f MB/s', [BytesPerSec / (1024 * 1024)])
+  Result := Format('%6.1f Mo/s', [BytesPerSec / (1024 * 1024)])
  Else
-  Result := Format('%6.1f GB/s', [BytesPerSec / (1024 * 1024 * 1024)]);
+  Result := Format('%6.1f Go/s', [BytesPerSec / (1024 * 1024 * 1024)]);
 End;
 
 { === FONCTIONS RÉSEAU RÉELLES === }
@@ -229,7 +225,7 @@ Begin
  {$ENDIF}
 End;
 
-{ Nettoyer réseau }
+{ Nettoyer du r�seau }
 Procedure CleanupNetwork;
 Begin
  {$IFDEF WINDOWS}
@@ -237,14 +233,13 @@ Begin
  {$ENDIF}
 End;
 
-{ Obtenir statistiques des interfaces }
+ { Obtenir statistiques des interfaces }
 Function GetInterfaceStatistics: Integer;
 Var
  I: Integer;
 Begin
  InterfaceCount := 0;
- 
- { Interface Loopback }
+  { Interface Loopback }
  With Interfaces[InterfaceCount] Do Begin
   Name := 'lo';
   IsActive := True;
@@ -259,8 +254,7 @@ Begin
   LastUpdate := Now;
  End;
  Inc(InterfaceCount);
- 
- { Interface Ethernet }
+  { Interface Ethernet }
  With Interfaces[InterfaceCount] Do Begin
   Name := 'eth0';
   IsActive := True;
@@ -275,8 +269,7 @@ Begin
   LastUpdate := Now;
  End;
  Inc(InterfaceCount);
- 
- { Interface WiFi }
+  { Interface WiFi }
  With Interfaces[InterfaceCount] Do Begin
   Name := 'wlan0';
   IsActive := True;
@@ -291,11 +284,10 @@ Begin
   LastUpdate := Now;
  End;
  Inc(InterfaceCount);
- 
  Result := InterfaceCount;
 End;
 
-{ Capturer paquets réseau (simulation) }
+ { Capturer paquets r�seau (simulation) }
 Function CaptureNetworkPackets: Integer;
 Var
  I: Integer;
@@ -305,11 +297,9 @@ Var
                                '127.0.0.1', '224.0.0.1');
 Begin
  PacketCount := 0;
- 
- { Générer paquets aléatoirement }
+ { G�n�rer paquets al�atoirement }
  For I := 0 To Random(50) + 10 Do Begin
   If PacketCount >= High(Packets) Then Break;
-  
   With Packets[PacketCount] Do Begin
    Timestamp := Now;
    Protocol := Protocols[Random(7)];
@@ -318,28 +308,23 @@ Begin
    SourcePort := Random(65535) + 1;
    DestPort := Random(65535) + 1;
    PacketSize := Random(1400) + 64;
-   
    Case Random(4) Of
     0: Flags := 'SYN';
     1: Flags := 'ACK';
     2: Flags := 'FIN';
     3: Flags := 'RST';
    End;
-   
    Case Random(3) Of
     0: Interface_ := 'eth0';
     1: Interface_ := 'wlan0';
     2: Interface_ := 'lo';
    End;
-   
    Direction := Chr(Random(3) + Ord('I')); { I, J, K -> I=In, O=Out, B=Both }
    If Direction = 'J' Then Direction := 'O';
    If Direction = 'K' Then Direction := 'B';
   End;
-  
   Inc(PacketCount);
  End;
- 
  Result := PacketCount;
 End;
 
@@ -347,15 +332,13 @@ End;
 Function GetTCPConnections: Integer;
 Var
  I: Integer;
- States: Array[0..5] of String = ('ESTABLISHED', 'LISTEN', 'SYN_SENT', 
+ States: Array[0..5] of String = ('ESTABLISHED', 'LISTEN', 'SYN_SENT',
                                   'SYN_RECV', 'FIN_WAIT1', 'CLOSE_WAIT');
 Begin
  ConnectionCount := 0;
- 
- { Générer connexions actives }
+  { G�n�rer connexions actives }
  For I := 0 To Random(20) + 5 Do Begin
   If ConnectionCount >= High(Connections) Then Break;
-  
   With Connections[ConnectionCount] Do Begin
    LocalIP := '192.168.1.' + IntToStr(Random(254) + 1);
    LocalPort := Random(65535) + 1024;
@@ -370,10 +353,8 @@ Begin
    LastActivity := Now - (Random(60) / (24 * 3600 * 60));
    IsActive := (Random(10) > 2); { 70% actives }
   End;
-  
-  Inc(ConnectionCount);
+   Inc(ConnectionCount);
  End;
- 
  Result := ConnectionCount;
 End;
 
@@ -385,30 +366,26 @@ Var
 Begin
  ProtocolCount := 0;
  TotalBytes := 0;
- 
- { Initialiser protocoles courants }
+  { Initialiser protocoles courants }
  With ProtocolStats[ProtocolCount] Do Begin
   Name := 'TCP';
   Packets := 0;
   Bytes := 0;
  End;
  Inc(ProtocolCount);
- 
  With ProtocolStats[ProtocolCount] Do Begin
   Name := 'UDP';
   Packets := 0;
   Bytes := 0;
  End;
  Inc(ProtocolCount);
- 
  With ProtocolStats[ProtocolCount] Do Begin
   Name := 'ICMP';
   Packets := 0;
   Bytes := 0;
  End;
  Inc(ProtocolCount);
- 
- { Calculer statistiques }
+  { Calculer statistiques }
  For I := 0 To PacketCount - 1 Do Begin
   For J := 0 To ProtocolCount - 1 Do Begin
    If ProtocolStats[J].Name = Packets[I].Protocol Then Begin
@@ -419,8 +396,7 @@ Begin
    End;
   End;
  End;
- 
- { Calculer pourcentages }
+  { Calculer pourcentages }
  If TotalBytes > 0 Then Begin
   For I := 0 To ProtocolCount - 1 Do Begin
    ProtocolStats[I].Percentage := (ProtocolStats[I].Bytes * 100.0) / TotalBytes;
@@ -428,39 +404,34 @@ Begin
  End;
 End;
 
-{ === ÉCRANS D'AFFICHAGE === }
+{ === �CRANS D'AFFICHAGE === }
 
-{ Écran 1: Menu principal }
+{ �cran 1: Menu principal }
 Procedure ShowMainMenu;
 Var
  Choice: Char;
 Begin
  DrawScreenBorder('IPTraf - IP Traffic Monitor');
- 
  SetTextColor(White, Blue);
- WriteCenter(5, 'IPTraf - Moniteur de Trafic IP Réseau', White);
- WriteCenter(7, 'Sélectionnez une option :', LightCyan);
- 
+ WriteCenter(5, 'IPTraf - Moniteur de trafic IP r�seau', White);
+ WriteCenter(7, 'S�lectionnez une option :', LightCyan);
  SetTextColor(Yellow, Blue);
- GotoXY(20, 9);  WriteLn('1. Moniteur Trafic IP - Interface spécifique');
- GotoXY(20, 10); WriteLn('2. Moniteur Trafic IP - Toutes interfaces');  
+ GotoXY(20, 9);  WriteLn('1. Moniteur Trafic IP - Interface sp�cifique');
+ GotoXY(20, 10); WriteLn('2. Moniteur Trafic IP - Toutes interfaces');
  GotoXY(20, 11); WriteLn('3. Statistiques par Interface');
  GotoXY(20, 12); WriteLn('4. Connexions TCP et UDP actives');
  GotoXY(20, 13); WriteLn('5. Statistiques par Protocole');
  GotoXY(20, 14); WriteLn('6. Moniteur LAN Station');
  GotoXY(20, 15); WriteLn('7. Filtres de Trafic');
  GotoXY(20, 16); WriteLn('8. Configuration');
- 
  SetTextColor(LightRed, Blue);
  GotoXY(20, 18); WriteLn('X. Quitter');
- 
  SetTextColor(LightGreen, Blue);
  GotoXY(20, 20); Write('Votre choix: ');
- 
- { Ne pas attendre d'entrée dans le menu - utiliser ProcessKeyboard }
+  { Ne pas attendre d'entr�e dans le menu - utiliser ProcessKeyboard }
 End;
 
-{ Écran 2: Moniteur trafic IP }
+{ �cran 2: Moniteur trafic IP }
 Procedure ShowIPTrafficMonitor;
 Var
  I: Integer;
@@ -469,22 +440,18 @@ Var
  Rate: Single;
 Begin
  DrawScreenBorder('Moniteur Trafic IP - ' + IPTrafConfig.Interface_);
- 
- { Capturer nouveaux paquets }
+  { Capturer nouveaux paquets }
  CaptureNetworkPackets;
- 
- { En-têtes }
+  { Ent�tes }
  SetTextColor(Yellow, Blue);
  GotoXY(2, 3);
  Write('Proto  Source IP        Port  -> Dest IP          Port   Taille  Flags');
  DrawSeparatorLine(4, '');
- 
- { Afficher paquets }
+  { Afficher paquets }
  Y := 5;
  SetTextColor(White, Blue);
  For I := 0 To Min(PacketCount - 1, 16) Do Begin
   If Y > 20 Then Break;
-  
   With Packets[I] Do Begin
    GotoXY(2, Y);
    Write(Format('%-6s %-15s %5d -> %-15s %5d %6d  %-8s',
@@ -492,56 +459,46 @@ Begin
   End;
   Inc(Y);
  End;
- 
- { Statistiques globales }
+  { Statistiques globales }
  DrawSeparatorLine(22, 'Statistiques');
- 
  ElapsedTime := Now - StartTime;
  Rate := TotalBytesIn / (ElapsedTime * 24 * 3600);
- 
  SetTextColor(LightCyan, Blue);
  GotoXY(2, 23);
- Write('Paquets: ', PacketCount, '  Débit: ', FormatRate(Rate));
- 
+ Write('Paquets: ', PacketCount, '  D�bit: ', FormatRate(Rate));
  SetTextColor(LightGreen, Blue);
  GotoXY(45, 23);
- Write('Durée: ', FormatDateTime('hh:nn:ss', ElapsedTime));
+ Write('Dur�e: ', FormatDateTime('hh:nn:ss', ElapsedTime));
 End;
 
-{ Écran 3: Statistiques d'interface }
+{ �cran 3: Statistiques d'interface }
 Procedure ShowInterfaceStatistics;
 Var
  I: Integer;
  Y: Integer;
 Begin
  DrawScreenBorder('Statistiques par Interface');
- 
  GetInterfaceStatistics;
- 
- { En-têtes }
+  { Ent�tes }
  SetTextColor(Yellow, Blue);
  GotoXY(2, 3);
  Write('Interface    Paq.In   Paq.Out     Octets In     Octets Out  Err  Drop');
  DrawSeparatorLine(4, '');
- 
- { Afficher interfaces }
+  { Afficher interfaces }
  Y := 5;
  TotalPacketsIn := 0;
  TotalPacketsOut := 0;
  TotalBytesIn := 0;
  TotalBytesOut := 0;
- 
  SetTextColor(White, Blue);
  For I := 0 To InterfaceCount - 1 Do Begin
   With Interfaces[I] Do Begin
    If IsActive Then SetTextColor(LightGreen, Blue)
-   Else SetTextColor(LightRed, Blue);
-   
+               Else SetTextColor(LightRed, Blue);
    GotoXY(2, Y);
    Write(Format('%-12s %8d %8d %12s %12s %4d %4d',
-               [Name, PacketsIn, PacketsOut, FormatBytes(BytesIn), 
+               [Name, PacketsIn, PacketsOut, FormatBytes(BytesIn),
                 FormatBytes(BytesOut), ErrorsIn + ErrorsOut, DroppedIn + DroppedOut]));
-   
    Inc(TotalPacketsIn, PacketsIn);
    Inc(TotalPacketsOut, PacketsOut);
    Inc(TotalBytesIn, BytesIn);
@@ -549,42 +506,36 @@ Begin
   End;
   Inc(Y);
  End;
- 
  { Totaux }
  DrawSeparatorLine(Y + 1, 'Totaux');
  SetTextColor(LightCyan, Blue);
  GotoXY(2, Y + 2);
  Write(Format('TOTAL        %8d %8d %12s %12s',
-             [TotalPacketsIn, TotalPacketsOut, FormatBytes(TotalBytesIn), 
+             [TotalPacketsIn, TotalPacketsOut, FormatBytes(TotalBytesIn),
               FormatBytes(TotalBytesOut)]));
 End;
 
-{ Écran 4: Connexions TCP/UDP }
+{ �cran 4: Connexions TCP/UDP }
 Procedure ShowTCPConnections;
 Var
  I: Integer;
  Y: Integer;
 Begin
  DrawScreenBorder('Connexions TCP et UDP Actives');
- 
  GetTCPConnections;
- 
- { En-têtes }
+ { Ent�tes }
  SetTextColor(Yellow, Blue);
  GotoXY(2, 3);
- Write('Local Address        Remote Address       État       Octets    Paquets');
+ Write('Adresse local        Adresse � distance   �tat       Octets    Paquets');
  DrawSeparatorLine(4, '');
- 
- { Afficher connexions }
+  { Afficher connexions }
  Y := 5;
  SetTextColor(White, Blue);
  For I := 0 To Min(ConnectionCount - 1, 16) Do Begin
   If Y > 20 Then Break;
-  
   With Connections[I] Do Begin
    If IsActive Then SetTextColor(LightGreen, Blue)
-   Else SetTextColor(DarkGray, Blue);
-   
+               Else SetTextColor(DarkGray, Blue);
    GotoXY(2, Y);
    Write(Format('%-15s:%-5d %-15s:%-5d %-11s %8s %8d',
                [LocalIP, LocalPort, RemoteIP, RemotePort, State,
@@ -592,7 +543,6 @@ Begin
   End;
   Inc(Y);
  End;
- 
  { Statistiques }
  DrawSeparatorLine(22, 'Statistiques');
  SetTextColor(LightCyan, Blue);
@@ -600,7 +550,7 @@ Begin
  Write('Connexions actives: ', ConnectionCount);
 End;
 
-{ Écran 5: Statistiques par protocole }
+{ �cran 5: Statistiques par protocole }
 Procedure ShowProtocolStatistics;
 Var
  I: Integer;
@@ -609,21 +559,17 @@ Var
  J: Integer;
 Begin
  DrawScreenBorder('Statistiques par Protocole');
- 
  CalculateProtocolStats;
- 
- { En-têtes }
+ { Ent�tes }
  SetTextColor(Yellow, Blue);
  GotoXY(2, 3);
  Write('Protocole   Paquets      Octets    Pourcentage  Graphique');
  DrawSeparatorLine(4, '');
- 
- { Afficher protocoles }
+  { Afficher protocoles }
  Y := 5;
  SetTextColor(White, Blue);
  For I := 0 To ProtocolCount - 1 Do Begin
   If Y > 18 Then Break;
-  
   With ProtocolStats[I] Do Begin
    Case I Of
     0: SetTextColor(LightGreen, Blue);  { TCP }
@@ -631,54 +577,45 @@ Begin
     2: SetTextColor(Yellow, Blue);      { ICMP }
     Else SetTextColor(White, Blue);
    End;
-   
    GotoXY(2, Y);
    Write(Format('%-10s %8d %12s %7.2f%%   ',
                [Name, Packets, FormatBytes(Bytes), Percentage]));
-   
    { Barre graphique }
    BarLength := Round(Percentage / 2); { Max 50 caractères }
    If BarLength > 30 Then BarLength := 30;
-   
-   For J := 1 To BarLength Do Write('█');
+   For J := 1 To BarLength Do Write(#219);
   End;
   Inc(Y);
  End;
- 
- { Légende }
+ { L�gende }
  SetTextColor(LightGray, Blue);
  GotoXY(2, 20);
- Write('Graphique: chaque bloc représente 2% du trafic total');
+ Write('Graphique: chaque bloc repr�sente 2% du trafic total');
 End;
 
-{ Écran 6: Configuration }
-Procedure ShowConfiguration;
-Begin
+{ �cran 6: Configuration }
+Procedure ShowConfiguration;Begin
  DrawScreenBorder('Configuration IPTraf');
- 
  SetTextColor(Yellow, Blue);
  WriteCenter(5, 'Options de Configuration', Yellow);
- 
  SetTextColor(White, Blue);
- GotoXY(10, 8);  WriteLn('Interface surveillée: ', IPTrafConfig.Interface_);
- GotoXY(10, 9);  WriteLn('Intervalle de rafraîchissement: ', IPTrafConfig.RefreshInterval, ' ms');
- GotoXY(10, 10); WriteLn('Timeout connexions: ', IPTrafConfig.TimeoutSeconds, ' sec');
- GotoXY(10, 11); WriteLn('Nombre max connexions: ', IPTrafConfig.MaxConnections);
- GotoXY(10, 12); WriteLn('Mode promiscuité: ', IPTrafConfig.Promiscuous);
- GotoXY(10, 13); WriteLn('Résolution DNS inverse: ', IPTrafConfig.ReverseResolve);
+ GotoXY(10, 8);  WriteLn('Interface surveill�e: ', IPTrafConfig.Interface_);
+ GotoXY(10, 9);  WriteLn('Intervalle de rafra�chissement: ', IPTrafConfig.RefreshInterval, ' ms');
+ GotoXY(10, 10); WriteLn('D�passe de d�lai de connexions: ', IPTrafConfig.TimeoutSeconds, ' sec');
+ GotoXY(10, 11); WriteLn('Nombre maximum connexions: ', IPTrafConfig.MaxConnections);
+ GotoXY(10, 12); WriteLn('Mode promiscuit�: ', IPTrafConfig.Promiscuous);
+ GotoXY(10, 13); WriteLn('R�solution DNS inverse: ', IPTrafConfig.ReverseResolve);
  GotoXY(10, 14); WriteLn('Journalisation: ', IPTrafConfig.LogToFile);
- 
  If IPTrafConfig.LogToFile Then Begin
   GotoXY(10, 15); WriteLn('Fichier journal: ', IPTrafConfig.LogFile);
  End;
- 
+
  SetTextColor(LightGreen, Blue);
  WriteCenter(18, 'Appuyez sur ESC pour retourner au menu...', LightGreen);
 End;
 
-{ Mettre à jour affichage }
-Procedure UpdateDisplay;
-Begin
+{ Mettre � jour affichage }
+Procedure UpdateDisplay;Begin
  Case CurrentScreen Of
   0: ShowMainMenu;
   1, 2: ShowIPTrafficMonitor;
@@ -690,16 +627,14 @@ Begin
  End;
 End;
 
-{ Traiter entrées clavier }
-Function ProcessKeyboard: Boolean;
+{ Traiter entr�es clavier }
+Function ProcessKeyboard:Boolean;
 Var
  Key: Char;
 Begin
  Result := True;
- 
  If KeyPressed Then Begin
   Key := ReadKey;
-  
   Case Key Of
    #27: Begin { ESC }
     If CurrentScreen = 0 Then
@@ -707,29 +642,25 @@ Begin
     Else
      CurrentScreen := 0; { Retour au menu }
    End;
-   
    'q', 'Q': Begin
     ExitRequested := True;
    End;
-   
    '1'..'8': Begin
     If CurrentScreen = 0 Then Begin
      CurrentScreen := Ord(Key) - Ord('0');
      LastRefresh := 0; { Forcer rafraîchissement }
     End;
    End;
-   
    'x', 'X': Begin
     If CurrentScreen = 0 Then
      ExitRequested := True;
    End;
-   
-   #0: Begin { Touches spéciales }
+   #0: Begin { Touches sp�ciales }
     If KeyPressed Then Begin
      Key := ReadKey;
      Case Key Of
-      #63: Begin { F5 - Refresh }
-       LastRefresh := 0; { Forcer rafraîchissement }
+      #63: Begin { F5 - Rafraichissement }
+       LastRefresh := 0; { Forcer rafra�chissement }
       End;
      End;
     End;
@@ -738,9 +669,8 @@ Begin
  End;
 End;
 
-{ Initialiser configuration }
-Procedure InitializeConfig;
-Begin
+ { Initialiser configuration }
+Procedure InitializeConfig;Begin
  With IPTrafConfig Do Begin
   MonitorMode := 1;
   Interface_ := 'eth0';
@@ -761,7 +691,6 @@ Begin
   SortBy := 1;
   SortDirection := 2;
  End;
- 
  InterfaceCount := 0;
  PacketCount := 0;
  ConnectionCount := 0;
@@ -778,19 +707,16 @@ Begin
 End;
 
 { Boucle principale }
-Procedure MainLoop;
-Begin
+Procedure MainLoop;Begin
  While not ExitRequested Do Begin
-  { Vérifier entrées clavier }
+  { V�rifier entr�es clavier }
   If not ProcessKeyboard Then Break;
-  
-  { Rafraîchir affichage si nécessaire }
+   { Rafra�chir affichage si n�cessaire }
   If (Now - LastRefresh) * 24 * 3600 * 1000 >= IPTrafConfig.RefreshInterval Then Begin
    UpdateDisplay;
    LastRefresh := Now;
   End;
-  
-  { Petite pause pour éviter 100% CPU }
+   { Petite pause pour �viter 100% CPU }
   Sleep(50);
  End;
 End;
@@ -798,39 +724,54 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedIPTraf;
-Begin
+Procedure ShowSimulatedIPTraf;Begin
  ClrScr;
  TextColor(White);
  TextBackground(Blue);
  ClrScr;
- 
  WriteLn('IPTRAF [NETWORKKIT-P] IP Traffic Monitor (simulation)');
  WriteLn('====================================================');
  WriteLn;
- WriteLn('┌─────────────────── IPTraf - IP Traffic Monitor ────────────────────┐');
- WriteLn('│                                                                     │');
- WriteLn('│ Proto  Source IP        Port  -> Dest IP          Port   Size Flags│');
- WriteLn('├─────────────────────────────────────────────────────────────────────┤');
- WriteLn('│ TCP    192.168.1.100    1234  -> 203.0.113.45     80    1460  SYN  │');
- WriteLn('│ UDP    10.0.0.1         53    -> 192.168.1.100   1024   512   -    │');
- WriteLn('│ TCP    192.168.1.100    443   -> 8.8.8.8         443   1200  ACK  │');
- WriteLn('│ ICMP   127.0.0.1        -     -> 127.0.0.1       -     64    -    │');
- WriteLn('│ TCP    172.16.0.1       22    -> 192.168.1.100   2048  128   FIN  │');
- WriteLn('│                                                                     │');
- WriteLn('├──────────────────────── Statistiques ──────────────────────────────┤');
- WriteLn('│ Paquets: 1,247  Débit: 1.2 MB/s         Durée: 02:15:33           │');
- WriteLn('│                                                                     │');
- WriteLn('└─ [ESC]=Menu  [Q]=Quit  [F5]=Refresh ───────────────────────────────┘');
+ WriteLn(#218,',#196,#196,#196,#196,#196,#196,#196,#196 IPTraf - IP Traffic Monitor ',
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#191);
+ WriteLn(#179,'                                                                     ',#179);
+ WriteLn(#179,' Proto  Source IP        Port  -> Dest IP          Port   Size Flags',#179);
+ WriteLn(#195,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#180);
+ WriteLn(#179,' TCP    192.168.1.100    1234  -> 203.0.113.45     80    1460  SYN  ',#179);
+ WriteLn(#179,' UDP    10.0.0.1         53    -> 192.168.1.100   1024   512   -    ',#179);
+ WriteLn(#179,' TCP    192.168.1.100    443   -> 8.8.8.8         443   1200  ACK  ',#179);
+ WriteLn(#179,' ICMP   127.0.0.1        -     -> 127.0.0.1       -     64    -    ',#179);
+ WriteLn(#179,' TCP    172.16.0.1       22    -> 192.168.1.100   2048  128   FIN  ',#179);
+ WriteLn(#179,'                                                                     ',#179);
+ WriteLn(#195,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#180);
+ WriteLn(#179,' Paquets: 1,247  D�bit: 1.2 MB/s         Dur�e: 02:15:33           ',#179);
+ WriteLn(#179,'                                                                     ',#179);
+ WriteLn(#192,#196,#196,' [ESC]=Menu [Q]=Quitte [F5]=Rafra�chir ',#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,#196,
+         #196,#196,#196,#196,#196,#196,#196,#217);
 End;
 {$ENDIF}
 
 BEGIN
- WriteLn('DEBUG: Starting program, checking parameters');
+ {$IFDEF FPC}
+  {$IFDEF WINDOWS}
+   SetUseACP(False);
+  {$ENDIF}
+ {$ENDIF}
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('DEBUG: Showing help');
-  WriteLn('IPTRAF : Console-based network statistics utility');
+  WriteLn('IPTRAF : Cette commande permet de lancer l''utilitaire de statistiques r�esau en console.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  IPTRAF [options] [interface]');
@@ -838,111 +779,107 @@ BEGIN
   WriteLn('Options :');
   WriteLn('  -h, --help            Afficher cette aide');
   WriteLn('  --version             Afficher la version');
-  WriteLn('  -i INTERFACE          Interface à monitorer');
-  WriteLn('  -g                    Démarrer en mode graphique immédiat');
-  WriteLn('  -d INTERFACE          Moniteur trafic détaillé sur interface');
+  WriteLn('  -i INTERFACE          Interface � monitorer');
+  WriteLn('  -g                    D�marrer en mode graphique imm�diat');
+  WriteLn('  -d INTERFACE          Moniteur trafic d�taill� sur interface');
   WriteLn('  -s INTERFACE          Statistiques interface');
   WriteLn('  -z INTERFACE          Moniteur station LAN');
   WriteLn('  -l INTERFACE          Statistiques LAN station');
-  WriteLn('  -t TIMEOUT            Timeout en minutes (défaut: 0=infini)');
+  WriteLn('  -t TIMEOUT            Timeout en minutes (d�faut: 0=infini)');
   WriteLn('  -B                    Fonctionner en mode non-interactif');
-  WriteLn('  -L LOGFILE            Spécifier fichier de log');
-  WriteLn('  -I PIDFILE            Spécifier fichier PID');
-  WriteLn('  -u UID                Exécuter avec UID spécifique');
-  WriteLn('  -g GID                Exécuter avec GID spécifique');
-  WriteLn('  -f                    Vider toutes les locks');
-  WriteLn('  -c                    Convertir ancien format de config');
+  WriteLn('  -L LOGFILE            Sp�cifier fichier de journal de bord');
+  WriteLn('  -I PIDFILE            Sp�cifier fichier PID');
+  WriteLn('  -u UID                Ex�cuter avec UID sp�cifique');
+  WriteLn('  -g GID                Ex�cuter avec GID sp�cifique');
+  WriteLn('  -f                    Vider toutes les verroues');
+  WriteLn('  -c                    Convertir ancien format de configuration');
   WriteLn;
-  WriteLn('Modes de monitoring :');
-  WriteLn('  1. Trafic IP          Moniteur temps réel du trafic TCP/UDP/ICMP');
-  WriteLn('  2. Interface générale Statistiques globales toutes interfaces');
-  WriteLn('  3. Interface détaillé Statistiques détaillées par interface');
-  WriteLn('  4. Connexions réseau  Connexions TCP/UDP actives en temps réel');
-  WriteLn('  5. Statistiques proto Répartition du trafic par protocole');
-  WriteLn('  6. Station LAN        Activité des stations sur le réseau local');
+  WriteLn('Modes de surveillance :');
+  WriteLn('  1. Trafic IP           Moniteur temps r�el du trafic TCP/UDP/ICMP');
+  WriteLn('  2. Interface g�n�rale  Statistiques globales toutes interfaces');
+  WriteLn('  3. Interface d�taill�  Statistiques d�taill�es par interface');
+  WriteLn('  4. Connexions r�seau   Connexions TCP/UDP actives en temps r�el');
+  WriteLn('  5. Statistiques proto  R�partition du trafic par protocole');
+  WriteLn('  6. Station LAN         Activit� des stations sur le r�seau local');
   WriteLn;
   WriteLn('Navigation :');
   WriteLn('  [ESC]                 Retour au menu principal');
   WriteLn('  [Q]                   Quitter IPTraf');
   WriteLn('  [F5]                  Actualiser affichage');
-  WriteLn('  [↑] [↓]               Naviguer dans les listes');
-  WriteLn('  [Page Up/Down]        Défiler page par page');
-  WriteLn('  [Home/End]            Début/fin de liste');
+  WriteLn('  [↑] [↓]           Naviguer dans les listes');
+  WriteLn('  [Page Up/Down]        D�filer page par page');
+  WriteLn('  [Home/End]            D�but/fin de liste');
   WriteLn('  [Tab]                 Changer tri/filtre');
-  WriteLn('  [Enter]               Sélectionner/Confirmer');
+  WriteLn('  [Enter]               S�lectionner/Confirmer');
   WriteLn;
   WriteLn('Filtres :');
-  WriteLn('  TCP/UDP ports         Filtrer par numéro de port');
+  WriteLn('  TCP/UDP ports         Filtrer par num�ro de port');
   WriteLn('  Adresses IP           Filtrer par plage d''adresses');
-  WriteLn('  Protocoles            Afficher protocoles spécifiques');
+  WriteLn('  Protocoles            Afficher protocoles sp�cifiques');
   WriteLn('  Taille paquets        Filtrer par taille minimum/maximum');
   WriteLn;
   WriteLn('Affichages disponibles :');
-  WriteLn('  Temps réel            Paquets défilant en continu');
-  WriteLn('  Statistiques cumulées Totaux depuis démarrage');
+  WriteLn('  Temps r�el            Paquets d�filant en continu');
+  WriteLn('  Statistiques cumul�es Totaux depuis d�marrage');
   WriteLn('  Graphiques ASCII      Barres de progression');
-  WriteLn('  Mode détaillé         Informations étendues');
-  WriteLn('  Mode compact          Vue condensée');
+  WriteLn('  Mode d�taill�         Informations �tendues');
+  WriteLn('  Mode compact          Vue condens�e');
   WriteLn;
   WriteLn('Configuration :');
-  WriteLn('  Interface par défaut  Interface à monitorer automatiquement');
-  WriteLn('  Intervalle refresh    Fréquence de mise à jour (ms)');
-  WriteLn('  Timeout connexions    Délai expiration connexions inactives');
-  WriteLn('  Mode promiscuité      Capturer tout le trafic réseau');
-  WriteLn('  Résolution DNS        Résoudre noms d''hôte en temps réel');
-  WriteLn('  Journalisation        Sauvegarder activité dans fichier log');
+  WriteLn('  Interface par d�faut  Interface � surveiller automatiquement');
+  WriteLn('  Intervalle refresh    Fr�quence de mise � jour (ms)');
+  WriteLn('  Timeout connexions    D�lai expiration connexions inactives');
+  WriteLn('  Mode promiscuit�      Capturer tout le trafic r�seau');
+  WriteLn('  R�solution DNS        R�soudre noms d''h�te en temps r�el');
+  WriteLn('  Journalisation        Sauvegarder activit� dans fichier log');
   WriteLn;
-  WriteLn('Informations affichées :');
-  WriteLn('  Protocole             TCP, UDP, ICMP, ARP, etc.');
+  WriteLn('Informations affich�es :');
+  WriteLn('  Protocole             TCP, UDP, ICMP, ARP,...');
   WriteLn('  Adresses source/dest  IP:port source et destination');
   WriteLn('  Taille paquets        Nombre d''octets par paquet');
   WriteLn('  Drapeaux TCP          SYN, ACK, FIN, RST, PSH, URG');
-  WriteLn('  Débit instantané      Octets/paquets par seconde');
-  WriteLn('  Statistiques cumulées Total depuis démarrage session');
+  WriteLn('  D�bit instantan�      Octets/paquets par seconde');
+  WriteLn('  Statistiques cumul�es Total depuis d�marrage session');
   WriteLn;
   WriteLn('Fichiers de configuration :');
   WriteLn('  ~/.iptraf.cfg         Configuration utilisateur');
-  WriteLn('  /etc/iptraf.cfg       Configuration système');
-  WriteLn('  /var/log/iptraf.log   Fichier journal par défaut');
+  WriteLn('  /etc/iptraf.cfg       Configuration syst�me');
+  WriteLn('  /var/log/iptraf.log   Fichier journal par d�faut');
   WriteLn;
   WriteLn('Exemples d''utilisation :');
-  WriteLn('  IPTRAF                     # Interface interactive');
-  WriteLn('  IPTRAF -i eth0             # Monitorer eth0');
-  WriteLn('  IPTRAF -d eth0 -t 60       # Détaillé sur eth0, 60 min');
+  WriteLn('  IPTRAF                      # Interface interactive');
+  WriteLn('  IPTRAF -i eth0              # Surveiller eth0');
+  WriteLn('  IPTRAF -d eth0 -t 60        # D�taill� sur eth0, 60 min');
   WriteLn('  IPTRAF -s eth0 -L stats.log # Stats vers fichier');
-  WriteLn('  IPTRAF -g -i wlan0         # Mode graphique direct');
+  WriteLn('  IPTRAF -g -i wlan0          # Mode graphique direct');
   WriteLn;
-  WriteLn('Note: Moniteur de trafic réseau temps réel avec interface colorée.');
-  WriteLn('Fournit analyse détaillée du trafic TCP/UDP/ICMP sur interfaces réseau.');
+  WriteLn('Note: Moniteur de trafic r�seau temps r�el avec interface color�e.');
+  WriteLn('Fournit analyse d�taill�e du trafic TCP/UDP/ICMP sur interfaces r�seau.');
   WriteLn('Compatible avec iptraf original de Linux.');
   Exit;
  End
  Else If ParamStr(1) = '--version' Then Begin
-  WriteLn('DEBUG: Showing version');
-  WriteLn('iptraf (NETWORKKIT-P) 1.0');
-  WriteLn('Console-based network traffic monitor');
-  WriteLn('Compatible with Linux iptraf');
+  WriteLn('iptraf 1.0 - Clone Pascal pour NETWORKKIT-P, Linux-0, Corail');
+  WriteLn('Moniteur de trafic r�seau bas� sur la console');
+  WriteLn('Compatible avec Linux iptraf');
   WriteLn;
-  WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+  WriteLn('�crit par Sylvain Maltais');
   Exit;
  End
- Else Begin
-  WriteLn('DEBUG: Starting interactive mode');
+  Else
+ Begin
   {$IFDEF FPC}
   If not InitializeNetwork Then Begin
-   WriteLn('Error: Cannot initialize network subsystem');
+   WriteLn('Erreur: Impossible d''initialiser le sous-syst�me r�seau.');
    Halt(1);
   End;
-  
-  Try
+   Try
    InitializeConfig;
    MainLoop;
-   
-   { Restaurer affichage normal }
+    { Restaurer affichage normal }
    SetTextColor(LightGray, Black);
    ClrScr;
-   WriteLn('IPTraf terminé.');
-   
+   WriteLn('IPTraf termin�.');
   Finally
    CleanupNetwork;
   End;
