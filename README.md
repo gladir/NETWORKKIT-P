@@ -63,6 +63,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de publier des articles d''actualité sur un serveur NNTP.</td>
 	</tr>
 	<tr>
+		<td><b>IP.PAS</b></td>
+		<td>Cette commande permet d''afficher et manipuler la configuration réseau.</td>
+	</tr>
+	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
 		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
 	</tr>
