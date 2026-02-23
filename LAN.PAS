@@ -52,7 +52,7 @@ Type
  End;
  PIP_ADAPTER_INFO = ^IP_ADAPTER_INFO;
 
- { Structure pour les informations d'adaptateur rÃ©seau }
+ { Structure pour les informations d'adaptateur r‚seau }
  TAdapterInfo = Record
   AdapterName:String;
   Description:String;
@@ -369,7 +369,7 @@ Var
  I:Integer;
 Begin
  WriteLn;
- WriteLn('=== Statistiques rÃ©seau ===');
+ WriteLn('=== Statistiques r‚seau ===');
   { Initialiser les totaux }
  TotalPacketsIn:=0;
  TotalPacketsOut:=0;
@@ -381,12 +381,12 @@ Begin
   IfRow.dwIndex:=I;
   RetVal:=GetIfEntry(@IfRow);
   If RetVal=NO_ERROR Then Begin
-   { Interface trouvÃ©e, additionner les statistiques }
+   { Interface trouv‚e, additionner les statistiques }
    Inc(TotalPacketsIn,IfRow.dwInUcastPkts+IfRow.dwInNUcastPkts);
    Inc(TotalPacketsOut,IfRow.dwOutUcastPkts+IfRow.dwOutNUcastPkts);
    Inc(TotalErrorsIn,IfRow.dwInErrors+IfRow.dwInDiscards);
    Inc(TotalErrorsOut,IfRow.dwOutErrors+IfRow.dwOutDiscards);
-    { Afficher les informations de la premiÃ¨re interface active }
+    { Afficher les informations de la premiŠre interface active }
    If (I=1) and (IfRow.dwOperStatus=1) Then Begin
     WriteLn('Interface principale (Index ',IfRow.dwIndex,'):');
     WriteLn('  Vitesse         : ',IfRow.dwSpeed div 1000000,' Mbps');
@@ -408,7 +408,7 @@ Begin
 End;
 {$ENDIF}
 
-{ Proc‚dure pour dÃ©tecter les protocoles r‚seau communs }
+{ Proc‚dure pour d‚tecter les protocoles r‚seau communs }
 Procedure DetectNetworkProtocols;Begin
  WriteLn('=== Protocoles r‚seau support‚s ===');
  {$IFDEF FPC}
@@ -450,12 +450,12 @@ BEGIN
   WriteLn;
   WriteLn('Syntaxe : LAN');
   WriteLn;
-  WriteLn('Cette commande affiche les informations sur le r‚seau local :');
-  WriteLn('- Adaptateurs r‚seau et leurs propri‚t‚s');
-  WriteLn('- Adresses IP, masques et passerelles');
-  WriteLn('- Protocoles r‚seau install‚s');
-  WriteLn('- Statistiques de transmission/r‚ception');
-  WriteLn('- Lecteurs r‚seau cartographi‚s (DOS)');
+  WriteLn('Cette commande affiche les informations sur le r‚seau local suivante :');
+  WriteLn('þ Adaptateurs r‚seau et leurs propri‚t‚s');
+  WriteLn('þ Adresses IP, masques et passerelles');
+  WriteLn('þ Protocoles r‚seau install‚s');
+  WriteLn('þ Statistiques de transmission/r‚ception');
+  WriteLn('þ Lecteurs r‚seau cartographi‚s (DOS)');
   WriteLn;
   WriteLn('Compatible Turbo Pascal (interruptions) et Free Pascal (API Windows)');
  End
