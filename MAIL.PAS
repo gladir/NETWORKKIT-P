@@ -811,36 +811,36 @@ Var
  I: Integer;
 Begin
  Count := 0;
-
- { Simplification pour la simulation }
+  { Simplification pour la simulation }
  If MsgList = '' Then Begin
   { Message actuel }
   Messages[0] := MailInterface.CurrentMessage - 1;
   Count := 1;
  End
- Else If MsgList = '*' Then Begin
+  Else
+ If MsgList = '*' Then Begin
   { Tous les messages }
   For I := 0 To MessageCount - 1 Do Begin
    Messages[I] := I;
    Inc(Count);
   End;
  End
- Else If MsgList = '$' Then Begin
-  { Dernier message }
-  Messages[0] := MessageCount - 1;
+  Else
+ If MsgList='$'Then Begin
+   { Dernier message }
+  Messages[0]:=MessageCount-1;
   Count := 1;
  End
- Else Begin
-  { Message sp√©cifique }
+  Else
+ Begin
+  { Message spÇcifique }
   Try
-   Messages[0] := StrToInt(MsgList) - 1;
-   If (Messages[0] >= 0) and (Messages[0] < MessageCount) Then
-    Count := 1;
+   Messages[0]:=StrToInt(MsgList)-1;
+   If(Messages[0] >= 0)and(Messages[0]<MessageCount)Then Count := 1;
   Except
    Count := 0;
   End;
  End;
-
  ParseMessageList := Count;
 End;
 
@@ -855,11 +855,9 @@ Var
  I: Integer;
 Begin
  ProcessMailCommand := True;
-
  Command := Trim(Command);
  If Command = '' Then Exit;
-
- { S√©parer commande et arguments }
+ { SÇparer commande et arguments }
  SpacePos := Pos(' ', Command);
  If SpacePos > 0 Then Begin
   Cmd := Copy(Command, 1, SpacePos - 1);
@@ -868,24 +866,19 @@ Begin
   Cmd := Command;
   Args := '';
  End;
-
  Cmd := LowerCase(Cmd);
-
  Case Cmd Of
   { Aide }
   '?', 'help': DisplayMailHelp;
-
   { Afficher en-t√™tes }
   'h', 'headers': DisplayMessageHeaders;
-
   { Afficher message (type) }
   't', 'type': Begin
    MsgCount := ParseMessageList(Args, Messages);
    For I := 0 To MsgCount - 1 Do
     DisplayMessage(Messages[I]);
   End;
-
-  { Message suivant }
+   { Message suivant }
   'n', 'next': Begin
    If MailInterface.CurrentMessage < MessageCount Then Begin
     Inc(MailInterface.CurrentMessage);
@@ -894,8 +887,7 @@ Begin
     WriteLn('At EOF');
    End;
   End;
-
-  { Message pr√©c√©dent }
+    { Message prÇcÇdent }
   'p', 'prev': Begin
    If MailInterface.CurrentMessage > 1 Then Begin
     Dec(MailInterface.CurrentMessage);
@@ -904,22 +896,20 @@ Begin
     WriteLn('At BOF');
    End;
   End;
-
-  { Supprimer messages }
+   { Supprimer messages }
   'd', 'delete': Begin
    MsgCount := ParseMessageList(Args, Messages);
    For I := 0 To MsgCount - 1 Do
     DeleteMessage(Messages[I]);
   End;
-
-  { Restaurer messages }
+   { Restaurer messages }
   'u', 'undelete': Begin
    MsgCount := ParseMessageList(Args, Messages);
    For I := 0 To MsgCount - 1 Do Begin
     With MailMessages[Messages[I]] Do Begin
      IsDeleted := False;
      Status := 'read';
-     WriteLn('Message ', Messages[I] + 1, ' undeleted');
+     WriteLn('Message ', Messages[I] + 1, ' restaurÇ');
     End;
    End;
   End;
@@ -946,91 +936,80 @@ Begin
     ComposeMessage(Args);
    End;
   End;
-
-  { Sauvegarder messages }
+   { Sauvegarder messages }
   's', 'save': Begin
    MsgCount := ParseMessageList(Args, Messages);
    For I := 0 To MsgCount - 1 Do
     SaveMessage(Messages[I], '');
   End;
-
-  { Quitter avec sauvegarde }
+   { Quitter avec sauvegarde }
   'q', 'quit': Begin
-   WriteLn('Saving changes...');
+   WriteLn('Sauvegarde les changements...');
    MailInterface.QuitRequested := True;
    ProcessMailCommand := False;
   End;
-
-  { Sortir sans sauvegarde }
+   { Sortir sans sauvegarde }
   'x', 'exit': Begin
-   WriteLn('Exiting without saving changes');
+   WriteLn('Quitte sans sauvegarder les changements');
    MailInterface.QuitRequested := True;
    ProcessMailCommand := False;
   End;
-
   Else Begin
-   { Commande inconnue - peut-√™tre un num√©ro de message }
+    { Commande inconnue - peut-àtre un numÇro de message }
    Try
     I := StrToInt(Cmd) - 1;
     If (I >= 0) and (I < MessageCount) Then Begin
      MailInterface.CurrentMessage := I + 1;
      DisplayMessage(I);
-    End Else Begin
-     WriteLn('Unknown command: ', Cmd);
+    End
+    Else
+   Begin
+     WriteLn('Commande inconnu : ', Cmd);
     End;
    Except
-    WriteLn('Unknown command: ', Cmd);
+    WriteLn('Command inconnu : ', Cmd);
    End;
   End;
  End;
 End;
 
-{ Mode interactif mail }
+ { Mode interactif mail }
 Procedure RunInteractiveMode;
 Var
  Command: String;
 Begin
- WriteLn('Mail interactive mode simulation');
- WriteLn('Commands executed automatically:');
+ WriteLn('Simulation du mode interactif de messagerie');
+ WriteLn('Commandes exÇcutÇs automatiquement :');
  WriteLn;
-
- { Afficher les en-t√™tes }
- WriteLn('> headers');
+  { Afficher les entàtes }
+ WriteLn('> entàtes');
  DisplayMessageHeaders;
-
- { Lire premier message }
+  { Lire premier message }
  WriteLn('> 1');
  ProcessMailCommand('1');
-
- { Message suivant }
+  { Message suivant }
  WriteLn('> n');
  ProcessMailCommand('n');
-
- { R√©pondre au message }
+  { RÇpondre au message }
  WriteLn('> r');
  ProcessMailCommand('r');
-
- { Composer nouveau message }
+  { Composer nouveau message }
  WriteLn('> m john@example.com');
  ProcessMailCommand('m john@example.com');
-
- { Supprimer message spam }
+  { Supprimer message spam }
  WriteLn('> d 4');
  ProcessMailCommand('d 4');
-
- { Afficher aide }
+  { Afficher aide }
  WriteLn('> ?');
  ProcessMailCommand('?');
-
- { Quitter }
+  { Quitter }
  WriteLn('> q');
  ProcessMailCommand('q');
-
- WriteLn('End of interactive mode simulation');
+ WriteLn('Fin de la simulation du mode interactif');
 End;
 
-{ Envoyer mail directement }
-Function SendDirectMail(Recipients: TStringList; Subject: String; MessageFile: String): Boolean;
+ { Envoyer de courriel directement }
+Function SendDirectMail(Recipients: TStringList; Subject: String; MessageFile:String):Boolean;
 Var
  I: Integer;
  MessageBody: TStringList;
@@ -1038,13 +1017,11 @@ Var
  Line: String;
 Begin
  SendDirectMail := False;
-
  If Recipients.Count = 0 Then Begin
-  WriteLn('No recipients specified');
+  WriteLn('Destinataires non spÇcifiÇs');
   Exit;
  End;
-
- { Pr√©parer le corps du message }
+  { PrÇparer le corps du message }
  MessageBody := TStringList.Create;
  Try
   If MessageFile <> '' Then Begin
@@ -1052,38 +1029,36 @@ Begin
    Try
     MessageBody.LoadFromFile(MessageFile);
    Except
-    WriteLn('Error: Cannot read file ', MessageFile);
+    WriteLn('Erreur: Impossible de lire le fichier ', MessageFile);
     Exit;
    End;
-  End Else Begin
+  End
+   Else
+  Begin
    { Lire depuis stdin }
-   WriteLn('Reading message from stdin (end with Ctrl+Z or EOF):');
+   WriteLn('Lecture du message depuis l''entrÇe standard (terminez par Ctrl+Z ou EOF) :');
    While not EOF Do Begin
     ReadLn(Line);
     MessageBody.Add(Line);
    End;
   End;
-
-  { Construire le texte }
+   { Construire le texte }
   MessageText := '';
   For I := 0 To MessageBody.Count - 1 Do Begin
    MessageText := MessageText + MessageBody[I];
    If I < MessageBody.Count - 1 Then
     MessageText := MessageText + #13#10;
   End;
-
-  { Envoyer √† tous les destinataires }
+   { Envoyer Ö tous les destinataires }
   For I := 0 To Recipients.Count - 1 Do Begin
-   WriteLn('Sending to: ', Recipients[I]);
+   WriteLn('Envoi Ö : ', Recipients[I]);
    If not SendEmailSMTP(Recipients[I], MailConfig.UserEmail, Subject, MessageText) Then Begin
-    WriteLn('Failed to send to: ', Recipients[I]);
+    WriteLn('êchec de l''envoi Ö : ', Recipients[I]);
     Exit;
    End;
   End;
-
-  WriteLn('All messages sent successfully');
+  WriteLn('Tous les messages ont ÇtÇ envoyÇs avec succäs.');
   SendDirectMail := True;
-
  Finally
   MessageBody.Free;
  End;
@@ -1105,119 +1080,127 @@ Begin
  MessageFile := '';
  Interactive := False;
  SendMode := False;
-
  Try
   I := 1;
   While I <= ParamCount Do Begin
    Param := ParamStr(I);
-
    If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--version') Then Begin
-    WriteLn('mail (GNU Mailutils) 3.7 - NETWORKKIT-P Implementation');
-    WriteLn('Compatible with Unix/Linux mail command');
-    WriteLn('With real SMTP sending capability');
+    WriteLn('mail (GNU Mailutils) 3.7 - Clone Pascal pour NETWORKKIT-P, Linux-0, Corail');
+    WriteLn('Compatible avec la commande mail de Unix/Linux');
+    WriteLn('Avec une vÇritable fonctionnalitÇ d''envoi SMTP');
     Exit;
    End
-   Else If (LowerCase(Param) = '-h') or (LowerCase(Param) = '--help') Then Begin
-    { L'aide sera affich√©e par le bloc principal }
+    Else
+   If (LowerCase(Param) = '-h') or (LowerCase(Param) = '--help') Then Begin
+    { L'aide sera affichÇe par le bloc principal }
     Exit;
    End
-   Else If LowerCase(Param) = '-s' Then Begin
-    { Subject }
+    Else
+   If LowerCase(Param) = '-s'Then Begin
+    { Sujet }
     Inc(I);
     If I <= ParamCount Then
      Subject := ParamStr(I)
     Else Begin
-     WriteLn('Option -s requires an argument');
+     WriteLn('L''option -s requiert un argument');
      Exit;
     End;
    End
-   Else If LowerCase(Param) = '-f' Then Begin
+    Else
+   If LowerCase(Param) = '-f' Then Begin
     { File }
     Inc(I);
     If I <= ParamCount Then
      MessageFile := ParamStr(I)
     Else Begin
-     WriteLn('Option -f requires an argument');
+     WriteLn('L''option -f requiert un argument');
      Exit;
     End;
    End
-   Else If LowerCase(Param) = '-smtp' Then Begin
+    Else
+   If LowerCase(Param) = '-smtp' Then Begin
     { SMTP Server }
     Inc(I);
-    If I <= ParamCount Then
-     MailConfig.SMTPServer := ParamStr(I)
-    Else Begin
-     WriteLn('Option -smtp requires an argument');
+    If I <= ParamCount Then MailConfig.SMTPServer := ParamStr(I)
+     Else
+    Begin
+     WriteLn('L''option -smtp requiert un argument');
      Exit;
     End;
    End
-   Else If LowerCase(Param) = '-port' Then Begin
+    Else
+   If LowerCase(Param) = '-port' Then Begin
     { SMTP Port }
     Inc(I);
-    If I <= ParamCount Then
-     MailConfig.SMTPPort := StrToIntDef(ParamStr(I), 587)
-    Else Begin
-     WriteLn('Option -port requires an argument');
+    If I <= ParamCount Then MailConfig.SMTPPort := StrToIntDef(ParamStr(I), 587)
+     Else
+    Begin
+     WriteLn('L''option -port requiert un argument');
      Exit;
     End;
    End
-   Else If LowerCase(Param) = '-user' Then Begin
-    { SMTP User }
+    Else
+   If LowerCase(Param) = '-user' Then Begin
+    { Utilisateur SMTP }
     Inc(I);
     If I <= ParamCount Then
      MailConfig.UserEmail := ParamStr(I)
     Else Begin
-     WriteLn('Option -user requires an argument');
+     WriteLn('L''option -user requiert un argument');
      Exit;
     End;
    End
-   Else If LowerCase(Param) = '-pass' Then Begin
-    { SMTP Password }
+    Else
+   If LowerCase(Param) = '-pass' Then Begin
+     { Mot de passe SMTP }
     Inc(I);
-    If I <= ParamCount Then
-     MailConfig.Password := ParamStr(I)
-    Else Begin
-     WriteLn('Option -pass requires an argument');
+    If I <= ParamCount Then MailConfig.Password := ParamStr(I)
+     Else
+    Begin
+     WriteLn('L''option -pass requiert un argument');
      Exit;
     End;
    End
-   Else If LowerCase(Param) = '-verbose' Then Begin
+    Else
+   If LowerCase(Param) = '-verbose' Then Begin
     { Mode verbeux }
     MailConfig.Verbose := True;
    End
-   Else If LowerCase(Param) = '-i' Then Begin
+    Else
+   If LowerCase(Param) = '-i' Then Begin
     { Interactive }
     Interactive := True;
    End
-   Else If LowerCase(Param) = '-n' Then Begin
+    Else
+   If LowerCase(Param) = '-n' Then Begin
     { Non-interactive }
     Interactive := False;
    End
-   Else If Copy(Param, 1, 1) <> '-' Then Begin
-    { Recipient }
+    Else
+   If Copy(Param, 1, 1) <> '-' Then Begin
+    { Destinataire }
     Recipients.Add(Param);
     SendMode := True;
    End;
-
    Inc(I);
   End;
-
-  { Cr√©er les donn√©es d'exemple }
+   { CrÇer les donnÇes d'exemple }
   CreateSampleMessages;
   MailInterface.MessageCount := MessageCount;
-
   If SendMode Then Begin
-   { Mode envoi }
+    { Mode envoi }
    SendDirectMail(Recipients, Subject, MessageFile);
   End
-  Else If Interactive or (ParamCount = 0) Then Begin
-   { Mode interactif }
+   Else
+  If Interactive or (ParamCount = 0)Then Begin
+    { Mode interactif }
    RunInteractiveMode;
-  End Else Begin
-   { Mode lecture par d√©faut }
+  End
+   Else
+  Begin
+   { Mode lecture par dÇfaut }
    DisplayMessageHeaders;
   End;
-
  Finally
   Recipients.Free;
  End;
@@ -1228,20 +1211,20 @@ End;
 { Version Turbo Pascal - Simulation }
 Procedure ShowSimulatedMail;
 Begin
- WriteLn('MAIL [NETWORKKIT-P] Unix/Linux mail command (simulation)');
+ WriteLn('MAIL [NETWORKKIT-P] Simulation de la commande mail de Unix/Linux');
  WriteLn('=========================================================');
  WriteLn;
- WriteLn('Mail version 8.1.2 01/15/2001.  Type ? for help.');
+ WriteLn('Mail version 8.1.2 01/15/2001.  Tapez ? pour l''aide.');
  WriteLn('"/var/mail/user": 4 messages');
  WriteLn;
- WriteLn(' N  1 System Administrator  Feb 21 08:15  URGENT: System maintenance');
- WriteLn(' R  2 John Doe             Feb 20 14:30  Weekly team meeting - Agenda');
- WriteLn('    3 TechBlog Weekly      Feb 19 09:45  Weekly Tech Newsletter #142');
- WriteLn(' D  4 Special Offer        Feb 21 10:20  WIN $10000 NOW!!! CLICK HERE');
+ WriteLn(' N  1 System Administrator  Feb 21 08:15  URGENT: Maintenance systäme');
+ WriteLn(' R  2 John Doe              Feb 20 14:30  RÇunion d''Çquipe hebdomadaire - Ordre du jour');
+ WriteLn('    3 TechBlog Weekly       Feb 19 09:45  Bulletin technique hebdomadaire No 142');
+ WriteLn(' D  4 Special Offer         Feb 21 10:20  GAGNEZ $10000 MAINTENANT!!! CLIQUER ICI');
  WriteLn;
  WriteLn('& ');
  WriteLn;
- WriteLn('Commands: t(ype) n(ext) p(rev) d(elete) r(eply) m(ail) q(uit) ?(help)');
+ WriteLn('Commandes: t(apez) n(prochain) p(rev) d(efface) r(Çpondre) m(courrier) q(uitte) ?(aide)');
 End;
 {$ENDIF}
 
@@ -1257,16 +1240,16 @@ BEGIN
   WriteLn('Options :');
   WriteLn('  -h, --help            Afficher cette aide');
   WriteLn('  -v, --version         Afficher la version');
-  WriteLn('  -s SUBJECT            Sp√©cifier le sujet du message');
+  WriteLn('  -s SUBJECT            SpÇcifier le sujet du message');
   WriteLn('  -f FILE               Lire le message depuis un fichier');
   WriteLn('  -i                    Mode interactif');
   WriteLn('  -n                    Mode non-interactif');
   WriteLn('  -c RECIPIENT          Ajouter destinataire en copie carbone');
   WriteLn('  -b RECIPIENT          Ajouter destinataire en copie carbone invisible');
   WriteLn('  -a FILE               Attacher un fichier');
-  WriteLn('  -r FROM               Sp√©cifier l''adresse d''exp√©diteur');
-  WriteLn('  -smtp SERVER          Serveur SMTP (d√©faut: smtp.gmail.com)');
-  WriteLn('  -port PORT            Port SMTP (d√©faut: 587)');
+  WriteLn('  -r FROM               SpÇcifier l''adresse d''expÇditeur');
+  WriteLn('  -smtp SERVER          Serveur SMTP (dÇfaut: smtp.gmail.com)');
+  WriteLn('  -port PORT            Port SMTP (dÇfaut: 587)');
   WriteLn('  -user EMAIL           Adresse email utilisateur');
   WriteLn('  -pass PASSWORD        Mot de passe SMTP');
   WriteLn('  -verbose              Mode verbeux (debug SMTP)');
@@ -1284,77 +1267,77 @@ BEGIN
   WriteLn;
   WriteLn('Commandes interactives :');
   WriteLn('  Navigation :');
-  WriteLn('    1, 2, 3...          Afficher message num√©ro N');
+  WriteLn('    1, 2, 3...          Afficher message numÇro N');
   WriteLn('    n, next             Message suivant');
-  WriteLn('    p, prev             Message pr√©c√©dent');
+  WriteLn('    p, prev             Message prÇcÇdent');
   WriteLn('    h, headers          Afficher liste des messages');
-  WriteLn('    f [msglist]         Afficher en-t√™tes des messages');
+  WriteLn('    f [msglist]         Afficher entàtes des messages');
   WriteLn;
   WriteLn('  Actions sur messages :');
   WriteLn('    t [msglist]         Afficher contenu des messages');
   WriteLn('    d [msglist]         Supprimer messages');
-  WriteLn('    u [msglist]         Restaurer messages supprim√©s');
+  WriteLn('    u [msglist]         Restaurer messages supprimÇs');
   WriteLn('    s [msglist] file    Sauvegarder messages dans fichier');
-  WriteLn('    w [msglist] file    √âcrire messages dans fichier (sans en-t√™tes)');
+  WriteLn('    w [msglist] file    êcrire messages dans fichier (sans entàtes)');
   WriteLn;
   WriteLn('  Communication :');
-  WriteLn('    r [message]         R√©pondre au message');
-  WriteLn('    R [message]         R√©pondre √† tous');
+  WriteLn('    r [message]         RÇpondre au message');
+  WriteLn('    R [message]         RÇpondre Ö tous');
   WriteLn('    m [user]            Composer nouveau message');
-  WriteLn('    fo [message]        Transf√©rer message');
+  WriteLn('    fo [message]        TransfÇrer message');
   WriteLn;
   WriteLn('  Gestion :');
   WriteLn('    q, quit             Quitter et sauvegarder');
   WriteLn('    x, exit             Quitter sans sauvegarder');
-  WriteLn('    !, shell            Ex√©cuter commande shell');
+  WriteLn('    !, shell            ExÇcuter commande shell');
   WriteLn('    ?, help             Afficher cette aide');
   WriteLn;
-  WriteLn('Sp√©cification de messages (msglist) :');
-  WriteLn('  1               Message num√©ro 1');
-  WriteLn('  1-5             Messages 1 √† 5');
+  WriteLn('SpÇcification de messages (msglist) :');
+  WriteLn('  1               Message numÇro 1');
+  WriteLn('  1-5             Messages 1 Ö 5');
   WriteLn('  1 3 5           Messages 1, 3 et 5');
   WriteLn('  *               Tous les messages');
   WriteLn('  $               Dernier message');
   WriteLn('  .               Message actuel');
   WriteLn('  ^               Premier message');
   WriteLn;
-  WriteLn('Indicateurs de statut :');
+  WriteLn('Indicateurs d''Çtat :');
   WriteLn('  N       Nouveau message (non lu)');
   WriteLn('  U       Non lu');
-  WriteLn('  R       Lu avec r√©ponse envoy√©e');
-  WriteLn('  D       Marqu√© pour suppression');
-  WriteLn('  *       Message sauvegard√©');
-  WriteLn('  P       Message conserv√©');
+  WriteLn('  R       Lu avec rÇponse envoyÇe');
+  WriteLn('  D       MarquÇ pour suppression');
+  WriteLn('  *       Message sauvegardÇ');
+  WriteLn('  P       Message conservÇ');
   WriteLn;
   WriteLn('Variables d''environnement :');
   WriteLn('  MAIL            Fichier de courrier principal');
-  WriteLn('  MAILPATH        Chemins de recherche des bo√Ætes mail');
-  WriteLn('  EDITOR          √âditeur par d√©faut pour composer');
+  WriteLn('  MAILPATH        Chemins de recherche des boåtes de courrier');
+  WriteLn('  EDITOR          êditeur par dÇfaut pour composer');
   WriteLn('  PAGER           Programme de pagination');
   WriteLn('  MAILRC          Fichier de configuration');
   WriteLn;
   WriteLn('Fichiers :');
-  WriteLn('  /var/mail/user      Bo√Æte mail syst√®me');
-  WriteLn('  ~/mbox              Bo√Æte mail utilisateur');
+  WriteLn('  /var/mail/user      Boåte mail systäme');
+  WriteLn('  ~/mbox              Boåte mail utilisateur');
   WriteLn('  ~/.mailrc           Configuration utilisateur');
-  WriteLn('  ~/dead.letter       Messages non envoy√©s');
+  WriteLn('  ~/dead.letter       Messages non envoyÇs');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  MAIL                        # Lire courrier');
-  WriteLn('  MAIL john@example.com       # Envoyer √† john');
+  WriteLn('  MAIL john@example.com       # Envoyer Ö john');
   WriteLn('  MAIL -s "Hello" john@example.com');
   WriteLn('  MAIL -s "Report" -f report.txt boss@company.com');
   WriteLn('  echo "Test" | MAIL -s "Test" user@domain.com');
   WriteLn;
-  WriteLn('Envoi SMTP r√©el :');
+  WriteLn('Envoi SMTP rÇel :');
   WriteLn('  MAIL -smtp smtp.gmail.com -port 587 -user mon@gmail.com -pass motdepasse -s "Test" dest@example.com');
   WriteLn('  MAIL -verbose -s "Debug" dest@example.com  # Avec debug SMTP');
   WriteLn;
   WriteLn('Variables d''environnement SMTP :');
-  WriteLn('  SMTP_SERVER          Serveur SMTP par d√©faut');
-  WriteLn('  SMTP_PORT            Port SMTP par d√©faut');
-  WriteLn('  SMTP_USER            Utilisateur SMTP par d√©faut');
-  WriteLn('  SMTP_PASS            Mot de passe SMTP par d√©faut');
+  WriteLn('  SMTP_SERVER          Serveur SMTP par dÇfaut');
+  WriteLn('  SMTP_PORT            Port SMTP par dÇfaut');
+  WriteLn('  SMTP_USER            Utilisateur SMTP par dÇfaut');
+  WriteLn('  SMTP_PASS            Mot de passe SMTP par dÇfaut');
   WriteLn;
   WriteLn('Configuration ~/.mailrc exemple :');
   WriteLn('  set ask');
@@ -1368,11 +1351,11 @@ BEGIN
   WriteLn('Compatible avec Berkeley Mail et System V mailx.');
  End
  Else If ParamStr(1) = '--version' Then Begin
-  WriteLn('mail (NETWORKKIT-P) 1.00');
-  WriteLn('Compatible with Unix/Linux mail command');
-  WriteLn('Based on Berkeley Mail and GNU Mailutils');
+  WriteLn('mail 1.00 pour NETWORKKIT-P, Linux-0, Corail');
+  WriteLn('Compatible avec la commande mail de Unix/Linux');
+  WriteLn('BasÇ sur Berkeley Mail et GNU Mailutils');
   WriteLn;
-  WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+  WriteLn('êcrit par Sylvain Maltais');
  End
  Else Begin
   {$IFDEF FPC}
