@@ -75,6 +75,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet d'effectuer la gestion des adresses de multidiffusion IP.</td>
 	</tr>
 	<tr>
+		<td><b>IPTRAF.PAS</b></td>
+		<td>Cette commande permet de lancer l'utilitaire de statistiques réseau en console.</td>
+	</tr>
+	<tr>
 		<td><b>ISEMAIL.PAS</b></td>
 		<td>Cette commande permet de vérifier si le courriel est un courriel valide.</td>
 	</tr>
