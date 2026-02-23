@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande ip (iproute2 network configuration))
+  @abstract(Target: Turbo Pascal 7, Free Pascal
+  @description: Commande ip (iproute2 network configuration))
 }
 
 Program IP;
@@ -20,83 +21,83 @@ Program IP;
 
 {$IFDEF FPC}
 Type
- { Interface r√©seau }
+ { Interface rÇseau }
  TNetworkInterface = Record
-  Index: Integer;               { Index interface }
-  Name: String[32];             { Nom interface }
-  Type_: String[16];            { Type (ethernet, loopback, etc) }
-  Flags: LongWord;              { Drapeaux interface }
-  MTU: Integer;                 { Maximum Transmission Unit }
-  QDisc: String[16];            { Queue discipline }
-  State: String[16];            { √âtat (UP, DOWN, etc) }
-  Mode: String[16];             { Mode (DEFAULT, DORMANT) }
-  Group: String[16];            { Groupe }
-  QLen: Integer;                { Queue length }
-  LinkType: String[16];         { Type de lien }
-  Address: String[18];          { Adresse MAC }
-  Broadcast: String[18];        { Adresse broadcast }
-  IsUp: Boolean;                { Interface active }
-  IsRunning: Boolean;           { Interface en cours d'utilisation }
-  IsLoopback: Boolean;          { Interface de bouclage }
-  IsPointToPoint: Boolean;      { Interface point √† point }
-  IsNoArp: Boolean;             { Pas d'ARP }
-  IsPromisc: Boolean;           { Mode promiscuit√© }
-  IsMulticast: Boolean;         { Support multicast }
-  IsBroadcast: Boolean;         { Support broadcast }
-  TxPackets: Int64;             { Paquets transmis }
-  RxPackets: Int64;             { Paquets re√ßus }
-  TxBytes: Int64;               { Octets transmis }
-  RxBytes: Int64;               { Octets re√ßus }
-  TxErrors: Int64;              { Erreurs transmission }
-  RxErrors: Int64;              { Erreurs r√©ception }
-  TxDropped: Int64;             { Paquets supprim√©s TX }
-  RxDropped: Int64;             { Paquets supprim√©s RX }
+  Index: Integer;                { Index interface }
+  Name: String[32];              { Nom interface }
+  Type_: String[16];             { Type (ethernet, loopback,...) }
+  Flags: LongWord;               { Drapeaux interface }
+  MTU: Integer;                  { Maximum Transmission Unit }
+  QDisc: String[16];             { Queue discipline }
+  State: String[16];             { êtat (UP, DOWN, etc) }
+  Mode: String[16];              { Mode (DEFAULT, DORMANT) }
+  Group: String[16];             { Groupe }
+  QLen: Integer;                 { Queue length }
+  LinkType: String[16];          { Type de lien }
+  Address: String[18];           { Adresse MAC }
+  Broadcast: String[18];         { Adresse broadcast }
+  IsUp: Boolean;                 { Interface active }
+  IsRunning: Boolean;            { Interface en cours d'utilisation }
+  IsLoopback: Boolean;           { Interface de bouclage }
+  IsPointToPoint: Boolean;       { Interface point Ö point }
+  IsNoArp: Boolean;              { Pas d'ARP }
+  IsPromisc: Boolean;            { Mode promiscuitÇ }
+  IsMulticast: Boolean;          { Support multicast }
+  IsBroadcast: Boolean;          { Support broadcast }
+  TxPackets: Int64;              { Paquets transmis }
+  RxPackets: Int64;              { Paquets reáus }
+  TxBytes: Int64;                { Octets transmis }
+  RxBytes: Int64;                { Octets reáus }
+  TxErrors: Int64;               { Erreurs transmission }
+  RxErrors: Int64;               { Erreurs rÇception }
+  TxDropped: Int64;              { Paquets supprimÇs TX }
+  RxDropped: Int64;              { Paquets supprimÇs RX }
  End;
 
  { Adresse IP }
  TIPAddress = Record
-  Interface_: String[32];       { Interface associ√©e }
-  Family: String[8];            { Famille (inet, inet6) }
-  Address: String[45];          { Adresse IP }
-  Prefix: Integer;              { Longueur pr√©fixe }
-  Broadcast: String[45];        { Adresse broadcast }
-  Scope: String[16];            { Port√©e (global, link, host) }
-  LabelName: String[32];        { √âtiquette }
-  ValidLifetime: String[32];    { Dur√©e de vie valide }
-  PreferredLifetime: String[32]; { Dur√©e de vie pr√©f√©r√©e }
-  Flags: String[64];            { Drapeaux d'adresse }
+  Interface_: String[32];        { Interface associÇe }
+  Family: String[8];             { Famille (inet, inet6) }
+  Address: String[45];           { Adresse IP }
+  Prefix: Integer;               { Longueur prÇfixe }
+  Broadcast: String[45];         { Adresse broadcast }
+  Scope: String[16];             { PortÇe (global, link, host) }
+  LabelName: String[32];         { êtiquette }
+  ValidLifetime: String[32];     { DurÇe de vie valide }
+  PreferredLifetime: String[32]; { DurÇe de vie prÇfÇrÇe }
+  Flags: String[64];             { Drapeaux d'adresse }
  End;
 
- { Route r√©seau }
+ { Route rÇseau }
  TNetworkRoute = Record
-  Destination: String[45];      { Destination }
-  Prefix: Integer;              { Longueur pr√©fixe }
-  Gateway: String[45];          { Passerelle }
-  Device: String[32];           { Interface de sortie }
-  Protocol: String[16];         { Protocole de routage }
-  Scope: String[16];            { Port√©e }
-  Type_: String[16];            { Type de route }
-  Source: String[45];           { Adresse source pr√©f√©r√©e }
-  Metric: Integer;              { M√©trique }
-  Table: String[16];            { Table de routage }
-  Flags: String[32];            { Drapeaux de route }
+  Destination: String[45];       { Destination }
+  Prefix: Integer;               { Longueur prÇfixe }
+  Gateway: String[45];           { Passerelle }
+  Device: String[32];            { Interface de sortie }
+  Protocol: String[16];          { Protocole de routage }
+  Scope: String[16];             { PortÇe }
+  Type_: String[16];             { Type de route }
+  Source: String[45];            { Adresse source prÇfÇrÇe }
+  Metric: Integer;               { MÇtrique }
+  Table: String[16];             { Table de routage }
+  Flags: String[32];             { Drapeaux de route }
  End;
 
- { R√®gle de routage }
+  { RÇgle de routage }
  TRoutingRule = Record
-  Priority: Integer;            { Priorit√© }
+  Priority: Integer;            { PrioritÇ }
   From: String[45];             { Adresse source }
-  FromPrefix: Integer;          { Pr√©fixe source }
+  FromPrefix: Integer;          { PrÇfixe source }
   To_: String[45];              { Adresse destination }
-  ToPrefix: Integer;            { Pr√©fixe destination }
+  ToPrefix: Integer;            { PrÇfixe destination }
   IIF: String[32];              { Interface entrante }
   OIF: String[32];              { Interface sortante }
   Table: String[16];            { Table de routage }
-  Action: String[16];           { Action (lookup, blackhole, etc) }
+  Action: String[16];           { Action (lookup, blackhole,...) }
   Flags: String[32];            { Drapeaux }
  End;
 
- { Tunnel r√©seau }
+  { Tunnel rÇseau }
  TNetworkTunnel = Record
   Name: String[32];             { Nom du tunnel }
   Type_: String[16];            { Type (ipip, gre, sit, etc) }
@@ -104,8 +105,8 @@ Type
   Remote: String[45];           { Adresse distante }
   TTL: Integer;                 { Time To Live }
   TOS: Integer;                 { Type Of Service }
-  Key: String[32];              { Cl√© }
-  Seq: Boolean;                 { Num√©rotation s√©quentielle }
+  Key: String[32];              { Clef }
+  Seq: Boolean;                 { NumÇrotation sÇquentielle }
   Csum: Boolean;                { Checksum }
  End;
 
@@ -116,23 +117,23 @@ Type
   Action: String[32];           { Action (show, add, del, etc) }
   Family: String[8];            { Famille d'adresses }
   Interface_: String[32];       { Interface cible }
-  ColorOutput: Boolean;         { Sortie color√©e }
-  BriefOutput: Boolean;         { Sortie abr√©g√©e }
+  ColorOutput: Boolean;         { Sortie colorÇe }
+  BriefOutput: Boolean;         { Sortie abrÇgÇe }
   JsonOutput: Boolean;          { Sortie JSON }
-  PrettyPrint: Boolean;         { Formatage am√©lior√© }
-  OnelineOutput: Boolean;       { Une ligne par entr√©e }
+  PrettyPrint: Boolean;         { Formatage amÇliorÇ }
+  OnelineOutput: Boolean;       { Une ligne par entrÇe }
   ShowStats: Boolean;           { Afficher statistiques }
-  ShowDetails: Boolean;         { Afficher d√©tails }
+  ShowDetails: Boolean;         { Afficher dÇtails }
   AllNamespaces: Boolean;       { Tous les namespaces }
-  Netns: String[32];            { Namespace r√©seau }
-  Batch: Boolean;               { Mode batch }
+  Netns: String[32];            { Espace de noms rÇseau }
+  Batch: Boolean;               { Mode de traitement par lots }
   Force: Boolean;               { Forcer l'action }
   Verbose: Boolean;             { Mode verbeux }
   Quiet: Boolean;               { Mode silencieux }
  End;
 
 Var
- { Variables globales }
+  { Variables globales }
  IPConfig: TIPConfig;
  Interfaces: Array[0..63] of TNetworkInterface;
  InterfaceCount: Integer;
@@ -158,20 +159,18 @@ Begin
  Result := '';
  {$IFDEF WINDOWS}
  Len := GetEnvironmentVariable(@VarName[1], Buffer, SizeOf(Buffer));
- If Len > 0 Then
-  Result := StrPas(Buffer);
+ If Len > 0 Then Result := StrPas(Buffer);
  {$ELSE}
- Result := GetEnvironmentVariable(VarName);
+  Result := GetEnvironmentVariable(VarName);
  {$ENDIF}
 End;
 
-{ Convertir drapeaux en cha√Æne }
-Function FlagsToString(Flags: LongWord): String;
+ { Convertir drapeaux en chaåne }
+Function FlagsToString(Flags:LongWord):String;
 Var
  FlagStr: String;
 Begin
  FlagStr := '';
- 
  If (Flags and $1) <> 0 Then FlagStr := FlagStr + 'UP,';
  If (Flags and $2) <> 0 Then FlagStr := FlagStr + 'BROADCAST,';
  If (Flags and $4) <> 0 Then FlagStr := FlagStr + 'DEBUG,';
@@ -183,25 +182,21 @@ Begin
  If (Flags and $100) <> 0 Then FlagStr := FlagStr + 'PROMISC,';
  If (Flags and $200) <> 0 Then FlagStr := FlagStr + 'ALLMULTI,';
  If (Flags and $1000) <> 0 Then FlagStr := FlagStr + 'MULTICAST,';
- 
- { Retirer la derni√®re virgule }
- If Length(FlagStr) > 0 Then
-  Delete(FlagStr, Length(FlagStr), 1);
- 
+  { Retirer la derniäre virgule }
+ If Length(FlagStr) > 0 Then Delete(FlagStr, Length(FlagStr), 1);
  Result := FlagStr;
 End;
 
-{ Formater taille en octets }
-Function FormatBytes(Bytes: Int64): String;
-Begin
+ { Formater taille en octets }
+Function FormatBytes(Bytes: Int64):String;Begin
  If Bytes < 1024 Then
-  Result := IntToStr(Bytes) + 'B'
+  Result := IntToStr(Bytes) + 'o'
  Else If Bytes < 1024 * 1024 Then
-  Result := FormatFloat('0.0', Bytes / 1024) + 'KB'
+  Result := FormatFloat('0.0', Bytes / 1024) + 'Ko'
  Else If Bytes < 1024 * 1024 * 1024 Then
-  Result := FormatFloat('0.0', Bytes / (1024 * 1024)) + 'MB'
+  Result := FormatFloat('0.0', Bytes / (1024 * 1024)) + 'Mo'
  Else
-  Result := FormatFloat('0.0', Bytes / (1024 * 1024 * 1024)) + 'GB';
+  Result := FormatFloat('0.0', Bytes / (1024 * 1024 * 1024)) + 'Go';
 End;
 
 { === FONCTIONS R√âSEAU R√âELLES === }
@@ -216,34 +211,31 @@ Begin
  InitializeNetwork := True;
  {$IFDEF WINDOWS}
  If WSAStartup($0202, WSAData) <> 0 Then Begin
-  WriteLn('Error: Cannot initialize WinSock');
+  WriteLn('Erreur : Impossible d''initialiser WinSock');
   InitializeNetwork := False;
  End;
  {$ENDIF}
 End;
 
-{ Nettoyer r√©seau }
-Procedure CleanupNetwork;
-Begin
+ { Nettoyer le rÇseau }
+Procedure CleanupNetwork;Begin
  {$IFDEF WINDOWS}
  WSACleanup;
  {$ENDIF}
 End;
 
-{ Obtenir les interfaces r√©seau }
-Function GetNetworkInterfaces: Integer;
+ { Obtenir les interfaces rÇseau }
+Function GetNetworkInterfaces:Integer;
 {$IFDEF WINDOWS}
 Var
  I: Integer;
 {$ENDIF}
 Begin
  InterfaceCount := 0;
- 
  {$IFDEF WINDOWS}
- { Windows - Simuler interfaces communes }
+  { Windows - Simuler interfaces communes }
  InterfaceCount := 0;
- 
- { Interface loopback }
+  { Interface loopback }
  With Interfaces[InterfaceCount] Do Begin
   Index := 1;
   Name := 'Loopback';
@@ -270,8 +262,7 @@ Begin
   RxDropped := 0;
  End;
  Inc(InterfaceCount);
- 
- { Interface Ethernet simul√©e }
+  { Interface Ethernet simulÇe }
  With Interfaces[InterfaceCount] Do Begin
   Index := 2;
   Name := 'Ethernet';
@@ -300,8 +291,7 @@ Begin
   RxDropped := Random(5);
  End;
  Inc(InterfaceCount);
- 
- { Interface WiFi simul√©e }
+  { Interface WiFi simulÇe }
  With Interfaces[InterfaceCount] Do Begin
   Index := 3;
   Name := 'Wi-Fi';
@@ -330,11 +320,9 @@ Begin
   RxDropped := Random(8);
  End;
  Inc(InterfaceCount);
- 
  {$ELSE}
  { Linux - Simuler quelques interfaces }
  InterfaceCount := 0;
- 
  { Interface loopback }
  With Interfaces[InterfaceCount] Do Begin
   Index := 1;
@@ -354,8 +342,7 @@ Begin
   IsLoopback := True;
  End;
  Inc(InterfaceCount);
- 
- { Interface Ethernet }
+  { Interface Ethernet }
  With Interfaces[InterfaceCount] Do Begin
   Index := 2;
   Name := 'eth0';
@@ -377,23 +364,20 @@ Begin
  End;
  Inc(InterfaceCount);
  {$ENDIF}
- 
  GetNetworkInterfaces := InterfaceCount;
 End;
 
-{ Obtenir les adresses IP }
-Function GetIPAddresses: Integer;
+ { Obtenir les adresses IP }
+Function GetIPAddresses:Integer;
 {$IFDEF WINDOWS}
 Var
  I: Integer;
 {$ENDIF}
 Begin
  AddressCount := 0;
- 
  {$IFDEF WINDOWS}
  { Windows - Simuler adresses communes }
  AddressCount := 0;
- 
  { Adresse loopback IPv4 }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'Loopback';
@@ -407,7 +391,6 @@ Begin
   Flags := 'permanent';
  End;
  Inc(AddressCount);
- 
  { Adresse loopback IPv6 }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'Loopback';
@@ -421,7 +404,6 @@ Begin
   Flags := 'permanent';
  End;
  Inc(AddressCount);
- 
  { Adresse Ethernet }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'Ethernet';
@@ -436,7 +418,6 @@ Begin
   Flags := 'dynamic';
  End;
  Inc(AddressCount);
- 
  { Adresse IPv6 Ethernet }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'Ethernet';
@@ -450,7 +431,6 @@ Begin
   Flags := 'permanent';
  End;
  Inc(AddressCount);
- 
  { Adresse Wi-Fi }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'Wi-Fi';
@@ -465,11 +445,9 @@ Begin
   Flags := 'dynamic';
  End;
  Inc(AddressCount);
- 
  {$ELSE}
  { Linux - Simuler quelques adresses }
  AddressCount := 0;
- 
  { Adresse loopback }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'lo';
@@ -483,7 +461,6 @@ Begin
   Flags := 'permanent';
  End;
  Inc(AddressCount);
- 
  { Adresse IPv6 loopback }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'lo';
@@ -497,7 +474,6 @@ Begin
   Flags := 'permanent';
  End;
  Inc(AddressCount);
- 
  { Adresse Ethernet }
  With Addresses[AddressCount] Do Begin
   Interface_ := 'eth0';
@@ -513,7 +489,6 @@ Begin
  End;
  Inc(AddressCount);
  {$ENDIF}
- 
  GetIPAddresses := AddressCount;
 End;
 
@@ -525,12 +500,10 @@ Var
 {$ENDIF}
 Begin
  RouteCount := 0;
- 
  {$IFDEF WINDOWS}
  { Windows - Simuler routes communes }
  RouteCount := 0;
- 
- { Route par d√©faut IPv4 }
+ { Route par dÇfaut IPv4 }
  With Routes[RouteCount] Do Begin
   Destination := 'default';
   Prefix := 0;
@@ -544,8 +517,7 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
- { Route r√©seau local }
+ { Route rÇseau local }
  With Routes[RouteCount] Do Begin
   Destination := '192.168.1.0';
   Prefix := 24;
@@ -560,8 +532,7 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
- { Route Wi-Fi par d√©faut }
+ { Route Wi-Fi par dÇfaut }
  With Routes[RouteCount] Do Begin
   Destination := 'default';
   Prefix := 0;
@@ -575,8 +546,7 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
- { Route r√©seau Wi-Fi }
+ { Route rÇseau Wi-Fi }
  With Routes[RouteCount] Do Begin
   Destination := '192.168.0.0';
   Prefix := 24;
@@ -591,7 +561,6 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
  { Route loopback }
  With Routes[RouteCount] Do Begin
   Destination := '127.0.0.0';
@@ -607,12 +576,10 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
  {$ELSE}
  { Linux - Simuler quelques routes }
  RouteCount := 0;
- 
- { Route par d√©faut }
+ { Route par dÇfaut }
  With Routes[RouteCount] Do Begin
   Destination := 'default';
   Prefix := 0;
@@ -626,7 +593,6 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
  { Route locale }
  With Routes[RouteCount] Do Begin
   Destination := '192.168.1.0';
@@ -642,7 +608,6 @@ Begin
   Flags := '';
  End;
  Inc(RouteCount);
- 
  { Route loopback }
  With Routes[RouteCount] Do Begin
   Destination := '127.0.0.0';
@@ -659,32 +624,31 @@ Begin
  End;
  Inc(RouteCount);
  {$ENDIF}
- 
  GetRoutes := RouteCount;
 End;
 
 { === COMMANDES IP === }
 
-{ Afficher les interfaces (ip link) }
+ { Afficher les interfaces (ip link) }
 Procedure ShowLinks;
 Var
  I: Integer;
  FlagsStr: String;
 Begin
  If InterfaceCount = 0 Then Begin
-  WriteLn('No network interfaces found');
+  WriteLn('Aucun interface rÇseau trouvÇe');
   Exit;
  End;
- 
  For I := 0 To InterfaceCount - 1 Do Begin
   With Interfaces[I] Do Begin
    FlagsStr := FlagsToString(Flags);
-   
    If IPConfig.BriefOutput Then Begin
     WriteLn(Index, ': ', Name, ': <', FlagsStr, '> state ', State);
-   End Else Begin
-    WriteLn(Index, ': ', Name, ': <', FlagsStr, '> mtu ', MTU, ' qdisc ', QDisc, ' state ', State, ' mode ', Mode, ' group ', Group, ' qlen ', QLen);
-    
+   End
+    Else
+   Begin
+    WriteLn(Index, ': ', Name, ': <', FlagsStr, '> mtu ', MTU, ' qdisc ', QDisc,
+                   ' state ', State, ' mode ', Mode, ' group ', Group, ' qlen ', QLen);
     If Address <> '' Then Begin
      Write('    link/', Type_);
      If Type_ <> 'loopback' Then
@@ -693,38 +657,35 @@ Begin
       Write(' brd ', Broadcast);
      WriteLn;
     End;
-    
     If IPConfig.ShowStats Then Begin
-     WriteLn('    RX: bytes packets errors dropped missed mcast');
+     WriteLn('    RX: paquets d''octets, erreurs, perte, multidiffusion manquÇ');
      WriteLn('    ', FormatBytes(RxBytes), '  ', RxPackets, '     ', RxErrors, '    ', RxDropped, '     0       0');
-     WriteLn('    TX: bytes packets errors dropped carrier collsns');
+     WriteLn('    TX: octets d''octets, erreurs, perte, collision avec l''opÇrateur');
      WriteLn('    ', FormatBytes(TxBytes), '  ', TxPackets, '     ', TxErrors, '    ', TxDropped, '     0       0');
     End;
-    
     If not IPConfig.OnelineOutput Then WriteLn;
    End;
   End;
  End;
 End;
 
-{ Afficher les adresses (ip addr) }
+ { Afficher les adresses (ip addr) }
 Procedure ShowAddresses;
 Var
  I, J: Integer;
  CurrentInterface: String;
 Begin
  If AddressCount = 0 Then Begin
-  WriteLn('No IP addresses found');
+  WriteLn('Pas d''adresse IP trouvÇ');
   Exit;
  End;
- 
- { Grouper par interface }
+  { Grouper par interface }
  For I := 0 To InterfaceCount - 1 Do Begin
   CurrentInterface := Interfaces[I].Name;
-  
-  { Afficher l'interface }
+   { Afficher l'interface }
   With Interfaces[I] Do Begin
-   WriteLn(Index, ': ', Name, ': <', FlagsToString(Flags), '> mtu ', MTU, ' qdisc ', QDisc, ' state ', State, ' group ', Group);
+   WriteLn(Index, ': ', Name, ': <', FlagsToString(Flags), '> mtu ', MTU, ' qdisc ', QDisc,
+           ' state ', State, ' group ', Group);
    If Address <> '' Then Begin
     Write('    link/', Type_);
     If Type_ <> 'loopback' Then
@@ -734,8 +695,7 @@ Begin
     WriteLn;
    End;
   End;
-  
-  { Afficher les adresses de cette interface }
+   { Afficher les adresses de cette interface }
   For J := 0 To AddressCount - 1 Do Begin
    With Addresses[J] Do Begin
     If Interface_ = CurrentInterface Then Begin
@@ -746,135 +706,99 @@ Begin
      If LabelName <> '' Then
       Write(' ', LabelName);
      WriteLn;
-     
      If IPConfig.ShowDetails Then Begin
       WriteLn('       valid_lft ', ValidLifetime, ' preferred_lft ', PreferredLifetime);
      End;
     End;
    End;
   End;
-  
   If not IPConfig.OnelineOutput Then WriteLn;
  End;
 End;
 
-{ Afficher les routes (ip route) }
+ { Afficher les routes (ip route) }
 Procedure ShowRoutes;
 Var
  I: Integer;
 Begin
  If RouteCount = 0 Then Begin
-  WriteLn('No routes found');
+  WriteLn('Pas de route trouvÇe');
   Exit;
  End;
- 
  For I := 0 To RouteCount - 1 Do Begin
   With Routes[I] Do Begin
-   If Destination = 'default' Then
-    Write('default')
-   Else If Prefix = 32 Then
-    Write(Destination)
-   Else
-    Write(Destination, '/', Prefix);
-   
-   If Gateway <> '' Then
-    Write(' via ', Gateway);
-   
+   If Destination = 'default' Then Write('default') Else
+   If Prefix = 32 Then Write(Destination)
+                  Else Write(Destination, '/', Prefix);
+   If Gateway <> '' Then Write(' via ', Gateway);
    Write(' dev ', Device);
-   
-   If Protocol <> '' Then
-    Write(' proto ', Protocol);
-   
-   If Scope <> '' Then
-    Write(' scope ', Scope);
-   
-   If Source <> '' Then
-    Write(' src ', Source);
-   
-   If Metric > 0 Then
-    Write(' metric ', Metric);
-   
+   If Protocol <> '' Then Write(' proto ', Protocol);
+   If Scope <> '' Then Write(' scope ', Scope);
+   If Source <> '' Then Write(' src ', Source);
+   If Metric > 0 Then Write(' metric ', Metric);
    WriteLn;
   End;
  End;
 End;
 
-{ Afficher les r√®gles (ip rule) }
-Procedure ShowRules;
-Begin
+{ Afficher les rägles (ip rule) }
+Procedure ShowRules;Begin
  WriteLn('0:      from all lookup local');
  WriteLn('32766:  from all lookup main');
  WriteLn('32767:  from all lookup default');
 End;
 
-{ Ajouter une adresse IP }
-Function AddAddress(InterfaceName, Address: String): Boolean;
-Begin
+ { Ajouter une adresse IP }
+Function AddAddress(InterfaceName, Address: String): Boolean;Begin
  AddAddress := False;
- 
- If IPConfig.Verbose Then
-  WriteLn('Adding address ', Address, ' to interface ', InterfaceName);
- 
+ If IPConfig.Verbose Then WriteLn('Ajout d''adresse ', Address, ' vers l''interface ', InterfaceName);
  {$IFDEF WINDOWS}
- { Sur Windows, utiliser netsh }
- WriteLn('Windows: Use "netsh interface ip add address" command');
+  { Sur Windows, utiliser netsh }
+  WriteLn('Windows: UtilisÇ la commande "netsh interface ip add address"');
  {$ELSE}
- { Sur Linux, cette fonctionnalit√© n√©cessiterait des privil√®ges root }
- WriteLn('Linux: Root privileges required for network configuration');
+  { Sur Linux, cette fonctionnalitÇ nÇcessiterait des priviläges root }
+  WriteLn('Linux: Priviläges root requis pour la configuration rÇseau');
  {$ENDIF}
- 
  AddAddress := True;
 End;
 
-{ Supprimer une adresse IP }
-Function DeleteAddress(InterfaceName, Address: String): Boolean;
-Begin
+ { Supprimer une adresse IP }
+Function DeleteAddress(InterfaceName,Address:String):Boolean;Begin
  DeleteAddress := False;
- 
- If IPConfig.Verbose Then
-  WriteLn('Deleting address ', Address, ' from interface ', InterfaceName);
- 
+ If IPConfig.Verbose Then WriteLn('Suppression de l''adresse ', Address, ' de l''interface ', InterfaceName);
  {$IFDEF WINDOWS}
- WriteLn('Windows: Use "netsh interface ip delete address" command');
+  WriteLn('Windows: UtilisÇ la commande "netsh interface ip delete address"');
  {$ELSE}
- WriteLn('Linux: Root privileges required for network configuration');
+  WriteLn('Linux: Priviläge root requis pour la configuration rÇseau');
  {$ENDIF}
- 
  DeleteAddress := True;
 End;
 
-{ Activer/d√©sactiver interface }
-Function SetLinkState(InterfaceName: String; Up: Boolean): Boolean;
-Begin
+ { Activer/dÇsactiver interface }
+Function SetLinkState(InterfaceName: String; Up: Boolean): Boolean;Begin
  SetLinkState := False;
- 
  If IPConfig.Verbose Then Begin
-  If Up Then
-   WriteLn('Bringing up interface ', InterfaceName)
-  Else
-   WriteLn('Bringing down interface ', InterfaceName);
+  If Up Then WriteLn('Activation de l''interface ', InterfaceName)
+        Else WriteLn('DÇsactivation de l''interface ', InterfaceName);
  End;
- 
  {$IFDEF WINDOWS}
- If Up Then
-  WriteLn('Windows: Use "netsh interface set interface \"', InterfaceName, '\" enable"')
- Else
-  WriteLn('Windows: Use "netsh interface set interface \"', InterfaceName, '\" disable"');
+  If Up Then
+   WriteLn('Windows: UtilisÇ "netsh interface set interface \"', InterfaceName, '\" activÇ"')
+  Else
+   WriteLn('Windows: UtilisÇ "netsh interface set interface \"', InterfaceName, '\" dÇsactivÇ"');
  {$ELSE}
- If Up Then
-  WriteLn('Linux: Use "ip link set ', InterfaceName, ' up"')
- Else
-  WriteLn('Linux: Use "ip link set ', InterfaceName, ' down"');
+  If Up Then
+   WriteLn('Linux: UtilisÇ "ip link set ', InterfaceName, ' activÇ"')
+  Else
+   WriteLn('Linux: UtilisÇ "ip link set ', InterfaceName, ' dÇsactivÇ"');
  {$ENDIF}
- 
  SetLinkState := True;
 End;
 
 { === FONCTIONS PRINCIPALES === }
 
-{ Initialiser configuration par d√©faut }
-Procedure InitializeConfig;
-Begin
+{ Initialiser configuration par dÇfaut }
+Procedure InitializeConfig;Begin
  With IPConfig Do Begin
   Command := '';
   Object_ := '';
@@ -895,7 +819,6 @@ Begin
   Verbose := False;
   Quiet := False;
  End;
- 
  InterfaceCount := 0;
  AddressCount := 0;
  RouteCount := 0;
@@ -903,222 +826,219 @@ Begin
  TunnelCount := 0;
 End;
 
-{ Analyser les arguments de ligne de commande }
+ { Analyser les arguments de ligne de commande }
 Function ParseCommandLine: Boolean;
 Var
  I: Integer;
  Param: String;
 Begin
  ParseCommandLine := False;
- 
  If ParamCount < 1 Then Begin
   IPConfig.Object_ := 'help';
   ParseCommandLine := True;
   Exit;
  End;
- 
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-h') or (LowerCase(Param) = '--help') Then Begin
    IPConfig.Object_ := 'help';
    ParseCommandLine := True;
    Exit;
   End
-  Else If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--version') Then Begin
+   Else
+  If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--version') Then Begin
    IPConfig.Object_ := 'version';
    ParseCommandLine := True;
    Exit;
   End
-  Else If (LowerCase(Param) = '-c') or (LowerCase(Param) = '--color') Then Begin
+   Else
+  If (LowerCase(Param) = '-c') or (LowerCase(Param) = '--color') Then Begin
    IPConfig.ColorOutput := True;
   End
-  Else If (LowerCase(Param) = '-b') or (LowerCase(Param) = '--brief') Then Begin
+   Else
+  If (LowerCase(Param) = '-b') or (LowerCase(Param) = '--brief') Then Begin
    IPConfig.BriefOutput := True;
   End
-  Else If (LowerCase(Param) = '-j') or (LowerCase(Param) = '--json') Then Begin
+   Else
+  If (LowerCase(Param) = '-j') or (LowerCase(Param) = '--json') Then Begin
    IPConfig.JsonOutput := True;
   End
-  Else If (LowerCase(Param) = '-p') or (LowerCase(Param) = '--pretty') Then Begin
+   Else
+  If (LowerCase(Param) = '-p') or (LowerCase(Param) = '--pretty') Then Begin
    IPConfig.PrettyPrint := True;
   End
-  Else If (LowerCase(Param) = '-o') or (LowerCase(Param) = '--oneline') Then Begin
+   Else
+  If (LowerCase(Param) = '-o') or (LowerCase(Param) = '--oneline') Then Begin
    IPConfig.OnelineOutput := True;
   End
-  Else If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--stats') Then Begin
+   Else
+  If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--stats') Then Begin
    IPConfig.ShowStats := True;
   End
-  Else If (LowerCase(Param) = '-d') or (LowerCase(Param) = '--details') Then Begin
+   Else
+  If (LowerCase(Param) = '-d') or (LowerCase(Param) = '--details') Then Begin
    IPConfig.ShowDetails := True;
   End
-  Else If LowerCase(Param) = '-f' Then Begin
+   Else
+  If LowerCase(Param) = '-f' Then Begin
    Inc(I);
-   If I <= ParamCount Then
-    IPConfig.Family := ParamStr(I);
+   If I <= ParamCount Then IPConfig.Family := ParamStr(I);
   End
-  Else If LowerCase(Param) = '-4' Then Begin
+   Else
+  If LowerCase(Param) = '-4' Then Begin
    IPConfig.Family := 'inet';
   End
-  Else If LowerCase(Param) = '-6' Then Begin
+   Else
+  If LowerCase(Param) = '-6' Then Begin
    IPConfig.Family := 'inet6';
   End
-  Else If Copy(Param, 1, 1) <> '-' Then Begin
+   Else
+  If Copy(Param, 1, 1) <> '-' Then Begin
    { Objet principal }
    If IPConfig.Object_ = '' Then Begin
     IPConfig.Object_ := LowerCase(Param);
-   End Else If IPConfig.Action = 'show' Then Begin
+   End
+    Else
+   If IPConfig.Action = 'show' Then Begin
     IPConfig.Action := LowerCase(Param);
    End;
   End;
-  
   Inc(I);
  End;
- 
- { Valeurs par d√©faut }
+  { Valeurs par dÇfaut }
  If IPConfig.Object_ = '' Then IPConfig.Object_ := 'help';
- 
  ParseCommandLine := True;
 End;
 
-{ Ex√©cuter la commande }
-Procedure ExecuteCommand;
-Begin
- { Obtenir les informations r√©seau }
- If (IPConfig.Object_ = 'link') or (IPConfig.Object_ = 'addr') or 
+{ ExÇcuter la commande }
+Procedure ExecuteCommand;Begin
+  { Obtenir les informations rÇseau }
+ If (IPConfig.Object_ = 'link') or (IPConfig.Object_ = 'addr') or
     (IPConfig.Object_ = 'address') or (IPConfig.Object_ = 'route') Then Begin
   GetNetworkInterfaces;
   GetIPAddresses;
   GetRoutes;
  End;
- 
  Case IPConfig.Object_ Of
   'help': Begin
-   WriteLn('Usage: ip [OPTIONS] OBJECT {COMMAND}');
-   WriteLn('       ip [-force] -batch filename');
+   WriteLn('Syntaxe: ip [OPTIONS] OBJECT {COMMAND}');
+   WriteLn('         ip [-force] -batch filename');
    WriteLn;
    WriteLn('OPTIONS := {');
-   WriteLn('  -v, --version       Show version information');
-   WriteLn('  -h, --help          Show this help message');
-   WriteLn('  -c, --color         Use colored output');
-   WriteLn('  -b, --brief         Show brief information');
-   WriteLn('  -j, --json          Output in JSON format');
-   WriteLn('  -p, --pretty        Pretty print JSON');
-   WriteLn('  -o, --oneline       Output each record on single line');
-   WriteLn('  -s, --stats         Show statistics');
-   WriteLn('  -d, --details       Show detailed information');
-   WriteLn('  -f, --family FAMILY Address family (inet, inet6, link)');
-   WriteLn('  -4                  IPv4 only');
-   WriteLn('  -6                  IPv6 only');
-   WriteLn('  -n, --netns NAME    Network namespace');
-   WriteLn('  -a, --all           Show all objects');
-   WriteLn('  -r, --resolve       Resolve names');
-   WriteLn('  -B, --batch FILE    Read commands from file');
-   WriteLn('  -force              Force operations');
+   WriteLn('  -v, --version       Affiche les informations de version');
+   WriteLn('  -h, --help          Affiche ce message d''aide');
+   WriteLn('  -c, --color         Utiliser une sortie couleur');
+   WriteLn('  -b, --brief         Affiche les informations en bref');
+   WriteLn('  -j, --json          Sortie au format JSON');
+   WriteLn('  -p, --pretty        Format JSON lisible');
+   WriteLn('  -o, --oneline       Afficher chaque enregistrement sur une seule ligne');
+   WriteLn('  -s, --stats         Affiche les statistiques');
+   WriteLn('  -d, --details       Affiche les informations dÇtaillÇes');
+   WriteLn('  -f, --family FAMILY Famille d''adresse (inet, inet6, link)');
+   WriteLn('  -4                  IPv4 seulement');
+   WriteLn('  -6                  IPv6 seulement');
+   WriteLn('  -n, --netns NAME    Espace de noms de rÇseau');
+   WriteLn('  -a, --all           Afficher tous les objets');
+   WriteLn('  -r, --resolve       RÇsoudre les noms');
+   WriteLn('  -B, --batch FILE    Lire les commandes Ö partir du fichier');
+   WriteLn('  -force              Force l''opÇration');
    WriteLn('}');
    WriteLn;
    WriteLn('OBJECT := {');
-   WriteLn('  link            Network device');
-   WriteLn('  address | addr  Protocol (IP/IPv6) address');
-   WriteLn('  addrlabel       Label configuration for protocol address');
-   WriteLn('  route           Routing table entry');
-   WriteLn('  rule            Rule in routing policy database');
-   WriteLn('  neigh           Neighbor/ARP table entry');
-   WriteLn('  ntable          Neighbor table configuration');
-   WriteLn('  tunnel          Tunnel over IP');
-   WriteLn('  tuntap          Manage TUN/TAP devices');
-   WriteLn('  maddress        Multicast address');
-   WriteLn('  mroute          Multicast routing table entry');
-   WriteLn('  mrule           Rule in multicast routing policy database');
-   WriteLn('  monitor         Watch for netlink messages');
-   WriteLn('  xfrm            Framework for IPsec protocol');
-   WriteLn('  netns           Manage network namespaces');
-   WriteLn('  l2tp            Layer 2 Tunneling Protocol');
-   WriteLn('  fou             Foo-over-UDP encapsulation');
+   WriteLn('  link            PÇriphÇrique rÇseau');
+   WriteLn('  address | addr  Adresse de protocole (IP/IPv6)');
+   WriteLn('  addrlabel       Configuration des Çtiquettes pour l''adresse de protocole');
+   WriteLn('  route           EntrÇe de la table de routage');
+   WriteLn('  rule            Rägle dans la base de donnÇes de stratÇgie de routage');
+   WriteLn('  neigh           EntrÇe de la table des voisins/ARP');
+   WriteLn('  ntable          Configuration de la table des voisins');
+   WriteLn('  tunnel          Tunnel sur IP');
+   WriteLn('  tuntap          Gestion des pÇriphÇriques TUN/TAP');
+   WriteLn('  maddress        Adresse multicast');
+   WriteLn('  mroute          EntrÇe de la table de routage multicast');
+   WriteLn('  mrule           Rägle dans la base de donnÇes de stratÇgie de routage multicast');
+   WriteLn('  monitor         Surveillance des messages netlink');
+   WriteLn('  xfrm            Cadre de protocole IPsec');
+   WriteLn('  netns           Gestion des espaces de noms rÇseau');
+   WriteLn('  l2tp            Protocole de tunnelisation de couche 2');
+   WriteLn('  fou             Encapsulation Foo sur UDP');
    WriteLn('  macsec          IEEE 802.1AE MACsec');
-   WriteLn('  tcp_metrics     TCP metric');
-   WriteLn('  token           Tokenized interface identifiers');
+   WriteLn('  tcp_metrics     MÇtrique TCP');
+   WriteLn('  token           Identifiants d''interface tokenisÇs');
    WriteLn('}');
    WriteLn;
-   WriteLn('See "ip OBJECT help" for detailed command syntax.');
+   WriteLn('Consulter "ip OBJECT help" pour obtenir la syntaxe dÇtaillÇe de la commande.');
   End;
-  
   'version': Begin
    WriteLn('ip utility (NETWORKKIT-P) 1.0');
-   WriteLn('iproute2 compatible network configuration tool');
+   WriteLn('Outil de configuration rÇseau compatible iproute2');
    WriteLn;
-   WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+   WriteLn('êcrit par Sylvain Maltais');
   End;
-  
   'link', 'l': Begin
    Case IPConfig.Action Of
     'show', 'list', 's': ShowLinks;
     'set': Begin
-     WriteLn('Link configuration requires administrative privileges');
+     WriteLn('La configuration des liens nÇcessite des priviläges d''administrateur');
     End;
     'add': Begin
-     WriteLn('Adding virtual interfaces requires administrative privileges');
+     WriteLn('L''ajout d''interfaces virtuelles nÇcessite des priviläges d''administrateur');
     End;
     'delete', 'del': Begin
-     WriteLn('Deleting interfaces requires administrative privileges');
+     WriteLn('La suppression des interfaces nÇcessite des priviläges d''administrateur');
     End;
     Else Begin
-     WriteLn('Unknown link command: ', IPConfig.Action);
+     WriteLn('Commande de lien inconnue: ', IPConfig.Action);
      WriteLn('Try: show, set, add, delete');
     End;
    End;
   End;
-  
   'address', 'addr', 'a': Begin
    Case IPConfig.Action Of
     'show', 'list', 's': ShowAddresses;
     'add': Begin
-     WriteLn('Adding addresses requires administrative privileges');
+     WriteLn('L''ajout d''adresses nÇcessite des priviläges d''administrateur');
     End;
     'delete', 'del': Begin
-     WriteLn('Deleting addresses requires administrative privileges');
+     WriteLn('La suppression d''adresses nÇcessite des priviläges d''administrateur');
     End;
     Else Begin
-     WriteLn('Unknown address command: ', IPConfig.Action);
-     WriteLn('Try: show, add, delete');
+     WriteLn('Commande d''adresse inconnue: ', IPConfig.Action);
+     WriteLn('Essayer: show, add, delete');
     End;
    End;
   End;
-  
   'route', 'r': Begin
    Case IPConfig.Action Of
     'show', 'list', 's': ShowRoutes;
     'add': Begin
-     WriteLn('Adding routes requires administrative privileges');
+     WriteLn('L''ajout d''itinÇraires nÇcessite des priviläges d''administrateur');
     End;
     'delete', 'del': Begin
-     WriteLn('Deleting routes requires administrative privileges');
+     WriteLn('La suppression des itinÇraires nÇcessite des priviläges d''administrateur');
     End;
     'change', 'replace': Begin
-     WriteLn('Modifying routes requires administrative privileges');
+     WriteLn('La modification des itinÇraires nÇcessite des priviläges d''administrateur');
     End;
     Else Begin
-     WriteLn('Unknown route command: ', IPConfig.Action);
-     WriteLn('Try: show, add, delete, change, replace');
+     WriteLn('Commande de route inconnue : ', IPConfig.Action);
+     WriteLn('Essayer: show, add, delete, change, replace');
     End;
    End;
   End;
-  
   'rule': Begin
    ShowRules;
   End;
-  
   'neigh': Begin
-   WriteLn('Neighbor table functionality not implemented');
+   WriteLn('FonctionnalitÇ de table des voisins non implÇmentÇe');
   End;
-  
   'tunnel': Begin
-   WriteLn('Tunnel management functionality not implemented');
+   WriteLn('FonctionnalitÇ de gestion des tunnels non implÇmentÇe');
   End;
-  
   Else Begin
-   WriteLn('Unknown object: ', IPConfig.Object_);
-   WriteLn('Try "ip help" for list of available objects');
+   WriteLn('Objet inconnu: ', IPConfig.Object_);
+   WriteLn('Essayez "ip help" pour obtenir la liste des objets disponibles');
   End;
  End;
 End;
@@ -1126,9 +1046,8 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedIP;
-Begin
- WriteLn('IP [NETWORKKIT-P] Network Configuration Tool (simulation)');
+Procedure ShowSimulatedIP;Begin
+ WriteLn('IP [NETWORKKIT-P] Outil de configuration rÇseau (simulation)');
  WriteLn('========================================================');
  WriteLn;
  WriteLn('1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000');
@@ -1150,7 +1069,7 @@ End;
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/help') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('IP : Show and manipulate network configuration');
+  WriteLn('IP : Cette commande permet d''afficher et manipuler la configuration rÇseau');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  IP [OPTIONS] OBJECT {COMMAND}');
@@ -1159,62 +1078,62 @@ BEGIN
   WriteLn('OPTIONS :');
   WriteLn('  -h, --help            Afficher cette aide');
   WriteLn('  -v, --version         Afficher la version');
-  WriteLn('  -c, --color           Sortie color√©e');
-  WriteLn('  -b, --brief           Informations abr√©g√©es');
+  WriteLn('  -c, --color           Sortie colorÇe');
+  WriteLn('  -b, --brief           Informations abrÇgÇes');
   WriteLn('  -j, --json            Format de sortie JSON');
-  WriteLn('  -p, --pretty          JSON format√©');
+  WriteLn('  -p, --pretty          JSON formatÇ');
   WriteLn('  -o, --oneline         Une ligne par enregistrement');
   WriteLn('  -s, --stats           Afficher statistiques');
-  WriteLn('  -d, --details         Informations d√©taill√©es');
+  WriteLn('  -d, --details         Informations dÇtaillÇes');
   WriteLn('  -f, --family FAMILY   Famille d''adresses (inet, inet6, link)');
   WriteLn('  -4                    IPv4 seulement');
   WriteLn('  -6                    IPv6 seulement');
-  WriteLn('  -n, --netns NAME      Namespace r√©seau');
+  WriteLn('  -n, --netns NAME      Espace de noms rÇseau');
   WriteLn('  -a, --all             Afficher tous les objets');
-  WriteLn('  -r, --resolve         R√©soudre les noms');
+  WriteLn('  -r, --resolve         RÇsoudre les noms');
   WriteLn('  -B, --batch FILE      Lire commandes depuis fichier');
-  WriteLn('  -force                Forcer les op√©rations');
+  WriteLn('  -force                Forcer les opÇrations');
   WriteLn;
   WriteLn('OBJECTS :');
-  WriteLn('  Interfaces r√©seau :');
-  WriteLn('    link, l             P√©riph√©rique r√©seau');
+  WriteLn('  Interfaces rÇseau :');
+  WriteLn('    link, l             PÇriphÇrique rÇseau');
   WriteLn('    address, addr, a    Adresse de protocole (IP/IPv6)');
-  WriteLn('    addrlabel          Configuration √©tiquettes d''adresse');
+  WriteLn('    addrlabel           Configuration d''Çtiquettes d''adresse');
   WriteLn;
   WriteLn('  Routage :');
-  WriteLn('    route, r           Entr√©e table de routage');
-  WriteLn('    rule               R√®gle base de donn√©es politique routage');
-  WriteLn('    mroute             Entr√©e table routage multicast');
-  WriteLn('    mrule              R√®gle politique routage multicast');
+  WriteLn('    route, r           EntrÇe de table de routage');
+  WriteLn('    rule               Rägle de base de donnÇes de politique de routage');
+  WriteLn('    mroute             EntrÇe de table de routage multicast');
+  WriteLn('    mrule              Rägle de politique de routage multicast');
   WriteLn;
   WriteLn('  Voisinage :');
-  WriteLn('    neigh              Entr√©e table voisinage/ARP');
+  WriteLn('    neigh              EntrÇe table voisinage/ARP');
   WriteLn('    ntable             Configuration table voisinage');
   WriteLn('    maddress           Adresse multicast');
   WriteLn;
   WriteLn('  Tunnels :');
   WriteLn('    tunnel             Tunnel sur IP');
-  WriteLn('    tuntap             G√©rer p√©riph√©riques TUN/TAP');
+  WriteLn('    tuntap             GÇrer pÇriphÇriques TUN/TAP');
   WriteLn('    l2tp               Layer 2 Tunneling Protocol');
   WriteLn('    fou                Encapsulation Foo-over-UDP');
   WriteLn('    macsec             IEEE 802.1AE MACsec');
   WriteLn;
-  WriteLn('  S√©curit√© :');
+  WriteLn('  SÇcuritÇ :');
   WriteLn('    xfrm               Framework protocole IPsec');
   WriteLn;
-  WriteLn('  Monitoring :');
-  WriteLn('    monitor            Surveiller messages netlink');
-  WriteLn('    tcp_metrics        M√©triques TCP');
+  WriteLn('  Surveillance :');
+  WriteLn('    monitor            Surveiller des messages netlink');
+  WriteLn('    tcp_metrics        MÇtriques TCP');
   WriteLn;
-  WriteLn('  Namespaces :');
-  WriteLn('    netns              G√©rer namespaces r√©seau');
+  WriteLn('  Espaces de noms :');
+  WriteLn('    netns              GÇrer les espaces de noms rÇseau');
   WriteLn;
   WriteLn('COMMANDES LINK :');
   WriteLn('  ip link show [dev DEVICE]      Afficher interfaces');
-  WriteLn('  ip link set DEVICE up|down     Activer/d√©sactiver interface');
-  WriteLn('  ip link set DEVICE mtu MTU     D√©finir MTU');
+  WriteLn('  ip link set DEVICE up|down     Activer/dÇsactiver interface');
+  WriteLn('  ip link set DEVICE mtu MTU     DÇfinir MTU');
   WriteLn('  ip link set DEVICE name NAME   Renommer interface');
-  WriteLn('  ip link add NAME type TYPE     Cr√©er interface virtuelle');
+  WriteLn('  ip link add NAME type TYPE     CrÇer interface virtuelle');
   WriteLn('  ip link delete DEVICE          Supprimer interface');
   WriteLn;
   WriteLn('COMMANDES ADDRESS :');
@@ -1232,19 +1151,19 @@ BEGIN
   WriteLn('  ip route flush cache           Vider cache routage');
   WriteLn;
   WriteLn('COMMANDES RULE :');
-  WriteLn('  ip rule show                   Afficher r√®gles routage');
-  WriteLn('  ip rule add from SRC table TAB Ajouter r√®gle');
-  WriteLn('  ip rule del from SRC           Supprimer r√®gle');
+  WriteLn('  ip rule show                   Afficher rägles routage');
+  WriteLn('  ip rule add from SRC table TAB Ajouter la rägle');
+  WriteLn('  ip rule del from SRC           Supprimer la rägle');
   WriteLn;
   WriteLn('COMMANDES NEIGH :');
   WriteLn('  ip neigh show                  Afficher table ARP');
-  WriteLn('  ip neigh add IP lladdr MAC dev DEV Ajouter entr√©e ARP');
-  WriteLn('  ip neigh del IP dev DEV        Supprimer entr√©e ARP');
+  WriteLn('  ip neigh add IP lladdr MAC dev DEV Ajouter entrÇe ARP');
+  WriteLn('  ip neigh del IP dev DEV        Supprimer entrÇe ARP');
   WriteLn('  ip neigh flush dev DEV         Vider table ARP');
   WriteLn;
   WriteLn('COMMANDES TUNNEL :');
   WriteLn('  ip tunnel show                 Afficher tunnels');
-  WriteLn('  ip tunnel add NAME mode MODE   Cr√©er tunnel');
+  WriteLn('  ip tunnel add NAME mode MODE   CrÇer tunnel');
   WriteLn('  ip tunnel del NAME             Supprimer tunnel');
   WriteLn('  ip tunnel change NAME          Modifier tunnel');
   WriteLn;
@@ -1256,7 +1175,7 @@ BEGIN
   WriteLn('    IP -s link                   # Interfaces avec statistiques');
   WriteLn('    IP -4 addr show eth0         # Adresses IPv4 de eth0');
   WriteLn;
-  WriteLn('  Configuration (privil√®ges requis) :');
+  WriteLn('  Configuration (priviläges requis) :');
   WriteLn('    IP link set eth0 up          # Activer eth0');
   WriteLn('    IP addr add 192.168.1.10/24 dev eth0');
   WriteLn('    IP route add default via 192.168.1.1');
@@ -1268,9 +1187,9 @@ BEGIN
   WriteLn('    IP addr add 172.16.0.1/30 dev gre1');
   WriteLn;
   WriteLn('Tables de routage :');
-  WriteLn('  main                 Table principale (d√©faut)');
+  WriteLn('  main                 Table principale (dÇfaut)');
   WriteLn('  local                Adresses locales');
-  WriteLn('  default              Table par d√©faut');
+  WriteLn('  default              Table par dÇfaut');
   WriteLn('  all                  Toutes les tables');
   WriteLn;
   WriteLn('Familles d''adresses :');
@@ -1280,61 +1199,61 @@ BEGIN
   WriteLn('  bridge               Interfaces bridge');
   WriteLn;
   WriteLn('Types d''interfaces :');
-  WriteLn('  bridge               Bridge Ethernet');
-  WriteLn('  bond                 Interface bonding');
+  WriteLn('  bridge               Pont Ethernet');
+  WriteLn('  bond                 AgrÇgation d''interface');
   WriteLn('  vlan                 VLAN 802.1Q');
-  WriteLn('  vxlan                Virtual Extensible LAN');
-  WriteLn('  macvlan              MAC-based VLAN');
-  WriteLn('  ipvlan               IP-based VLAN');
-  WriteLn('  veth                 Virtual Ethernet pair');
-  WriteLn('  dummy                Interface factice');
-  WriteLn('  gre                  Generic Routing Encapsulation');
-  WriteLn('  ipip                 IP in IP');
-  WriteLn('  sit                  Simple Internet Transition');
-  WriteLn('  tun                  TUN device');
-  WriteLn('  tap                  TAP device');
+  WriteLn('  vxlan                RÇseau local virtuel extensible');
+  WriteLn('  macvlan              VLAN basÇ sur l''adresse MAC');
+  WriteLn('  ipvlan               VLAN basÇ sur l''adresse IP');
+  WriteLn('  veth                 Paire Ethernet virtuelle');
+  WriteLn('  dummy                Factice d''interface');
+  WriteLn('  gre                  Encapsulation de routage gÇnÇrique');
+  WriteLn('  ipip                 IP dans IP');
+  WriteLn('  sit                  Transition Internet simple');
+  WriteLn('  tun                  PÇriphÇrique TUN');
+  WriteLn('  tap                  PÇriphÇrique TAP');
   WriteLn;
   WriteLn('Codes de retour :');
-  WriteLn('  0                    Succ√®s');
-  WriteLn('  1                    Erreur g√©n√©rale');
+  WriteLn('  0                    Succäs');
+  WriteLn('  1                    Erreur gÇnÇrale');
   WriteLn('  2                    Erreur d''analyse des arguments');
   WriteLn('  255                  Erreur de communication netlink');
   WriteLn;
   WriteLn('Variables d''environnement :');
-  WriteLn('  IP_FORCE             Forcer op√©rations dangereuses');
-  WriteLn('  IP_COLOR             Activer sortie color√©e');
+  WriteLn('  IP_FORCE             Forcer opÇrations dangereuses');
+  WriteLn('  IP_COLOR             Activer sortie colorÇe');
   WriteLn;
-  WriteLn('Note: Outil de configuration r√©seau compatible iproute2.');
-  WriteLn('Permet la gestion compl√®te des interfaces, adresses, routes et tunnels.');
-  WriteLn('N√©cessite privil√®ges administrateur pour modifications.');
+  WriteLn('Note: Outil de configuration rÇseau compatible iproute2.');
+  WriteLn('Permet la gestion compläte des interfaces, adresses, routes et tunnels.');
+  WriteLn('NÇcessite priviläges administrateur pour modifications.');
  End
  Else If ParamStr(1) = '--version' Then Begin
-  WriteLn('ip (NETWORKKIT-P) 1.0');
-  WriteLn('iproute2 compatible network configuration tool');
-  WriteLn('Compatible with Linux iproute2 package');
+  WriteLn('ip 1.0 - Clone Pascal pour NETWORKKIT-P, Linux-0, Corail');
+  WriteLn('Outil de configuration rÇseau compatible iproute2');
+  WriteLn('Compatible avec le paquet iproute2 sous Linux');
   WriteLn;
-  WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+  WriteLn('êcrit par Sylvain Maltais');
  End
- Else Begin
+  Else
+ Begin
   {$IFDEF FPC}
   InitializeConfig;
   If not InitializeNetwork Then Begin
-   WriteLn('Failed to initialize network');
+   WriteLn('êchec d''initialisation rÇseau');
    Halt(1);
   End;
-  
   Try
-   If ParseCommandLine Then
-    ExecuteCommand
-   Else Begin
-    WriteLn('Try "ip help" for more information.');
+   If ParseCommandLine Then ExecuteCommand
+    Else
+   Begin
+    WriteLn('Essayer "ip help" pour plus d''informations.');
     Halt(2);
    End;
   Finally
    CleanupNetwork;
   End;
   {$ELSE}
-  ShowSimulatedIP;
+   ShowSimulatedIP;
   {$ENDIF}
  End;
 END.
