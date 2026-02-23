@@ -771,7 +771,7 @@ BEGIN
  {$ENDIF}
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('IPTRAF : Cette commande permet de lancer l''utilitaire de statistiques r‚esau en console.');
+  WriteLn('IPTRAF : Cette commande permet de lancer l''utilitaire de statistiques r‚seau en console.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  IPTRAF [options] [interface]');
