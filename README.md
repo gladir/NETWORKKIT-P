@@ -59,6 +59,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer l'interface de surveillance d'utilisation de la bande passante.</td>
 	</tr>
 	<tr>
+		<td><b>INEWS.PAS</b></td>
+		<td>Cette commande permet de publier des articles d''actualité sur un serveur NNTP.</td>
+	</tr>
+	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
 		<td>Cette commande permet d'afficher l'adresse IP de la machine local.</td>
 	</tr>
