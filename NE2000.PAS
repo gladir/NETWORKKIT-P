@@ -11,83 +11,83 @@ Program NE2000;
 {$IFDEF FPC}
  {$mode objfpc}
  Uses SysUtils,DOS;
-{$ELSE} 
+{$ELSE}
  Uses Crt,DOS;
 {$ENDIF}
 
 { Registres NE2000 }
 Const
  { Registres de page 0 }
- NE2000_P0_CR     = $00;  { Command Register }
- NE2000_P0_CLDA0  = $01;  { Current Local DMA Address 0 }
- NE2000_P0_CLDA1  = $02;  { Current Local DMA Address 1 }
- NE2000_P0_BNRY   = $03;  { Boundary Pointer }
- NE2000_P0_TSR    = $04;  { Transmit Status Register }
- NE2000_P0_NCR    = $05;  { Number of Collisions Register }
+ NE2000_P0_CR     = $00;  { Registre de commande (Command Register) }
+ NE2000_P0_CLDA0  = $01;  { Adresse local 0 courante du DMA (Current Local DMA Address 0) }
+ NE2000_P0_CLDA1  = $02;  { Adresse local 1 courante du DMA (Current Local DMA Address 1) }
+ NE2000_P0_BNRY   = $03;  { Pointeur de limite (Boundary Pointer) }
+ NE2000_P0_TSR    = $04;  { Registre d'Çtat de transmission (Transmit Status Register) }
+ NE2000_P0_NCR    = $05;  { Nombre de registre de collision (Number of Collisions Register) }
  NE2000_P0_FIFO   = $06;  { FIFO }
- NE2000_P0_ISR    = $07;  { Interrupt Status Register }
- NE2000_P0_CRDA0  = $08;  { Current Remote DMA Address 0 }
- NE2000_P0_CRDA1  = $09;  { Current Remote DMA Address 1 }
- NE2000_P0_RBCR0  = $0A;  { Remote Byte Count Register 0 }
- NE2000_P0_RBCR1  = $0B;  { Remote Byte Count Register 1 }
- NE2000_P0_RSR    = $0C;  { Receive Status Register }
- NE2000_P0_CNTR0  = $0D;  { Frame Alignment Error Counter }
- NE2000_P0_CNTR1  = $0E;  { CRC Error Counter }
- NE2000_P0_CNTR2  = $0F;  { Missed Packet Counter }
- NE2000_IOPORT    = $10;  { Data I/O Port }
- NE2000_RESET     = $1F;  { Reset Port }
+ NE2000_P0_ISR    = $07;  { Registre d'Çtat d'interruption (Interrupt Status Register) }
+ NE2000_P0_CRDA0  = $08;  { Adresse 0 courante Ö distance du DMA (Current Remote DMA Address 0) }
+ NE2000_P0_CRDA1  = $09;  { Adresse 1 courante Ö distance du DMA (Current Remote DMA Address 1) }
+ NE2000_P0_RBCR0  = $0A;  { Registre 0 de compteur d'octet Ö distance (Remote Byte Count Register 0) }
+ NE2000_P0_RBCR1  = $0B;  { Registre 1 de compteur d'octet Ö distance (Remote Byte Count Register 1) }
+ NE2000_P0_RSR    = $0C;  { Registre d'Çtat de rÇception (Receive Status Register) }
+ NE2000_P0_CNTR0  = $0D;  { Compteur d'erreur d'alignement de trame (Frame Alignment Error Counter) }
+ NE2000_P0_CNTR1  = $0E;  { Compteur d'erreur CRC (CRC Error Counter) }
+ NE2000_P0_CNTR2  = $0F;  { Compteur de paquet perdue (Missed Packet Counter) }
+ NE2000_IOPORT    = $10;  { Port d'entrÇe/sortie de donnÇes (Data I/O Port) }
+ NE2000_RESET     = $1F;  { Port de rÇinitialisation (Reset Port) }
 
  { Registres de page 1 }
- NE2000_P1_CR     = $00;  { Command Register }
- NE2000_P1_PAR0   = $01;  { Physical Address Register 0 }
- NE2000_P1_PAR1   = $02;  { Physical Address Register 1 }
- NE2000_P1_PAR2   = $03;  { Physical Address Register 2 }
- NE2000_P1_PAR3   = $04;  { Physical Address Register 3 }
- NE2000_P1_PAR4   = $05;  { Physical Address Register 4 }
- NE2000_P1_PAR5   = $06;  { Physical Address Register 5 }
- NE2000_P1_CURR   = $07;  { Current Page Register }
- NE2000_P1_MAR0   = $08;  { Multicast Address Register 0-7 }
+ NE2000_P1_CR     = $00;  { Registre de commande (Command Register) }
+ NE2000_P1_PAR0   = $01;  { Registre 0 d'adresse physique (Physical Address Register 0) }
+ NE2000_P1_PAR1   = $02;  { Registre 1 d'adresse physique (Physical Address Register 1) }
+ NE2000_P1_PAR2   = $03;  { Registre 2 d'adresse physique (Physical Address Register 2) }
+ NE2000_P1_PAR3   = $04;  { Registre 3 d'adresse physique (Physical Address Register 3) }
+ NE2000_P1_PAR4   = $05;  { Registre 4 d'adresse physique (Physical Address Register 4) }
+ NE2000_P1_PAR5   = $06;  { Registre 5 d'adresse physique (Physical Address Register 5) }
+ NE2000_P1_CURR   = $07;  { Registre du page courant (Current Page Register) }
+ NE2000_P1_MAR0   = $08;  { Registre de 0 Ö 7 de multidiffusion (Multicast Address Register 0-7) }
 
  { Commandes du registre de commande }
- NE2000_CR_STP    = $01;  { Stop }
- NE2000_CR_STA    = $02;  { Start }
- NE2000_CR_TXP    = $04;  { Transmit Packet }
- NE2000_CR_RD0    = $08;  { Remote DMA Command bit 0 }
- NE2000_CR_RD1    = $10;  { Remote DMA Command bit 1 }
- NE2000_CR_RD2    = $20;  { Remote DMA Command bit 2 }
- NE2000_CR_PS0    = $40;  { Page Select bit 0 }
- NE2000_CR_PS1    = $80;  { Page Select bit 1 }
+ NE2000_CR_STP    = $01;  { Arràt (Stop) }
+ NE2000_CR_STA    = $02;  { DÇmarre (Start) }
+ NE2000_CR_TXP    = $04;  { Paquet de transission (Transmit Packet) }
+ NE2000_CR_RD0    = $08;  { Bit 0 de commande DMA Ö distance (Remote DMA Command bit 0) }
+ NE2000_CR_RD1    = $10;  { Bit 1 de commande DMA Ö distance (Remote DMA Command bit 1) }
+ NE2000_CR_RD2    = $20;  { Bit 2 de commande DMA Ö disatnce (Remote DMA Command bit 2) }
+ NE2000_CR_PS0    = $40;  { Bit 0 de sÇlection de page (Page Select bit 0) }
+ NE2000_CR_PS1    = $80;  { Bit 1 de sÇlection de page (Page Select bit 1) }
 
- { Commandes Remote DMA }
- NE2000_CR_NODMA  = $20;  { No Remote DMA }
- NE2000_CR_READ   = $08;  { Remote Read }
- NE2000_CR_WRITE  = $10;  { Remote Write }
- NE2000_CR_SEND   = $18;  { Send Packet }
+ { Commandes Ö disatnce DMA }
+ NE2000_CR_NODMA  = $20;  { Pas de DMA Ö distance (No Remote DMA) }
+ NE2000_CR_READ   = $08;  { Lecture Ö distance (Remote Read) }
+ NE2000_CR_WRITE  = $10;  { êcriture Ö distance (Remote Write) }
+ NE2000_CR_SEND   = $18;  { Envoi de paquet (Send Packet) }
 
  { √âtats ISR }
- NE2000_ISR_PRX   = $01;  { Packet Received }
- NE2000_ISR_PTX   = $02;  { Packet Transmitted }
- NE2000_ISR_RXE   = $04;  { Receive Error }
- NE2000_ISR_TXE   = $08;  { Transmit Error }
- NE2000_ISR_OVW   = $10;  { Overwrite Warning }
- NE2000_ISR_CNT   = $20;  { Counter Overflow }
- NE2000_ISR_RDC   = $40;  { Remote DMA Complete }
- NE2000_ISR_RST   = $80;  { Reset Status }
+ NE2000_ISR_PRX   = $01;  { Reception de paquet (Packet Received) }
+ NE2000_ISR_PTX   = $02;  { Paquet transmit (Packet Transmitted) }
+ NE2000_ISR_RXE   = $04;  { Erreur de reception (Receive Error) }
+ NE2000_ISR_TXE   = $08;  { Erreur de transmission (Transmit Error) }
+ NE2000_ISR_OVW   = $10;  { Attention d'Çcrasement (Overwrite Warning) }
+ NE2000_ISR_CNT   = $20;  { Compteur de dÇbordement (Counter Overflow) }
+ NE2000_ISR_RDC   = $40;  { DMA Ö distance complÇtÇ (Remote DMA Complete) }
+ NE2000_ISR_RST   = $80;  { êtat d'initialisation (Reset Status) }
 
- { Configuration par d√©faut }
- DEFAULT_SOFT_INT = $60;   { Interruption logicielle par d√©faut }
- DEFAULT_HARD_INT = 10;    { IRQ par d√©faut }
- DEFAULT_IO_BASE  = $300;  { Adresse I/O par d√©faut }
+ { Configuration par dÇfaut }
+ DEFAULT_SOFT_INT = $60;   { Interruption logicielle par dÇfaut }
+ DEFAULT_HARD_INT = 10;    { IRQ par dÇfaut }
+ DEFAULT_IO_BASE  = $300;  { Adresse d'entrÇe/sortie par dÇfaut }
 
 Type
- { Configuration du driver NE2000 }
+  { Configuration du pilote NE2000 }
  TNE2000Config = Record
-  SoftwareInt: Byte;     { Vecteur d'interruption logicielle }
-  HardwareInt: Byte;     { IRQ mat√©rielle }
-  IOBaseAddr: Word;      { Adresse de base I/O }
-  IsDetected: Boolean;   { Carte d√©tect√©e }
+  SoftwareInt: Byte;                { Vecteur d'interruption logicielle }
+  HardwareInt: Byte;                { IRQ matÇrielle }
+  IOBaseAddr: Word;                 { Adresse de base d'entrÇe/sortie }
+  IsDetected: Boolean;              { Carte dÇtectÇe }
   MACAddress: Array[0..5] of Byte;  { Adresse MAC }
-  IsInstalled: Boolean;  { Driver install√© }
+  IsInstalled: Boolean;             { Pilote installÇ }
  End;
 
 Var
@@ -101,9 +101,9 @@ Var
  SimulatedPort: Array[0..65535] of Byte;
 {$ENDIF}
 
-{ === FONCTIONS DE COMPATIBILIT√â === }
+{ === FONCTIONS DE COMPATIBILITê === }
 
-{ Fonction StrToUpper pour compatibilit√© }
+ { Fonction StrToUpper pour compatibilitÇ }
 Function StrToUpper(S:String):String;
 Var
  I:Byte;
@@ -114,44 +114,42 @@ Begin
  StrToUpper:=S;
 End;
 
-{ Fonction IntToHex pour compatibilit√© Turbo Pascal }
+{ Fonction IntToHex pour compatibilitÇ Turbo Pascal }
 {$IFNDEF FPC}
-Function IntToHex(Value: Word; Digits: Integer): String;
+Function IntToHex(Value: Word; Digits: Integer):String;
 Const
- HexChars: String[16] = '0123456789ABCDEF';
+ HexChars:String[16] = '0123456789ABCDEF';
 Var
- Result: String;
- I: Integer;
+ Result:String;
+ I:Integer;
 Begin
- Result := '';
- For I := Digits - 1 DownTo 0 Do Begin
-  Result := Result + HexChars[((Value shr (I * 4)) and $F) + 1];
+ Result:='';
+ For I:=Digits-1 DownTo 0 Do Begin
+  Result:=Result+HexChars[((Value shr (I * 4)) and $F) + 1];
  End;
  IntToHex := Result;
 End;
 {$ENDIF}
 
 {$IFDEF FPC}
-{ Fonction Port simul√©e pour lecture }
-Function ReadPort(PortAddr: Word): Byte;
-Begin
- { Simulation - retourner des valeurs pr√©d√©termin√©es }
+ { Fonction Port simulÇe pour lecture }
+Function ReadPort(PortAddr: Word): Byte;Begin
+ { Simulation - retourner des valeurs prÇdÇterminÇes }
  Case PortAddr of
-  DEFAULT_IO_BASE + NE2000_P0_ISR: ReadPort := NE2000_ISR_RST;  { Simuler reset }
-  DEFAULT_IO_BASE + NE2000_P0_CR:  ReadPort := NE2000_CR_STP;   { Simuler stop }
-  DEFAULT_IO_BASE + NE2000_IOPORT: ReadPort := $57;             { Valeur MAC simul√©e }
+  DEFAULT_IO_BASE + NE2000_P0_ISR: ReadPort := NE2000_ISR_RST;  { Simuler rÇinitialisation (ReSeT) }
+  DEFAULT_IO_BASE + NE2000_P0_CR:  ReadPort := NE2000_CR_STP;   { Simuler arràt (SToP) }
+  DEFAULT_IO_BASE + NE2000_IOPORT: ReadPort := $57;             { Valeur MAC simulÇe }
   Else ReadPort := SimulatedPort[PortAddr];
  End;
 End;
 
-{ Fonction Port simul√©e pour √©criture }
-Procedure WritePort(PortAddr: Word; Value: Byte);
-Begin
+{ Fonction de port simulÇe pour l'Çcriture }
+Procedure WritePort(PortAddr: Word; Value:Byte);Begin
  SimulatedPort[PortAddr] := Value;
 End;
 
-{ Simulation de Delay }
-Procedure Delay(MS: Word);
+{ Simulation de dÇlai Delay }
+Procedure Delay(MS:Word);
 Var
  StartTime: TDateTime;
 Begin
@@ -161,109 +159,92 @@ Begin
 End;
 
 {$ELSE}
-{ === VERSION TURBO PASCAL AVEC ACC√àS PORTS R√âELS === }
+ { === VERSION TURBO PASCAL AVEC ACCES PORTS RêELS === }
 
-{ Fonction Port pour lecture - Turbo Pascal natif }
-Function ReadPort(PortAddr: Word): Byte;
-Begin
- ReadPort := Port[PortAddr];
+ { Fonction Port pour lecture - Turbo Pascal natif }
+Function ReadPort(PortAddr:Word):Byte;Begin
+ ReadPort:=Port[PortAddr];
 End;
 
-{ Fonction Port pour √©criture - Turbo Pascal natif }
-Procedure WritePort(PortAddr: Word; Value: Byte);
-Begin
+ { Fonction de port pour l'Çcriture - Turbo Pascal natif }
+Procedure WritePort(PortAddr: Word; Value: Byte);Begin
  Port[PortAddr] := Value;
 End;
 
 {$ENDIF}
 
-{ === FONCTIONS D'ACC√àS MAT√âRIEL === }
+ { === FONCTIONS D'ACCES MATERIEL === }
 
 { Lire un octet du registre NE2000 }
-Function ReadNE2000Reg(BaseAddr: Word; RegOffset: Byte): Byte;
-Begin
- ReadNE2000Reg := ReadPort(BaseAddr + RegOffset);
+Function ReadNE2000Reg(BaseAddr:Word;RegOffset:Byte):Byte;Begin
+ ReadNE2000Reg:=ReadPort(BaseAddr+RegOffset);
 End;
 
-{ √âcrire un octet dans le registre NE2000 }
-Procedure WriteNE2000Reg(BaseAddr: Word; RegOffset: Byte; Value: Byte);
-Begin
- WritePort(BaseAddr + RegOffset, Value);
+{ êcrire un octet dans le registre NE2000 }
+Procedure WriteNE2000Reg(BaseAddr:Word;RegOffset:Byte;Value:Byte);Begin
+ WritePort(BaseAddr+RegOffset,Value);
 End;
 
-{ Lire donn√©es du port I/O NE2000 }
-Function ReadNE2000Data(BaseAddr: Word): Byte;
-Begin
+ { Lire donnÇes du port d'entrÇe/sortie NE2000 }
+Function ReadNE2000Data(BaseAddr:Word):Byte;Begin
  ReadNE2000Data := ReadPort(BaseAddr + NE2000_IOPORT);
 End;
 
-{ √âcrire donn√©es vers le port I/O NE2000 }
-Procedure WriteNE2000Data(BaseAddr: Word; Value: Byte);
-Begin
+{ êcrire donnÇes vers le port d'entrÇe/sortie NE2000 }
+Procedure WriteNE2000Data(BaseAddr:Word;Value:Byte);Begin
  WritePort(BaseAddr + NE2000_IOPORT, Value);
 End;
 
-{ === D√âTECTION ET INITIALISATION === }
+{ === DêTECTION ET INITIALISATION === }
 
-{ R√©initialiser la carte NE2000 }
+{ RÇinitialiser la carte NE2000 }
 Procedure ResetNE2000(BaseAddr: Word);
 Var
  ResetValue: Byte;
 Begin
- { Lecture du port de r√©initialisation pour d√©clencher le reset }
+ { Lecture du port de rÇinitialisation pour dÇclencher le rÇinitilisation }
  ResetValue := ReadPort(BaseAddr + NE2000_RESET);
- 
- { Attendre un peu pour la r√©initialisation }
+  { Attendre un peu pour la rÇinitialisation }
  Delay(10);
- 
- { √âcrire la valeur lue pour compl√©ter la r√©initialisation }
+  { êcrire la valeur lue pour complÇter la rÇinitialisation }
  WritePort(BaseAddr + NE2000_RESET, ResetValue);
- 
- { Attendre la fin de la r√©initialisation }
+  { Attendre la fin de la rÇinitialisation }
  Delay(100);
 End;
 
-{ D√©tecter la pr√©sence d'une carte NE2000 }
+{ DÇtecter la prÇsence d'une carte NE2000 }
 Function DetectNE2000(BaseAddr: Word): Boolean;
 Var
  TestValue, ReadValue: Byte;
  I: Integer;
 Begin
  DetectNE2000 := False;
- 
- { Test 1: R√©initialisation et v√©rification du registre de commande }
+  { Test 1: RÇinitialisation et vÇrification du registre de commande }
  ResetNE2000(BaseAddr);
- 
- { Attendre que la carte soit pr√™te }
- For I := 1 To 1000 Do Begin
+  { Attendre que la carte soit pràte }
+ For I:=1 To 1000 Do Begin
   ReadValue := ReadNE2000Reg(BaseAddr, NE2000_P0_ISR);
   If (ReadValue and NE2000_ISR_RST) <> 0 Then Break;
   Delay(1);
  End;
- 
- { V√©rifier si la r√©initialisation s'est bien pass√©e }
+  { VÇrifier si la rÇinitialisation s'est bien passÇe }
  If (ReadValue and NE2000_ISR_RST) = 0 Then Exit;
- 
- { Test 2: Mettre la carte en mode stop et v√©rifier }
+  { Test 2: Mettre la carte en mode stop et vÇrifier }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
  Delay(10);
- 
  ReadValue := ReadNE2000Reg(BaseAddr, NE2000_P0_CR);
  If (ReadValue and NE2000_CR_STP) = 0 Then Exit;
- 
- { Test 3: Test d'√©criture/lecture sur le registre RBCR }
+  { Test 3: Test d'Çcriture/lecture sur le registre RBCR }
  TestValue := $A5;  { Valeur de test }
  WriteNE2000Reg(BaseAddr, NE2000_P0_RBCR0, TestValue);
  ReadValue := ReadNE2000Reg(BaseAddr, NE2000_P0_RBCR0);
  If ReadValue <> TestValue Then Exit;
- 
  TestValue := $5A;  { Autre valeur de test }
  WriteNE2000Reg(BaseAddr, NE2000_P0_RBCR1, TestValue);
  ReadValue := ReadNE2000Reg(BaseAddr, NE2000_P0_RBCR1);
  If ReadValue <> TestValue Then Exit;
- 
- { Test 4: V√©rifier la signature NE2000 dans la ROM }
- { Configuration pour lecture remote DMA }
+  { Test 4: VÇrifier la signature NE2000 dans la ROM }
+  { Configuration pour lecture remote DMA }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
  WriteNE2000Reg(BaseAddr, NE2000_P0_ISR, $FF);  { Effacer interruptions }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CRDA0, 0);  { Adresse remote DMA }
@@ -271,57 +252,46 @@ Begin
  WriteNE2000Reg(BaseAddr, NE2000_P0_RBCR0, 32); { Lire 32 octets }
  WriteNE2000Reg(BaseAddr, NE2000_P0_RBCR1, 0);
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_READ);
- 
- { Lire quelques octets pour v√©rifier l'acc√®s DMA }
+  { Lire quelques octets pour vÇrifier l'accäs DMA }
  For I := 0 To 5 Do Begin
   ReadValue := ReadNE2000Data(BaseAddr);
-  { Stocker l'adresse MAC pendant qu'on y est }
+   { Entreposer l'adresse MAC pendant qu'on y est }
   NE2000Config.MACAddress[I] := ReadValue;
  End;
- 
- { Si on arrive ici, la carte semble √™tre une NE2000 }
- DetectNE2000 := True;
+  { Si on arrive ici, la carte semble àtre une NE2000 }
+ DetectNE2000:=True;
 End;
 
-{ Initialiser la carte NE2000 }
+ { Initialiser la carte NE2000 }
 Function InitializeNE2000(BaseAddr: Word): Boolean;
 Var
  I: Integer;
 Begin
  InitializeNE2000 := False;
- 
- { R√©initialiser la carte }
+  { RÇinitialiser la carte }
  ResetNE2000(BaseAddr);
- 
- { Configuration initiale }
+  { Configuration initiale }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
  WriteNE2000Reg(BaseAddr, NE2000_P0_ISR, $FF);  { Effacer toutes les interruptions }
- 
+
  { Configuration des tampons }
- WriteNE2000Reg(BaseAddr, NE2000_P0_BNRY, $40);   { Page de d√©but r√©ception }
+ WriteNE2000Reg(BaseAddr, NE2000_P0_BNRY, $40);   { Page de dÇbut de rÇception }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CRDA0, 0);    { Adresse DMA courante }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CRDA1, 0);
- 
- { Passer en page 1 pour configurer l'adresse physique }
+  { Passer en page 1 pour configurer l'adresse physique }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA or NE2000_CR_PS0);
- 
- { Configurer l'adresse MAC (utiliser l'adresse lue lors de la d√©tection) }
+  { Configurer l'adresse MAC (utiliser l'adresse lue lors de la dÇtection) }
  For I := 0 To 5 Do Begin
   WriteNE2000Reg(BaseAddr, NE2000_P1_PAR0 + I, NE2000Config.MACAddress[I]);
  End;
- 
- { Configuration du pointeur courant }
+  { Configuration du pointeur courant }
  WriteNE2000Reg(BaseAddr, NE2000_P1_CURR, $41);
- 
- { Revenir en page 0 }
+  { Revenir en page 0 }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
- 
- { D√©marrer la carte }
+  { DÇmarrer la carte }
  WriteNE2000Reg(BaseAddr, NE2000_P0_CR, NE2000_CR_STA or NE2000_CR_NODMA);
- 
- { Attendre que la carte soit pr√™te }
+  { Attendre que la carte soit pràte }
  Delay(50);
- 
  InitializeNE2000 := True;
 End;
 
@@ -329,42 +299,36 @@ End;
 
 { Gestionnaire d'interruption simple }
 {$F+}
-Procedure NE2000InterruptHandler;
-Begin
- { Simplement effacer le registre d'√©tat d'interruption }
+Procedure NE2000InterruptHandler;Begin
+  { Simplement effacer le registre d'Çtat d'interruption }
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_ISR, $FF);
- 
- { Acquitter l'interruption mat√©rielle }
+  { Acquitter l'interruption matÇrielle }
  If NE2000Config.HardwareInt >= 8 Then Begin
-  WritePort($A0, $20);  { EOI vers contr√¥leur esclave }
-  WritePort($20, $20);  { EOI vers contr√¥leur ma√Ætre }
+  WritePort($A0, $20);  { EOI vers contrìleur esclave }
+  WritePort($20, $20);  { EOI vers contrìleur maåtre }
  End Else Begin
-  WritePort($20, $20);  { EOI vers contr√¥leur ma√Ætre }
+  WritePort($20, $20);  { EOI vers contrìleur maåtre }
  End;
 End;
 {$F-}
 
-{ Installer le gestionnaire d'interruption }
-Function InstallInterruptHandler: Boolean;
-Begin
+ { Installer le gestionnaire d'interruption }
+Function InstallInterruptHandler:Boolean;Begin
  InstallInterruptHandler := False;
- 
- { Pour cette version simplifi√©e, on ne g√®re pas les interruptions }
- { Dans un vrai driver, il faudrait installer le gestionnaire sur l'IRQ }
- 
+  { Pour cette version simplifiÇe, on ne gäre pas les interruptions }
+  { Dans un vrai pilote, il faudrait installer le gestionnaire sur l'IRQ }
  InstallInterruptHandler := True;
 End;
 
-{ === INTERFACE PACKET DRIVER === }
+{ === PILOTE D'INTERFACE DE PAQUET === }
 
-{ Gestionnaire d'interruption logicielle pour packet driver }
+ { Gestionnaire d'interruption logicielle pour pilote de paquet }
 {$F+}
-Procedure PacketDriverHandler;
-Begin
- { Interface simplifi√©e du packet driver }
- { Version simplifi√©e sans assembleur pour compatibilit√© }
- { En r√©alit√©, un vrai driver packet aurait besoin d'assembleur }
- 
+Procedure PacketDriverHandler;Begin
+ { Interface simplifiÇe du packet de pilote }
+ { Version simplifiÇe sans assembleur pour compatibilitÇ }
+ { En rÇalitÇ, un vrai pilote de packet aurait besoin d'assembleur }
+
  {$IFDEF FPC}
  { Version Free Pascal - simulation }
  { Pas d'assembleur inline complexe }
@@ -376,18 +340,15 @@ Begin
   CMP AH, 2     { Fonction 2: Access Type }
   JE @AccessType
   JMP @Exit
-  
 @DriverInfo:
   MOV AL, 1     { Version }
   MOV BX, 1     { Type: Ethernet }
-  MOV CX, 0     { Num√©ro }
-  CLC           { Succ√®s }
+  MOV CX, 0     { NumÇro }
+  CLC           { Succäs }
   JMP @Exit
-
 @AccessType:
-  CLC           { Succ√®s pour l'instant }
+  CLC           { Succäs pour l'instant }
   JMP @Exit
-
 @Exit:
  END;
  {$ENDIF}
@@ -398,20 +359,19 @@ End;
 
 { Messages multilingues }
 
-
 { Afficher l'adresse MAC }
 Procedure DisplayMACAddress;
 Var
  I: Integer;
 Begin
- { Affichage multilingue du label MAC Address }
+  { Affichage multilingue du label MAC Address }
  Case Language of
   _English:   Write('MAC Address: ');
   _Germany:   Write('MAC-Adresse: ');
   _Italian:   Write('Indirizzo MAC: ');
-  _Spain:     Write('Direcci√≥n MAC: ');
+  _Spain:     Write('Direcci¢n MAC: ');
   _Albanian:  Write('Adresa MAC: ');
-  _Portuguese:Write('Endere√ßo MAC: ');
+  _Portuguese:Write('Endereáo MAC: ');
   _Swedish:   Write('MAC-adress: ');
   _Danish:    Write('MAC-adresse: ');
   _Japanese:  Write('MAC adoresu: ');
@@ -424,7 +384,7 @@ Begin
  WriteLn;
 End;
 
-{ Afficher l'√©tat de la carte }
+{ Afficher l'Çtat de la carte }
 Procedure DisplayCardStatus;
 Var
  CR, ISR, TSR: Byte;
@@ -435,82 +395,72 @@ Begin
   _Germany:   WriteLn('NE2000-Karten Status:');
   _Italian:   WriteLn('Stato scheda NE2000:');
   _Spain:     WriteLn('Estado de tarjeta NE2000:');
-  _Albanian:  WriteLn('Gjendja e kart√´s NE2000:');
+  _Albanian:  WriteLn('Gjendja e kartâs NE2000:');
   _Portuguese:WriteLn('Status da placa NE2000:');
   _Swedish:   WriteLn('NE2000-kort status:');
   _Danish:    WriteLn('NE2000-kort status:');
   _Japanese:  WriteLn('NE2000 kaado no suteetasu:');
-  Else        WriteLn('√âtat de la carte NE2000:');
+  Else        WriteLn('êtat de la carte NE2000:');
  End;
  WriteLn('------------------------');
- 
+
  CR := ReadNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR);
  ISR := ReadNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_ISR);
  TSR := ReadNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_TSR);
- 
+
  WriteLn('Registre de commande (CR): $', IntToHex(CR, 2));
- WriteLn('Registre d''√©tat d''interruption (ISR): $', IntToHex(ISR, 2));
- WriteLn('Registre d''√©tat de transmission (TSR): $', IntToHex(TSR, 2));
- 
- Write('√âtat: ');
- If (CR and NE2000_CR_STA) <> 0 Then WriteLn('D√©marr√©')
-                                 Else WriteLn('Arr√™t√©');
- 
+ WriteLn('Registre d''Çtat d''interruption (ISR): $', IntToHex(ISR, 2));
+ WriteLn('Registre d''Çtat de transmission (TSR): $', IntToHex(TSR, 2));
+ Write('êtat: ');
+ If (CR and NE2000_CR_STA) <> 0 Then WriteLn('DÇmarrÇ')
+                                Else WriteLn('ArràtÇ');
+
  DisplayMACAddress;
 End;
 
-{ Test de la carte }
+ { Test de la carte }
 Function TestCard: Boolean;
 Var
  TestData: Array[0..15] of Byte;
  I: Integer;
 Begin
  TestCard := False;
- 
  WriteLn('Test de la carte NE2000...');
- 
- { Test simple de lecture/√©criture }
+  { Test simple de lecture/Çcriture }
  For I := 0 To 15 Do TestData[I] := I * 16 + I;
- 
- { Configuration pour DMA remote }
+  { Configuration pour DMA Ö distance }
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CRDA0, 0);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CRDA1, $40);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_RBCR0, 16);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_RBCR1, 0);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_WRITE);
- 
- { √âcrire donn√©es test }
- For I := 0 To 15 Do
-  WriteNE2000Data(NE2000Config.IOBaseAddr, TestData[I]);
- 
- { Relire les donn√©es }
+  { êcrire des donnÇes de test }
+ For I := 0 To 15 Do WriteNE2000Data(NE2000Config.IOBaseAddr, TestData[I]);
+ { Relire les donnÇes }
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CRDA0, 0);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CRDA1, $40);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_RBCR0, 16);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_RBCR1, 0);
  WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_READ);
- 
- { V√©rifier les donn√©es }
+  { VÇrifier les donnÇes }
  For I := 0 To 15 Do Begin
   If ReadNE2000Data(NE2000Config.IOBaseAddr) <> TestData[I] Then Exit;
  End;
- 
- WriteLn('Test de la carte: R√âUSSI');
+ WriteLn('Test de la carte: RêUSSI');
  TestCard := True;
 End;
 
-{ === FONCTIONS PRINCIPALES === }
+ { === FONCTIONS PRINCIPALES === }
 
-{ Analyser les param√®tres de ligne de commande }
+ { Analyser les paramätres de ligne de commande }
 Function ParseCommandLine: Boolean;
 Var
  ErrorCode: Integer;
 Begin
  ParseCommandLine := True;
- 
- { Initialiser configuration par d√©faut }
+  { Initialiser configuration par dÇfaut }
  With NE2000Config Do Begin
   SoftwareInt := DEFAULT_SOFT_INT;
   HardwareInt := DEFAULT_HARD_INT;
@@ -518,10 +468,9 @@ Begin
   IsDetected := False;
   IsInstalled := False;
  End;
- 
- { Analyser les param√®tres }
+  { Analyser les param√®tres }
  If ParamCount >= 1 Then Begin
-  { Premier param√®tre: interruption logicielle }
+  { Premier paramätre: interruption logicielle }
   Val('$' + ParamStr(1), NE2000Config.SoftwareInt, ErrorCode);
   If ErrorCode <> 0 Then Begin
    WriteLn('Erreur: Interruption logicielle invalide: ', ParamStr(1));
@@ -529,7 +478,7 @@ Begin
    Exit;
   End;
  End;
- 
+
  If ParamCount >= 2 Then Begin
   { Deuxi√®me param√®tre: IRQ mat√©rielle }
   Val(ParamStr(2), NE2000Config.HardwareInt, ErrorCode);
@@ -539,166 +488,151 @@ Begin
    Exit;
   End;
  End;
- 
+
  If ParamCount >= 3 Then Begin
-  { Troisi√®me param√®tre: adresse I/O }
+  { Troisiäme paramätre: adresse d'entrÇe/sortie }
   Val('$' + ParamStr(3), NE2000Config.IOBaseAddr, ErrorCode);
   If ErrorCode <> 0 Then Begin
-   WriteLn('Erreur: Adresse I/O invalide: ', ParamStr(3));
+   WriteLn('Erreur: Adresse d''entrÇe/sortie invalide: ', ParamStr(3));
    ParseCommandLine := False;
    Exit;
   End;
  End;
 End;
 
-{ Installer le driver NE2000 }
-Function InstallDriver: Boolean;
-Begin
- InstallDriver := False;
- 
- WriteLn('Installation du driver packet NE2000...');
+ { Installer le pilote NE2000 }
+Function InstallDriver:Boolean;Begin
+ InstallDriver:=False;
+ WriteLn('Installation du pilote paquet NE2000...');
  WriteLn('Interruption logicielle: $', IntToHex(NE2000Config.SoftwareInt, 2));
- WriteLn('IRQ mat√©rielle: ', NE2000Config.HardwareInt);
- WriteLn('Adresse I/O: $', IntToHex(NE2000Config.IOBaseAddr, 4));
+ WriteLn('IRQ matÇrielle: ', NE2000Config.HardwareInt);
+ WriteLn('Adresse d''entrÇe/sortie : $', IntToHex(NE2000Config.IOBaseAddr, 4));
  WriteLn;
- 
- { D√©tecter la carte }
- WriteLn('D√©tection de la carte NE2000...');
+  { DÇtecter la carte }
+ WriteLn('DÇtection de la carte NE2000...');
  If not DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-  { Affichage multilingue de l'erreur de d√©tection }
+  { Affichage multilingue de l'erreur de dÇtection }
   Case Language of
    _English:   Write('ERROR: No NE2000 card detected at address $');
    _Germany:   Write('FEHLER: Keine NE2000-Karte an Adresse $ erkannt ');
    _Italian:   Write('ERRORE: Nessuna scheda NE2000 rilevata all''indirizzo $');
-   _Spain:     Write('ERROR: No se detect√≥ tarjeta NE2000 en direcci√≥n $');
-   _Albanian:  Write('GABIM: Asnj√´ kart√´ NE2000 nuk u zbulua n√´ adres√´n $');
+   _Spain:     Write('ERROR: No se detect¢ tarjeta NE2000 en direcci¢n $');
+   _Albanian:  Write('GABIM: Asnjâ kartâ NE2000 nuk u zbulua nâ adresân $');
    _Portuguese:Write('ERRO: Nenhuma placa NE2000 detectada no endere√ßo $');
-   _Swedish:   Write('FEL: Inget NE2000-kort uppt√§ckt p√• adress $');
-   _Danish:    Write('FEJL: Intet NE2000-kort opdaget p√• adresse $');
+   _Swedish:   Write('FEL: Inget NE2000-kort upptÑckt pÜ adress $');
+   _Danish:    Write('FEJL: Intet NE2000-kort opdaget pÜ adresse $');
    _Japanese:  Write('ERAAH: Adoresu $ ni NE2000 kaado ga kenshutsu saremasen deshita ');
-   Else        Write('ERREUR: Aucune carte NE2000 d√©tect√©e √† l''adresse $');
+   Else        Write('ERREUR: Aucune carte NE2000 dÇtectÇe Ö l''adresse $');
   End;
   WriteLn(IntToHex(NE2000Config.IOBaseAddr, 4));
   Exit;
  End;
- 
- { Affichage multilingue du succ√®s de d√©tection }
+
+ { Affichage multilingue du succäs de dÇtection }
  Case Language of
   _English:   WriteLn('NE2000 card detected successfully!');
   _Germany:   WriteLn('NE2000-Karte erfolgreich erkannt!');
   _Italian:   WriteLn('Scheda NE2000 rilevata con successo!');
-  _Spain:     WriteLn('¬°Tarjeta NE2000 detectada exitosamente!');
+  _Spain:     WriteLn('Tarjeta NE2000 detectada exitosamente!');
   _Albanian:  WriteLn('Karta NE2000 u zbulua me sukses!');
   _Portuguese:WriteLn('Placa NE2000 detectada com sucesso!');
-  _Swedish:   WriteLn('NE2000-kort uppt√§ckt framg√•ngsrikt!');
+  _Swedish:   WriteLn('NE2000-kort upptÑckt framgÜngsrikt!');
   _Danish:    WriteLn('NE2000-kort opdaget succesfuldt!');
   _Japanese:  WriteLn('NE2000 kaado ga seikou ni kenshutsu saremashita!');
-  Else        WriteLn('Carte NE2000 d√©tect√©e avec succ√®s!');
+  Else        WriteLn('Carte NE2000 dÇtectÇe avec succäs!');
  End;
  NE2000Config.IsDetected := True;
  DisplayMACAddress;
  WriteLn;
- 
- { Initialiser la carte }
+  { Initialiser la carte }
  WriteLn('Initialisation de la carte...');
  If not InitializeNE2000(NE2000Config.IOBaseAddr) Then Begin
-  WriteLn('ERREUR: √âchec d''initialisation de la carte');
+  WriteLn('ERREUR: êchec d''initialisation de la carte');
   Exit;
  End;
- 
- WriteLn('Carte initialis√©e avec succ√®s!');
- 
- { Test de la carte }
- If not TestCard Then Begin
-  WriteLn('ATTENTION: Test de la carte √©chou√© - le driver pourrait ne pas fonctionner correctement');
+ WriteLn('Carte initialisÇe avec succäs!');
+  { Test de la carte }
+ If Not TestCard Then Begin
+  WriteLn('ATTENTION: Test de la carte ÇchouÇ - le pilote pourrait ne pas fonctionner correctement');
  End;
- 
- { Installer le gestionnaire d'interruption }
+  { Installer le gestionnaire d'interruption }
  WriteLn('Installation du gestionnaire d''interruption...');
  If InstallInterruptHandler Then Begin
-  WriteLn('Gestionnaire d''interruption install√©');
- End Else Begin
-  WriteLn('ATTENTION: √âchec d''installation du gestionnaire d''interruption');
+  WriteLn('Gestionnaire d''interruption installÇ');
+ End
+  Else
+ Begin
+  WriteLn('ATTENTION: êchec d''installation du gestionnaire d''interruption');
  End;
- 
- { Marquer comme install√© }
+  { Marquer comme installÇ }
  NE2000Config.IsInstalled := True;
- 
  WriteLn;
- { Affichage multilingue du succ√®s d'installation }
+  { Affichage multilingue du succäs d'installation }
  Case Language of
   _English:   WriteLn('NE2000 packet driver installed successfully!');
   _Germany:   WriteLn('NE2000 Packet-Treiber erfolgreich installiert!');
   _Italian:   WriteLn('Driver pacchetti NE2000 installato con successo!');
-  _Spain:     WriteLn('¬°Driver de paquetes NE2000 instalado exitosamente!');
+  _Spain:     WriteLn('Driver de paquetes NE2000 instalado exitosamente!');
   _Albanian:  WriteLn('Drajveri i paketave NE2000 u instalua me sukses!');
   _Portuguese:WriteLn('Driver de pacotes NE2000 instalado com sucesso!');
-  _Swedish:   WriteLn('NE2000 paketdrivrutin installerad framg√•ngsrikt!');
+  _Swedish:   WriteLn('NE2000 paketdrivrutin installerad framgÜngsrikt!');
   _Danish:    WriteLn('NE2000 pakkedriver installeret succesfuldt!');
   _Japanese:  WriteLn('NE2000 paketto doraibaa ga seikou ni insutooru saremashita!');
-  Else        WriteLn('Driver packet NE2000 install√© avec succ√®s!');
+  Else        WriteLn('Pilote de paquet NE2000 installÇ avec succäs!');
  End;
- WriteLn('Le driver est maintenant pr√™t √† √™tre utilis√© par les applications r√©seau.');
- 
+ WriteLn('Le pilote est maintenant pràt Ö àtre utilisÇ par les applications rÇseau.');
  InstallDriver := True;
 End;
 
-{ D√©sinstaller le driver }
-Procedure UninstallDriver;
-Begin
+ { DÇsinstaller le pilote }
+Procedure UninstallDriver;Begin
  If not NE2000Config.IsInstalled Then Begin
-  WriteLn('Aucun driver install√©');
+  WriteLn('Aucun pilote installÇ');
   Exit;
  End;
- 
- WriteLn('D√©sinstallation du driver NE2000...');
- 
- { Arr√™ter la carte }
+ WriteLn('DÇsinstallation du pilote NE2000...');
+  { Arràter la carte }
  If NE2000Config.IsDetected Then Begin
   WriteNE2000Reg(NE2000Config.IOBaseAddr, NE2000_P0_CR, NE2000_CR_STP or NE2000_CR_NODMA);
-  WriteLn('Carte arr√™t√©e');
+  WriteLn('Carte arràtÇe');
  End;
- 
- { Restaurer les gestionnaires d'interruption }
- { (Dans un vrai driver, il faudrait restaurer les vecteurs) }
- 
+  { Restaurer les gestionnaires d'interruption }
+  { (Dans un vrai driver, il faudrait restaurer les vecteurs) }
  NE2000Config.IsInstalled := False;
- WriteLn('Driver d√©sinstall√©');
+ WriteLn('Pilote dÇsinstallÇ');
 End;
 
-{ Afficher les informations sur le driver }
-Procedure ShowDriverInfo;
-Begin
- WriteLn('Informations sur le driver NE2000');
+ { Afficher les informations sur le driver }
+Procedure ShowDriverInfo;Begin
+ WriteLn('Informations sur le pilote NE2000');
  WriteLn('==================================');
  WriteLn;
  WriteLn('Version: 1.0 pour NETWORKKIT-P');
  WriteLn('Compatible: Cartes Ethernet NE2000 et compatibles');
- WriteLn('Type: Driver de paquet (Packet Driver)');
+ WriteLn('Type: Pilote de paquet (Packet Driver)');
  WriteLn;
  WriteLn('Configuration actuelle:');
  With NE2000Config Do Begin
   WriteLn('  Interruption logicielle: $', IntToHex(SoftwareInt, 2));
-  WriteLn('  IRQ mat√©rielle: ', HardwareInt);
-  WriteLn('  Adresse I/O: $', IntToHex(IOBaseAddr, 4));
-  Write('  √âtat d√©tection: ');
-  If IsDetected Then WriteLn('D√©tect√©') Else WriteLn('Non d√©tect√©');
-  Write('  √âtat installation: ');
-  If IsInstalled Then WriteLn('Install√©') Else WriteLn('Non install√©');
+  WriteLn('  IRQ matÇrielle: ', HardwareInt);
+  WriteLn('  Adresse d''entrÇe/sortie: $', IntToHex(IOBaseAddr, 4));
+  Write('  êtat dÇtection: ');
+  If IsDetected Then WriteLn('DÇtectÇ') Else WriteLn('Non dÇtectÇ');
+  Write('  êtat installation: ');
+  If IsInstalled Then WriteLn('InstallÇ') Else WriteLn('Non installÇ');
  End;
  WriteLn;
- 
  If NE2000Config.IsDetected Then Begin
   DisplayCardStatus;
  End;
 End;
 
-{ === DONN√âES CONSTANTES === }
+{ === DONNêES CONSTANTES === }
 Const
  DriverName: PChar = 'NE2000 Packet Driver';
 
 BEGIN
-{ Initialiser la langue }
+  { Initialiser la langue }
  Language:=_French;
  TmpLanguage:=GetEnv('LANGUAGE');
  If TmpLanguage<>''Then Begin
@@ -718,14 +652,14 @@ BEGIN
   If(StrToUpper(Copy(TmpLanguage,1,2))='JP')or
     (StrToUpper(Copy(TmpLanguage,1,3))='JPN')Then Language:=_Japanese;
  End;
- 
+
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
   Case Language of
    _English: Begin
     WriteLn('NE2000 : This command launches a packet driver for NE2000 compatible ISA Ethernet cards.');
     WriteLn;
-    WriteLn('Syntax:');    
+    WriteLn('Syntax:');
     WriteLn;
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
     WriteLn;
@@ -737,7 +671,7 @@ BEGIN
     WriteLn('Default values:');
     WriteLn('  soft_int     60h    (Software interrupt $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
-    WriteLn('  io_address   300h   (I/O address $300)');   
+    WriteLn('  io_address   300h   (I/O address $300)');
     WriteLn;
     WriteLn('Usage examples:');
     WriteLn('  NE2000                    # Default configuration');
@@ -746,7 +680,7 @@ BEGIN
     WriteLn('  NE2000 62 11 320          # IRQ 11, address $320');
    End;
    _Germany: Begin
-    WriteLn('NE2000 : Dieser Befehl startet einen Pakettreiber f√ºr NE2000-kompatible ISA-Ethernet-Karten.');
+    WriteLn('NE2000 : Dieser Befehl startet einen Pakettreiber fÅr NE2000-kompatible ISA-Ethernet-Karten.');
     WriteLn('Syntax:');
     WriteLn;
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
@@ -791,74 +725,74 @@ BEGIN
    End;
    _Spain: Begin
     WriteLn('NE2000 : Este comando inicia un controlador de paquetes para tarjetas Ethernet ISA compatibles NE2000.');
-    WriteLn('Sintaxis:');    
+    WriteLn('Sintaxis:');
     WriteLn;
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
     WriteLn;
     WriteLn('Par√°metros:');
-    WriteLn('  soft_int     Vector de interrupci√≥n de software en hexadecimal (60-7F)');
-    WriteLn('  hard_int     N√∫mero de IRQ de hardware (3, 5, 9, 10, 11, 12, 15)');
-    WriteLn('  io_address   Direcci√≥n base de E/S en hexadecimal (280, 300, 320, etc.)');
+    WriteLn('  soft_int     Vector de interrupci¢n de software en hexadecimal (60-7F)');
+    WriteLn('  hard_int     N£mero de IRQ de hardware (3, 5, 9, 10, 11, 12, 15)');
+    WriteLn('  io_address   Direcci¢n base de E/S en hexadecimal (280, 300, 320, etc.)');
     WriteLn;
     WriteLn('Valores predeterminados:');
-    WriteLn('  soft_int     60h    (Interrupci√≥n de software $60)');
+    WriteLn('  soft_int     60h    (Interrupci¢n de software $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
-    WriteLn('  io_address   300h   (Direcci√≥n I/O $300)');
+    WriteLn('  io_address   300h   (Direcci¢n I/O $300)');
     WriteLn;
     WriteLn('Ejemplos de uso:');
-    WriteLn('  NE2000                    # Configuraci√≥n predeterminada');
-    WriteLn('  NE2000 60 10 300          # Configuraci√≥n expl√≠cita');
-    WriteLn('  NE2000 61 5 280           # IRQ 5, direcci√≥n $280');
-    WriteLn('  NE2000 62 11 320          # IRQ 11, direcci√≥n $320');
+    WriteLn('  NE2000                    # Configuraci¢n predeterminada');
+    WriteLn('  NE2000 60 10 300          # Configuraci¢n explicita');
+    WriteLn('  NE2000 61 5 280           # IRQ 5, direcci¢n $280');
+    WriteLn('  NE2000 62 11 320          # IRQ 11, direcci¢n $320');
    End;
    _Albanian: Begin
-    WriteLn('NE2000 : Ky komand√´ nis nj√´ drejtues paketash p√´r karta Ethernet ISA t√´ p√´rputhshme NE2000.');
+    WriteLn('NE2000 : Ky komandâ nis njâ drejtues paketash pâr karta Ethernet ISA tâ pârputhshme NE2000.');
     WriteLn;
-    WriteLn('Sintaks√´:');
+    WriteLn('Sintaksâ:');
     WriteLn;
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
     WriteLn;
     WriteLn('Parametrat:');
-    WriteLn('  soft_int     Vektori i nd√´rprerjes s√´ softuerit n√´ heksadecimal (60-7F)');
-    WriteLn('  hard_int     Numri i IRQ t√´ harduerit (3, 5, 9, 10, 11, 12, 15)');
-    WriteLn('  io_address   Adresa baz√´ I/O n√´ heksadecimal (280, 300, 320, etj.)');
+    WriteLn('  soft_int     Vektori i ndârprerjes sâ softuerit nâ heksadecimal (60-7F)');
+    WriteLn('  hard_int     Numri i IRQ tâ harduerit (3, 5, 9, 10, 11, 12, 15)');
+    WriteLn('  io_address   Adresa bazâ I/O nâ heksadecimal (280, 300, 320, etj.)');
     WriteLn;
     WriteLn('Vlerat e paracaktuara:');
-    WriteLn('  soft_int     60h    (Nd√´rprerja e softuerit $60)');
+    WriteLn('  soft_int     60h    (Ndârprerja e softuerit $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
     WriteLn('  io_address   300h   (Adresa I/O $300)');
     WriteLn;
-    WriteLn('Shembuj p√´rdorimi:');
+    WriteLn('Shembuj pârdorimi:');
     WriteLn('  NE2000                    # Konfigurimi i paracaktuar');
     WriteLn('  NE2000 60 10 300          # Konfigurimi eksplicit');
     WriteLn('  NE2000 61 5 280           # IRQ 5, adresa $280');
     WriteLn('  NE2000 62 11 320          # IRQ 11, adresa $320');
    End;
    _Portuguese: Begin
-    WriteLn('NE2000 : Este comando inicia um driver de pacotes para placas Ethernet ISA compat√≠veis NE2000.');
+    WriteLn('NE2000 : Este comando inicia um driver de pacotes para placas Ethernet ISA compativeis NE2000.');
     WriteLn;
     WriteLn('Sintaxe:');
     WriteLn;
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
     WriteLn;
-    WriteLn('Par√¢metros:');
-    WriteLn('  soft_int     Vetor de interrup√ß√£o de software em hexadecimal (60-7F)');
-    WriteLn('  hard_int     N√∫mero do IRQ de hardware (3, 5, 9, 10, 11, 12, 15)');
-    WriteLn('  io_address   Endere√ßo base de I/O em hexadecimal (280, 300, 320, etc.)');
+    WriteLn('ParÉmetros:');
+    WriteLn('  soft_int     Vetor de interrupáao de software em hexadecimal (60-7F)');
+    WriteLn('  hard_int     N£mero do IRQ de hardware (3, 5, 9, 10, 11, 12, 15)');
+    WriteLn('  io_address   Endereáo base de I/O em hexadecimal (280, 300, 320, etc.)');
     WriteLn;
-    WriteLn('Valores padr√£o:');
-    WriteLn('  soft_int     60h    (Interrup√ß√£o de software $60)');
+    WriteLn('Valores padrao:');
+    WriteLn('  soft_int     60h    (Interrupáao de software $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
-    WriteLn('  io_address   300h   (Endere√ßo I/O $300)');
+    WriteLn('  io_address   300h   (Endereáo I/O $300)');
     WriteLn;
     WriteLn('Exemplos de uso:');
-    WriteLn('  NE2000                    # Configura√ß√£o padr√£o');
-    WriteLn('  NE2000 60 10 300          # Configura√ß√£o expl√≠cita');
-    WriteLn('  NE2000 61 5 280           # IRQ 5, endere√ßo $280');
-    WriteLn('  NE2000 62 11 320          # IRQ 11, endere√ßo $320');
+    WriteLn('  NE2000                    # Configuraáao padrao');
+    WriteLn('  NE2000 60 10 300          # Configuraáao explicita');
+    WriteLn('  NE2000 61 5 280           # IRQ 5, endereáo $280');
+    WriteLn('  NE2000 62 11 320          # IRQ 11, endereáo $320');
    End;
    _Swedish: Begin
-    WriteLn('NE2000 : Detta kommando startar en paketdrivrutin f√∂r NE2000-kompatibla ISA Ethernet-kort.');
+    WriteLn('NE2000 : Detta kommando startar en paketdrivrutin fîr NE2000-kompatibla ISA Ethernet-kort.');
     WriteLn;
     WriteLn('Syntax:');
     WriteLn;
@@ -866,15 +800,15 @@ BEGIN
     WriteLn;
     WriteLn('Parametrar:');
     WriteLn('  soft_int     Programvaruavbrottsvektor i hexadecimal (60-7F)');
-    WriteLn('  hard_int     H√•rdvaru-IRQ-nummer (3, 5, 9, 10, 11, 12, 15)');
+    WriteLn('  hard_int     HÜrdvaru-IRQ-nummer (3, 5, 9, 10, 11, 12, 15)');
     WriteLn('  io_address   I/O-basadress i hexadecimal (280, 300, 320, osv.)');
     WriteLn;
-    WriteLn('Standardv√§rden:');
+    WriteLn('StandardvÑrden:');
     WriteLn('  soft_int     60h    (Programvaruavbrott $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
     WriteLn('  io_address   300h   (I/O-adress $300)');
     WriteLn;
-    WriteLn('Anv√§ndningsexempel:');
+    WriteLn('AnvÑndningsexempel:');
     WriteLn('  NE2000                    # Standardkonfiguration');
     WriteLn('  NE2000 60 10 300          # Explicit konfiguration');
     WriteLn('  NE2000 61 5 280           # IRQ 5, adress $280');
@@ -892,7 +826,7 @@ BEGIN
     WriteLn('  hard_int     Hardware IRQ nummer (3, 5, 9, 10, 11, 12, 15)');
     WriteLn('  io_address   I/O baseadresse i hexadecimal (280, 300, 320, osv.)');
     WriteLn;
-    WriteLn('Standardv√¶rdier:');
+    WriteLn('Standardvaerdier:');
     WriteLn('  soft_int     60h    (Software interrupt $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
     WriteLn('  io_address   300h   (I/O-adresse $300)');
@@ -904,25 +838,25 @@ BEGIN
     WriteLn('  NE2000 62 11 320          # IRQ 11, adresse $320');
    End;
    _Japanese: Begin
-    WriteLn('NE2000 : Kono komando wa NE2000 g≈çkan ISA Ethernet kƒÅdo y≈ç no paketto doraibƒÅ wo kid≈ç shimasu.');
+    WriteLn('NE2000 : Kono komando wa NE2000 gokan ISA Ethernet kado yo no paketto doraiba wo kido shimasu.');
     WriteLn;
-    WriteLn('K≈çbun:');
+    WriteLn('Kobun:');
     WriteLn;
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
-    WriteLn;   
-    WriteLn('ParamƒìtƒÅ:');
-    WriteLn('  soft_int     Sofutouea warikomi bekutƒÅ (j≈´rokushinsh≈´ 60-7F)');
-    WriteLn('  hard_int     HƒÅdouea IRQ bang≈ç (3, 5, 9, 10, 11, 12, 15)');
-    WriteLn('  io_address   I/O kiban adoresu (j≈´rokushinsh≈´ 280, 300, 320, nado)');
     WriteLn;
-    WriteLn('Hy≈çjun atai:');
+    WriteLn('Parameta:');
+    WriteLn('  soft_int     Sofutouea warikomi bekuta (jurokushinshu 60-7F)');
+    WriteLn('  hard_int     HƒÅdouea IRQ bango (3, 5, 9, 10, 11, 12, 15)');
+    WriteLn('  io_address   I/O kiban adoresu (jurokushinshu 280, 300, 320, nado)');
+    WriteLn;
+    WriteLn('Hyojun atai:');
     WriteLn('  soft_int     60h    (Sofutouea warikomi $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
     WriteLn('  io_address   300h   (I/O adoresu $300)');
     WriteLn;
-    WriteLn('Shiy≈ç rei:');
-    WriteLn('  NE2000                    # Hy≈çjun k≈çsei');
-    WriteLn('  NE2000 60 10 300          # Meishiteki k≈çsei');
+    WriteLn('Shiyo rei:');
+    WriteLn('  NE2000                    # Hyojun kosei');
+    WriteLn('  NE2000 60 10 300          # Meishiteki kosei');
     WriteLn('  NE2000 61 5 280           # IRQ 5, adoresu $280');
     WriteLn('  NE2000 62 11 320          # IRQ 11, adoresu $320');
    End;
@@ -933,23 +867,23 @@ BEGIN
     WriteLn('Syntaxe :');
     WriteLn('  NE2000 [soft_int] [hard_int] [io_address]');
     WriteLn;
-    WriteLn('Param√®tres :');
-    WriteLn('  soft_int     Vecteur d''interruption logicielle en hexad√©cimal (60-7F)');
-    WriteLn('  hard_int     Num√©ro d''IRQ mat√©rielle (3, 5, 9, 10, 11, 12, 15)');
-    WriteLn('  io_address   Adresse de base d''entr√©e/sortie en hexad√©cimal (280, 300, 320,...)');
+    WriteLn('Paramätres :');
+    WriteLn('  soft_int     Vecteur d''interruption logicielle en hexadÇcimal (60-7F)');
+    WriteLn('  hard_int     NumÇro d''IRQ matÇrielle (3, 5, 9, 10, 11, 12, 15)');
+    WriteLn('  io_address   Adresse de base d''entrÇe/sortie en hexadÇcimal (280, 300, 320,...)');
     WriteLn;
     WriteLn('Valeurs par d√©faut :');
     WriteLn('  soft_int     60h    (Interruption logicielle $60)');
     WriteLn('  hard_int     10     (IRQ 10)');
-    WriteLn('  io_address   300h   (Adresse d''entr√©e/sortie $300)');
+    WriteLn('  io_address   300h   (Adresse d''entrÇe/sortie $300)');
     WriteLn;
     WriteLn('Exemples d''utilisation :');
-    WriteLn('  NE2000                    # Configuration par d√©faut');
+    WriteLn('  NE2000                    # Configuration par dÇfaut');
     WriteLn('  NE2000 60 10 300          # Configuration explicite');
     WriteLn('  NE2000 61 5 280           # IRQ 5, adresse $280');
     WriteLn('  NE2000 62 11 320          # IRQ 11, adresse $320');
     WriteLn;
-    WriteLn('Adresses d''entr√©e/sorties courantes :');
+    WriteLn('Adresses d''entrÇe/sorties courantes :');
     WriteLn('  280h, 300h, 320h, 340h, 360h');
     WriteLn;
     WriteLn('IRQ courantes :');
@@ -957,25 +891,27 @@ BEGIN
     WriteLn;
     WriteLn('Configuration des cavaliers :');
     WriteLn('  Les cavaliers de la carte doivent correspondre exactement');
-    WriteLn('  aux param√®tres sp√©cifi√©s pour l''IRQ et l''adresse d''entr√©e/sortie.');
+    WriteLn('  aux paramätres spÇcifiÇs pour l''IRQ et l''adresse d''entrÇe/sortie.');
     WriteLn;
     WriteLn('Options :');
-    WriteLn('  -i, /i       Afficher informations sur le pilote install√©');
-    WriteLn('  -u, /u       D√©sinstaller le pilote');
+    WriteLn('  -i, /i       Afficher informations sur le pilote installÇ');
+    WriteLn('  -u, /u       DÇsinstaller le pilote');
     WriteLn('  -t, /t       Tester la carte sans installer le pilote');
     WriteLn;
     WriteLn('Codes de retour :');
-    WriteLn('  0            Installation r√©ussie');
-    WriteLn('  1            Erreur de param√®tres');
-    WriteLn('  2            Carte non d√©tect√©e');
+    WriteLn('  0            Installation rÇussie');
+    WriteLn('  1            Erreur de paramätres');
+    WriteLn('  2            Carte non dÇtectÇe');
     WriteLn('  3            Erreur d''initialisation');
     WriteLn('  4            Erreur d''installation du pilote');
     WriteLn;
-    WriteLn('Note: Ce pilote impl√©mente l''interface Packet Driver standard');
+    WriteLn('Note: Ce pilote implÇmente l''interface Packet Driver standard');
     WriteLn('pour les cartes Ethernet Novell NE2000 et compatibles.');
-    WriteLn('N√©cessite une carte NE2000 ISA correctement configur√©e.');
+    WriteLn('NÇcessite une carte NE2000 ISA correctement configure.');
+    WriteLn;
+    WriteLn('Compatible Free Pascal (simulation) et Turbo Pascal (donnÇes rÇelles)');
    End;
-  End;  
+  End;
  End
   Else
  If ParamStr(1) = '--version' Then Begin
@@ -983,18 +919,18 @@ BEGIN
   WriteLn('Pilote de paquet pour cartes Ethernet NE2000');
   WriteLn('Compatible avec ne2000.com de Novell');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais pour NETWORKKIT-P, Corail');
+  WriteLn('êcrit par Sylvain Maltais pour NETWORKKIT-P, Corail');
  End
   Else
  If (ParamStr(1) = '-i') or (ParamStr(1) = '/i') Then Begin
   ShowDriverInfo;
  End
-  Else 
-If (ParamStr(1) = '-u') or (ParamStr(1) = '/u') Then Begin
+  Else
+ If (ParamStr(1) = '-u') or (ParamStr(1) = '/u') Then Begin
   UninstallDriver;
  End
  Else If (ParamStr(1) = '-t') or (ParamStr(1) = '/t') Then Begin
-  { Initialiser configuration par d√©faut pour le test }
+  { Initialiser configuration par dÇfaut pour le test }
   With NE2000Config Do Begin
    SoftwareInt := DEFAULT_SOFT_INT;
    HardwareInt := DEFAULT_HARD_INT;
@@ -1002,24 +938,24 @@ If (ParamStr(1) = '-u') or (ParamStr(1) = '/u') Then Begin
    IsDetected := False;
    IsInstalled := False;
   End;
-  
-  WriteLn('Test de d√©tection NE2000...');
-  WriteLn('Configuration de test: IRQ ', NE2000Config.HardwareInt, ', Adresse I/O $', IntToHex(NE2000Config.IOBaseAddr, 4));
+   WriteLn('Test de dÇtection NE2000...');
+  WriteLn('Configuration de test: IRQ ', NE2000Config.HardwareInt,
+          ', Adresse d''entrÇe/sortie $', IntToHex(NE2000Config.IOBaseAddr, 4));
   WriteLn;
-  
+
   If DetectNE2000(NE2000Config.IOBaseAddr) Then Begin
-   { Affichage multilingue du succ√®s de d√©tection dans le test }
+   { Affichage multilingue du succäs de dÇtection dans le test }
    Case Language of
     _English:   WriteLn('NE2000 card detected successfully!');
     _Germany:   WriteLn('NE2000-Karte erfolgreich erkannt!');
     _Italian:   WriteLn('Scheda NE2000 rilevata con successo!');
-    _Spain:     WriteLn('¬°Tarjeta NE2000 detectada exitosamente!');
+    _Spain:     WriteLn('Tarjeta NE2000 detectada exitosamente!');
     _Albanian:  WriteLn('Karta NE2000 u zbulua me sukses!');
     _Portuguese:WriteLn('Placa NE2000 detectada com sucesso!');
-    _Swedish:   WriteLn('NE2000-kort uppt√§ckt framg√•ngsrikt!');
+    _Swedish:   WriteLn('NE2000-kort upptÑckt framgÑngsrikt!');
     _Danish:    WriteLn('NE2000-kort opdaget succesfuldt!');
     _Japanese:  WriteLn('NE2000 kaado ga seikou ni kenshutsu saremashita!');
-    Else        WriteLn('Carte NE2000 d√©tect√©e avec succ√®s!');
+    Else        WriteLn('Carte NE2000 dÇtectÇe avec succäs !');
    End;
    NE2000Config.IsDetected := True;
    DisplayMACAddress;
@@ -1030,16 +966,16 @@ If (ParamStr(1) = '-u') or (ParamStr(1) = '/u') Then Begin
     _English:   Write('ERROR: No NE2000 card detected at address $');
     _Germany:   Write('FEHLER: Keine NE2000-Karte an Adresse $ erkannt ');
     _Italian:   Write('ERRORE: Nessuna scheda NE2000 rilevata all''indirizzo $');
-    _Spain:     Write('ERROR: No se detect√≥ tarjeta NE2000 en direcci√≥n $');
-    _Albanian:  Write('GABIM: Asnj√´ kart√´ NE2000 nuk u zbulua n√´ adres√´n $');
-    _Portuguese:Write('ERRO: Nenhuma placa NE2000 detectada no endere√ßo $');
-    _Swedish:   Write('FEL: Inget NE2000-kort uppt√§ckt p√• adress $');
-    _Danish:    Write('FEJL: Intet NE2000-kort opdaget p√• adresse $');
+    _Spain:     Write('ERROR: No se detect¢ tarjeta NE2000 en direcci¢n $');
+    _Albanian:  Write('GABIM: Asnjâ kartâ NE2000 nuk u zbulua nâ adresân $');
+    _Portuguese:Write('ERRO: Nenhuma placa NE2000 detectada no endereáo $');
+    _Swedish:   Write('FEL: Inget NE2000-kort upptÑckt pÜ adress $');
+    _Danish:    Write('FEJL: Intet NE2000-kort opdaget pÜ adresse $');
     _Japanese:  Write('ERAAH: Adoresu $ ni NE2000 kaado ga kenshutsu saremasen deshita ');
-    Else        Write('ERREUR: Aucune carte NE2000 d√©tect√©e √† l''adresse $');
+    Else        Write('ERREUR: Aucune carte NE2000 dÇtectÇe Ö l''adresse $');
    End;
    WriteLn(IntToHex(NE2000Config.IOBaseAddr, 4));
-   WriteLn('Essayez d''autres adresses I/O courantes: $280, $320, $340, $360');
+   WriteLn('Essayez d''autres adresses d''entrÇe/sortie courantes: $280, $320, $340, $360');
    Halt(2);
   End;
  End
