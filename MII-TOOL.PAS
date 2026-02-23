@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande mii-tool (Media Independent Interface))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande mii-tool (Media Independent Interface))
 }
 
 Program MIITOOL;
@@ -115,17 +116,19 @@ Const
 Var
  MIIList:Array[0..31] of TMIIInfo;
  MIICount:Integer;
- VerboseMode:Boolean;
- WatchMode:Boolean;
- WatchInterval:Integer;
 
 { Fonctions externes }
 Function GetAdaptersInfo(pAdapterInfo:PIP_ADAPTER_INFO;Var pOutBufLen:ULONG):DWORD;stdcall;external 'iphlpapi.dll';
 Function GetIfEntry(pIfRow:PMIB_IFROW):DWORD;stdcall;external 'iphlpapi.dll';
 {$ENDIF}
 
+Var
+ VerboseMode:Boolean;
+ WatchMode:Boolean;
+ WatchInterval:Integer;
+
 {$IFNDEF FPC}
-{ Fonctions utilitaires pour Turbo Pascal }
+ { Fonctions utilitaires pour Turbo Pascal }
 Function IntToStr(Value:LongInt):String;
 Var
  S:String;
@@ -184,58 +187,43 @@ End;
 {$ENDIF}
 
 {$IFDEF FPC}
-{ Fonction pour d√©terminer les capacit√©s MII bas√©es sur le type et la vitesse }
+ { Fonction pour dÇterminer les capacitÇs MII basÇes sur le type et la vitesse }
 Function GetMIICapabilities(AdapterType:DWORD;Speed:DWORD):String;
 Var
  Caps:String;
 Begin
  Caps:='';
- 
  Case AdapterType Of
   MIB_IF_TYPE_ETHERNET_CSMACD:Begin
-   If Speed>=SPEED_1G Then
-    Caps:='1000baseT-FD 1000baseT-HD 100baseTx-FD 100baseTx-HD 10baseT-FD 10baseT-HD'
-   Else If Speed>=SPEED_100M Then
-    Caps:='100baseTx-FD 100baseTx-HD 10baseT-FD 10baseT-HD'
-   Else
-    Caps:='10baseT-FD 10baseT-HD';
+   If Speed>=SPEED_1G Then Caps:='1000baseT-FD 1000baseT-HD 100baseTx-FD 100baseTx-HD 10baseT-FD 10baseT-HD' Else
+   If Speed>=SPEED_100M Then Caps:='100baseTx-FD 100baseTx-HD 10baseT-FD 10baseT-HD'
+                         Else Caps:='10baseT-FD 10baseT-HD';
   End;
   MIB_IF_TYPE_IEEE80211:Caps:='IEEE 802.11 wireless';
   MIB_IF_TYPE_SOFTWARE_LOOPBACK:Caps:='loopback';
  Else
   Caps:='unknown';
  End;
- 
  GetMIICapabilities:=Caps;
 End;
 
 { Fonction pour formater la vitesse }
-Function FormatSpeed(Speed:DWORD):String;
-Begin
- If Speed=0 Then
-  FormatSpeed:='100'  { Valeur par d√©faut si inconnue }
- Else If Speed>=SPEED_1G Then
-  FormatSpeed:='1000'
- Else If Speed>=SPEED_100M Then
-  FormatSpeed:='100'
- Else If Speed>=SPEED_10M Then
-  FormatSpeed:='10'
- Else
-  FormatSpeed:='100';  { D√©faut }
+Function FormatSpeed(Speed:DWORD):String;Begin
+ If Speed=0 Then FormatSpeed:='100' Else  { Valeur par dÇfaut si inconnue }
+ If Speed>=SPEED_1G Then FormatSpeed:='1000' Else
+ If Speed>=SPEED_100M Then FormatSpeed:='100' Else
+ If Speed>=SPEED_10M Then FormatSpeed:='10'
+                     Else FormatSpeed:='100';  { DÇfaut }
 End;
 
-{ Fonction pour d√©terminer le duplex (simulation bas√©e sur la vitesse) }
-Function GetDuplexMode(Speed:DWORD;AdapterType:DWORD):String;
-Begin
- If AdapterType=MIB_IF_TYPE_SOFTWARE_LOOPBACK Then
-  GetDuplexMode:='full'
- Else If Speed>=SPEED_100M Then
-  GetDuplexMode:='full'
- Else
-  GetDuplexMode:='half';
+{ Fonction pour dÇterminer le duplex (simulation basÇe sur la vitesse) }
+Function GetDuplexMode(Speed:DWORD;AdapterType:DWORD):String;Begin
+ If AdapterType=MIB_IF_TYPE_SOFTWARE_LOOPBACK Then GetDuplexMode:='full' Else
+ If Speed>=SPEED_100M Then GetDuplexMode:='full'
+                      Else GetDuplexMode:='half';
 End;
 
-{ Fonction pour obtenir les informations MII des interfaces }
+ { Fonction pour obtenir les informations MII des interfaces }
 Function GetMIIInfo:Boolean;
 Var
  pAdapterInfo,pAdapter:PIP_ADAPTER_INFO;
@@ -247,28 +235,25 @@ Begin
  GetMIIInfo:=False;
  MIICount:=0;
  OutBufLen:=0;
- 
- { Premi√®re appel pour obtenir la taille }
+  { Premiäre appel pour obtenir la taille }
  RetVal:=GetAdaptersInfo(nil,OutBufLen);
  If RetVal<>ERROR_BUFFER_OVERFLOW Then Exit;
- 
- { Allouer la m√©moire }
+  { Allouer la mÇmoire }
  GetMem(pAdapterInfo,OutBufLen);
  Try
-  { Obtenir les informations des adaptateurs }
+   { Obtenir les informations des adaptateurs }
   RetVal:=GetAdaptersInfo(pAdapterInfo,OutBufLen);
   If RetVal=NO_ERROR Then Begin
    pAdapter:=pAdapterInfo;
    While (pAdapter<>nil) and (MIICount<32) Do Begin
     { Ne traiter que les interfaces Ethernet }
-    If (pAdapter^.AdapterType=MIB_IF_TYPE_ETHERNET_CSMACD) or 
+    If (pAdapter^.AdapterType=MIB_IF_TYPE_ETHERNET_CSMACD) or
        (pAdapter^.AdapterType=MIB_IF_TYPE_IEEE80211) Then Begin
      With MIIList[MIICount] Do Begin
       InterfaceName:='eth'+IntToStr(pAdapter^.Index);
       Description:=StrPas(pAdapter^.Description);
       PhyAddress:=pAdapter^.Index;
-      
-      { Obtenir les statistiques via GetIfEntry }
+       { Obtenir les statistiques via GetIfEntry }
       FillChar(IfRow,SizeOf(IfRow),0);
       IfRow.dwIndex:=pAdapter^.Index;
       If GetIfEntry(@IfRow)=NO_ERROR Then Begin
@@ -276,43 +261,33 @@ Begin
        If IfRow.dwOperStatus=1 Then Begin
         LinkStatus:='link ok';
         OperStatus:='up';
-        If IfRow.dwSpeed>0 Then
-         Speed:=FormatSpeed(IfRow.dwSpeed)
-        Else
-         Speed:='100';  { Valeur par d√©faut }
+        If IfRow.dwSpeed>0 Then Speed:=FormatSpeed(IfRow.dwSpeed)
+                           Else Speed:='100';  { Valeur par dÇfaut }
         Duplex:=GetDuplexMode(IfRow.dwSpeed,IfRow.dwType);
        End Else Begin
         LinkStatus:='no link';
         OperStatus:='down';
-        Speed:='100';  { Valeur par d√©faut }
+        Speed:='100';  { Valeur par dÇfaut }
         Duplex:='full';
        End;
-       
-       { Statut administratif }
-       If IfRow.dwAdminStatus=1 Then
-        AdminStatus:='up'
-       Else
-        AdminStatus:='down';
-        
-       { Auto-n√©gociation (simul√©) }
-       If IfRow.dwSpeed>=SPEED_100M Then
-        AutoNeg:='on'
-       Else
-        AutoNeg:='off';
-        
-       { Capacit√©s MII }
+        { êtat administratif }
+       If IfRow.dwAdminStatus=1 Then AdminStatus:='up'
+                                Else AdminStatus:='down';
+        { Auto-nÇgociation (simulÇ) }
+       If IfRow.dwSpeed>=SPEED_100M Then AutoNeg:='on'
+                                    Else AutoNeg:='off';
+        { CapacitÇs MII }
        Capabilities:=GetMIICapabilities(IfRow.dwType,IfRow.dwSpeed);
-       
-       { Type de m√©dia }
+        { Type de mÇdia }
        Case IfRow.dwType Of
         MIB_IF_TYPE_ETHERNET_CSMACD:MediaType:='twisted pair';
         MIB_IF_TYPE_IEEE80211:MediaType:='wireless';
-       Else
-        MediaType:='unknown';
+        Else MediaType:='unknown';
        End;
-       
        MIIPresent:=True;
-      End Else Begin
+      End
+       Else
+      Begin
        LinkStatus:='no MII transceiver';
        OperStatus:='unknown';
        AdminStatus:='unknown';
@@ -340,24 +315,23 @@ Procedure ShowMIIInterface(Index:Integer);
 Begin
  With MIIList[Index] Do Begin
   Write(InterfaceName,': ');
-  
   If Not MIIPresent Then Begin
-   WriteLn('no MII transceiver present!.');
+   WriteLn('Pas de Çmetteur-rÇcepteur MII prÇsent !');
    Exit;
   End;
-  
   If VerboseMode Then Begin
    WriteLn;
-   WriteLn('  MII PHY #',PhyAddress,' transceiver registers:');
+   WriteLn('  Enregistrments de l''Çmetteur-rÇcepteur MII PHY no ',PhyAddress,' :');
    WriteLn('    ',Speed,'Mbit, ',Duplex,' duplex, ',LinkStatus);
-   WriteLn('    product info: ',Description);
-   WriteLn('    basic mode:   autonegotiation ',AutoNeg);
-   WriteLn('    basic status: ',LinkStatus);
-   WriteLn('    capabilities: ',Capabilities);
-   WriteLn('    advertising:  ',Capabilities);
-   If AutoNeg='on' Then
-    WriteLn('    link partner: ',Capabilities);
-  End Else Begin
+   WriteLn('    informations de produit: ',Description);
+   WriteLn('    mode de base:            auto-nÇgotiation ',AutoNeg);
+   WriteLn('    Çtat de base:            ',LinkStatus);
+   WriteLn('    capacitÇs:               ',Capabilities);
+   WriteLn('    publicitÇ:               ',Capabilities);
+   If AutoNeg='on' Then WriteLn('    partenaire de liaison:   ',Capabilities);
+  End
+   Else
+  Begin
    Write(Speed,'Mbit, ',Duplex,' duplex');
    If AutoNeg='on' Then Write(', autoneg');
    Write(', ',LinkStatus);
@@ -366,19 +340,19 @@ Begin
  End;
 End;
 
-{ Proc√©dure pour afficher toutes les interfaces MII }
+ { ProcÇdure pour afficher toutes les interfaces MII }
 Procedure ShowAllMIIInterfaces;
 Var
  I:Integer;
 Begin
  If GetMIIInfo Then Begin
-  For I:=0 To MIICount-1 Do
-   ShowMIIInterface(I);
- End Else
-  WriteLn('Erreur lors de la r√©cup√©ration des informations MII');
+  For I:=0 To MIICount-1 Do ShowMIIInterface(I);
+ End
+  Else
+ WriteLn('Erreur lors de la rÇcupÇration des informations MII');
 End;
 
-{ Proc√©dure pour afficher une interface sp√©cifique }
+ { ProcÇdure pour afficher une interface spÇcifique }
 Procedure ShowSpecificMIIInterface(InterfaceName:String);
 Var
  I:Integer;
@@ -387,18 +361,17 @@ Begin
  Found:=False;
  If GetMIIInfo Then Begin
   For I:=0 To MIICount-1 Do Begin
-   If (MIIList[I].InterfaceName=InterfaceName) or 
+   If (MIIList[I].InterfaceName=InterfaceName) or
       (Pos(UpperCase(InterfaceName),UpperCase(MIIList[I].Description))>0) Then Begin
     ShowMIIInterface(I);
     Found:=True;
    End;
   End;
-  If Not Found Then
-   WriteLn(InterfaceName,': no MII transceiver present!.');
+  If Not Found Then WriteLn(InterfaceName,': Aucun Çmetteur-rÇcepteur MII prÇsent !');
  End;
 End;
 
-{ Proc√©dure pour red√©marrer l'auto-n√©gociation }
+ { ProcÇdure pour red√©marrer l'auto-nÇgociation }
 Procedure RestartAutoNeg(InterfaceName:String);
 Var
  I:Integer;
@@ -407,19 +380,18 @@ Begin
  Found:=False;
  If GetMIIInfo Then Begin
   For I:=0 To MIICount-1 Do Begin
-   If (MIIList[I].InterfaceName=InterfaceName) or 
+   If (MIIList[I].InterfaceName=InterfaceName) or
       (Pos(UpperCase(InterfaceName),UpperCase(MIIList[I].Description))>0) Then Begin
-    WriteLn('red√©marrage de l''auto-n√©gociation...');
-    WriteLn(InterfaceName,': auto-n√©gociation red√©marr√©e');
+    WriteLn('redÇmarrage de l''auto-nÇgociation...');
+    WriteLn(InterfaceName,': auto-nÇgociation redÇmarrÇe');
     Found:=True;
    End;
   End;
-  If Not Found Then
-   WriteLn(InterfaceName,': interface non trouv√©e');
+  If Not Found Then WriteLn(InterfaceName,': interface non trouvÇe');
  End;
 End;
 
-{ Proc√©dure pour forcer la vitesse et le duplex }
+ { ProcÇdure pour forcer la vitesse et le duplex }
 Procedure ForceSpeedDuplex(InterfaceName,Speed,Duplex:String);
 Var
  I:Integer;
@@ -428,29 +400,27 @@ Begin
  Found:=False;
  If GetMIIInfo Then Begin
   For I:=0 To MIICount-1 Do Begin
-   If (MIIList[I].InterfaceName=InterfaceName) or 
+   If (MIIList[I].InterfaceName=InterfaceName) or
       (Pos(UpperCase(InterfaceName),UpperCase(MIIList[I].Description))>0) Then Begin
-    WriteLn('configuration forc√©e : ',Speed,'Mbit, duplex ',Duplex);
-    WriteLn(InterfaceName,': vitesse forc√©e √† ',Speed,'Mbit, duplex ',Duplex);
+    WriteLn('configuration forcÇe : ',Speed,'Mbit, duplex ',Duplex);
+    WriteLn(InterfaceName,': vitesse forcÇe Ö ',Speed,'Mbit, duplex ',Duplex);
     Found:=True;
    End;
   End;
-  If Not Found Then
-   WriteLn(InterfaceName,': interface non trouv√©e');
+  If Not Found Then WriteLn(InterfaceName,': interface non trouvÇe');
  End;
 End;
 
-{ Proc√©dure de surveillance continue }
+{ ProcÇdure de surveillance continue }
 Procedure WatchMode_Proc;
 Var
  I:Integer;
 Begin
- WriteLn('Surveillance des interfaces MII (Ctrl+C pour arr√™ter)');
+ WriteLn('Surveillance des interfaces MII (Ctrl+C pour arràter)');
  WriteLn;
- 
  While True Do Begin
   If GetMIIInfo Then Begin
-   WriteLn('--- Statut MII √† ',TimeToStr(Time),' ---');
+   WriteLn('--- êtat MII Ö ',TimeToStr(Time),' ---');
    For I:=0 To MIICount-1 Do Begin
     With MIIList[I] Do Begin
      WriteLn(InterfaceName,': ',Speed,'Mbit ',Duplex,' duplex, ',LinkStatus);
@@ -458,8 +428,7 @@ Begin
    End;
    WriteLn;
   End;
-  
-  { Attendre l'intervalle sp√©cifi√© }
+   { Attendre l'intervalle spÇcifiÇ }
   Sleep(WatchInterval * 1000);
  End;
 End;
@@ -467,15 +436,13 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedMII;
-Begin
+Procedure ShowSimulatedMII;Begin
  WriteLn('eth0: 100Mbit, full duplex, link ok');
  WriteLn('eth1: no link');
  WriteLn('eth2: no MII transceiver present!.');
 End;
 
-Procedure ShowSimulatedVerbose;
-Begin
+Procedure ShowSimulatedVerbose;Begin
  WriteLn('eth0: ');
  WriteLn('  MII PHY #1 transceiver registers:');
  WriteLn('    100Mbit, full duplex, link ok');
@@ -487,20 +454,17 @@ Begin
  WriteLn('    link partner: 100baseTx-FD 100baseTx-HD 10baseT-FD 10baseT-HD');
 End;
 
-Procedure SimulateRestart(InterfaceName:String);
-Begin
- WriteLn('red√©marrage de l''auto-n√©gociation...');
- WriteLn(InterfaceName,': auto-n√©gociation red√©marr√©e');
+Procedure SimulateRestart(InterfaceName:String);Begin
+ WriteLn('redÇmarrage de l''auto-nÇgociation...');
+ WriteLn(InterfaceName,': auto-nÇgociation redÇmarrÇe');
 End;
 
-Procedure SimulateForce(InterfaceName,Speed,Duplex:String);
-Begin
- WriteLn('configuration forc√©e : ',Speed,'Mbit, duplex ',Duplex);
- WriteLn(InterfaceName,': vitesse forc√©e √† ',Speed,'Mbit, duplex ',Duplex);
+Procedure SimulateForce(InterfaceName,Speed,Duplex:String);Begin
+ WriteLn('configuration forcÇe : ',Speed,'Mbit, duplex ',Duplex);
+ WriteLn(InterfaceName,': vitesse forcÇe Ö ',Speed,'Mbit, duplex ',Duplex);
 End;
 
-Procedure SimulateWatch;
-Begin
+Procedure SimulateWatch;Begin
  WriteLn('Surveillance des interfaces MII (simulation)');
  WriteLn('--- Statut MII ---');
  WriteLn('eth0: 100Mbit full duplex, link ok');
@@ -508,45 +472,49 @@ Begin
 End;
 {$ENDIF}
 
-{ Proc√©dure pour analyser les param√®tres }
+ { ProcÇdure pour analyser les paramätres }
 Procedure ParseCommand;
 Var
  I:Integer;
- Cmd,InterfaceName,Speed,Duplex:String;
+ Cmd,InterfaceName,Speed,Duplex,CurrParam:String;
 Begin
  VerboseMode:=False;
  WatchMode:=False;
  WatchInterval:=1;
  InterfaceName:='';
- 
- { Analyser les param√®tres }
+  { Analyser les paramätres }
  I:=1;
  While I<=ParamCount Do Begin
   Cmd:=UpperCase(ParamStr(I));
-  
-  If (Cmd='-V') or (Cmd='--VERBOSE') Then
-   VerboseMode:=True
-  Else If (Cmd='-W') or (Cmd='--WATCH') Then Begin
+  If (Cmd='-V') or (Cmd='--VERBOSE') Then VerboseMode:=True Else
+  If (Cmd='-W') or (Cmd='--WATCH') Then Begin
    WatchMode:=True;
-   If (I<ParamCount) and (ParamStr(I+1)[1] in ['0'..'9']) Then Begin
+   CurrParam:=ParamStr(I+1);
+   If (I<ParamCount) and (CurrParam[1] in ['0'..'9']) Then Begin
     Inc(I);
     WatchInterval:=StrToInt(ParamStr(I));
    End;
-  End Else If (Cmd='-R') or (Cmd='--RESTART') Then Begin
+  End
+   Else
+  If (Cmd='-R') or (Cmd='--RESTART') Then Begin
    If I<ParamCount Then Begin
     Inc(I);
     InterfaceName:=ParamStr(I);
     {$IFDEF FPC}
-    RestartAutoNeg(InterfaceName);
+     RestartAutoNeg(InterfaceName);
     {$ELSE}
-    SimulateRestart(InterfaceName);
+     SimulateRestart(InterfaceName);
     {$ENDIF}
     Exit;
-   End Else Begin
+   End
+    Else
+   Begin
     WriteLn('Erreur : interface manquante pour --restart');
     Exit;
    End;
-  End Else If (Cmd='-F') or (Cmd='--FORCE') Then Begin
+  End
+   Else
+  If (Cmd='-F') or (Cmd='--FORCE') Then Begin
    If I+2<ParamCount Then Begin
     Inc(I); Speed:=ParamStr(I);
     Inc(I); Duplex:=ParamStr(I);
@@ -557,40 +525,41 @@ Begin
     SimulateForce(InterfaceName,Speed,Duplex);
     {$ENDIF}
     Exit;
-   End Else Begin
+   End
+    Else
+   Begin
     WriteLn('Erreur : param√®tres manquants pour --force vitesse duplex interface');
     Exit;
    End;
-  End Else If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then
-   InterfaceName:=ParamStr(I);
-   
+  End
+   Else
+  If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then InterfaceName:=ParamStr(I);
   Inc(I);
  End;
- 
- { Ex√©cuter l'action appropri√©e }
+  { ExÇcuter l'action appropriÇe }
  If WatchMode Then Begin
   {$IFDEF FPC}
-  WatchMode_Proc;
+   WatchMode_Proc;
   {$ELSE}
-  SimulateWatch;
+   SimulateWatch;
   {$ENDIF}
- End Else If InterfaceName<>'' Then Begin
-  {$IFDEF FPC}
-  ShowSpecificMIIInterface(InterfaceName);
-  {$ELSE}
-  If VerboseMode Then
-   ShowSimulatedVerbose
+ End
   Else
-   WriteLn('eth0: 100Mbit, full duplex, link ok');
+ If InterfaceName<>'' Then Begin
+  {$IFDEF FPC}
+   ShowSpecificMIIInterface(InterfaceName);
+  {$ELSE}
+  If VerboseMode Then ShowSimulatedVerbose
+                 Else WriteLn('eth0: 100Mbit, full duplex, link ok');
   {$ENDIF}
- End Else Begin
-  {$IFDEF FPC}
-  ShowAllMIIInterfaces;
-  {$ELSE}
-  If VerboseMode Then
-   ShowSimulatedVerbose
+ End
   Else
-   ShowSimulatedMII;
+ Begin
+  {$IFDEF FPC}
+   ShowAllMIIInterfaces;
+  {$ELSE}
+  If VerboseMode Then ShowSimulatedVerbose
+                 Else ShowSimulatedMII;
   {$ENDIF}
  End;
 End;
@@ -598,19 +567,19 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('MII-TOOL : Affichage et configuration des interfaces MII');
+  WriteLn('MII-TOOL : Cette commande permet d''effectuer l''affichage et la configuration des interfaces ',
+                      'MII (Media Independent Interface)');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  MII-TOOL [options] [interface...]');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -v, --verbose          Mode verbeux');
-  WriteLn('  -w, --watch [sec]      Surveillance continue (d√©faut: 1 sec)');
-  WriteLn('  -r, --restart interface Red√©marrer l''auto-n√©gociation');
-  WriteLn('  -F, --force vitesse duplex interface');
-  WriteLn('                         Forcer vitesse et duplex');
+  WriteLn('  -v, --verbose                          Mode verbeux');
+  WriteLn('  -w, --watch [sec]                      Surveillance continue (dÇfaut: 1 seconde)');
+  WriteLn('  -r, --restart interface                RedÇmarrer l''auto-nÇgociation');
+  WriteLn('  -F, --force vitesse duplex interface   Forcer vitesse et duplex');
   WriteLn;
-  WriteLn('Param√®tres :');
+  WriteLn('Paramätres :');
   WriteLn('  interface   Nom de l''interface (ex: eth0, eth1)');
   WriteLn('  vitesse     Vitesse en Mbit (10, 100, 1000)');
   WriteLn('  duplex      Mode duplex (half, full)');
@@ -619,17 +588,17 @@ BEGIN
   WriteLn('  MII-TOOL                      # Afficher toutes les interfaces');
   WriteLn('  MII-TOOL -v eth0              # Mode verbeux pour eth0');
   WriteLn('  MII-TOOL -w 2                 # Surveillance toutes les 2 sec');
-  WriteLn('  MII-TOOL -r eth0              # Red√©marrer auto-n√©gociation');
+  WriteLn('  MII-TOOL -r eth0              # RedÇmarrer auto-nÇgociation');
   WriteLn('  MII-TOOL -F 100 full eth0     # Forcer 100Mbit full duplex');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (donn√©es r√©elles)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (donnÇes rÇelles)');
  End
   Else
  If ParamStr(1)='--version'Then Begin
-  WriteLn('MII-TOOL 1.00 - Media Independent Interface, NETWORKKIT-P, corail');
+  WriteLn('MII-TOOL 1.00 - Clone Pascal pour NETWORKKIT-P, Linux-0, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
   Else
  Begin
