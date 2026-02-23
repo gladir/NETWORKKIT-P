@@ -640,7 +640,7 @@ BEGIN
   WriteLn('  up, enable            Activer un tunnel');
   WriteLn('  down, disable         DÇsactiver un tunnel');
   WriteLn;
-  WriteLn('Param√®tres :');
+  WriteLn('Paramätres :');
   WriteLn('  mode=TYPE             Type de tunnel (ipip,gre,sit,vti)');
   WriteLn('  remote=ADDR           Adresse distante');
   WriteLn('  local=ADDR            Adresse locale');
