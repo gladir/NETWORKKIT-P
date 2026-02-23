@@ -95,6 +95,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer l'utilitaire de courriel mail de Unix/Linux.</td>
 	</tr>
 	<tr>
+		<td><b>MII-TOOL.PAS</b></td>
+		<td>Cette commande permet d'effectuer l'affichage et la configuration des interfaces MII (Media Independant Interface).</td>
+	</tr>
+	<tr>
 		<td><b>NE2000.PAS</b></td>
 		<td>Cette commande permet de lancer un pilote de paquet pour cartes Ethernet NE2000 compatible ISA.</td>
 	</tr>
