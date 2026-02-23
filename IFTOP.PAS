@@ -831,7 +831,7 @@ BEGIN
 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('IFTOP : Cette commande permet de lancer l''Interface du surveillance d''utilisation ',
+  WriteLn('IFTOP : Cette commande permet de lancer l''interface de surveillance d''utilisation ',
                    'de la bande passante.');
   WriteLn;
   WriteLn('Syntaxe :');
