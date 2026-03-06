@@ -103,6 +103,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer le serveur DNS Berkeley Internet Name Domain.</td>
 	</tr>
 	<tr>
+		<td><b>NAMEIF.PAS</b></td>
+		<td>Cette commande permet d'effectuer un renommage des interfaces réseau basé sur l'adresse MAC.</td>
+	</tr>
+	<tr>
 		<td><b>NE2000.PAS</b></td>
 		<td>Cette commande permet de lancer un pilote de paquet pour cartes Ethernet NE2000 compatible ISA.</td>
 	</tr>
