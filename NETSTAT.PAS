@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande netstat (statistiques r√©seau))
+  @abstract(Target: Turbo Pascal 7, Free Pascal
+  @description: Commande netstat (statistiques rÇseau))
 }
 
 Program NETSTAT;
@@ -16,7 +17,7 @@ Program NETSTAT;
 
 {$IFDEF FPC}
 Type
- { Structure pour les connexions TCP }
+  { Structure pour les connexions TCP }
  TTCPConnection = Record
   LocalAddr:String;
   LocalPort:DWORD;
@@ -27,7 +28,7 @@ Type
   ProcessName:String;
  End;
 
- { Structure pour les connexions UDP }
+  { Structure pour les connexions UDP }
  TUDPConnection = Record
   LocalAddr:String;
   LocalPort:DWORD;
@@ -35,7 +36,7 @@ Type
   ProcessName:String;
  End;
 
- { Structure MIB_TCPROW pour TCP }
+  { Structure MIB_TCPROW pour TCP }
  MIB_TCPROW = Record
   dwState:DWORD;
   dwLocalAddr:DWORD;
@@ -45,28 +46,28 @@ Type
  End;
  PMIB_TCPROW = ^MIB_TCPROW;
 
- { Structure MIB_TCPTABLE }
+  { Structure MIB_TCPTABLE }
  MIB_TCPTABLE = Record
   dwNumEntries:DWORD;
   table:Array[0..0] of MIB_TCPROW;
  End;
  PMIB_TCPTABLE = ^MIB_TCPTABLE;
 
- { Structure MIB_UDPROW pour UDP }
+  { Structure MIB_UDPROW pour UDP }
  MIB_UDPROW = Record
   dwLocalAddr:DWORD;
   dwLocalPort:DWORD;
  End;
  PMIB_UDPROW = ^MIB_UDPROW;
 
- { Structure MIB_UDPTABLE }
+  { Structure MIB_UDPTABLE }
  MIB_UDPTABLE = Record
   dwNumEntries:DWORD;
   table:Array[0..0] of MIB_UDPROW;
  End;
  PMIB_UDPTABLE = ^MIB_UDPTABLE;
 
- { Structure pour les statistiques TCP }
+  { Structure pour les statistiques TCP }
  MIB_TCPSTATS = Record
   dwRtoAlgorithm:DWORD;
   dwRtoMin:DWORD;
@@ -153,7 +154,7 @@ End;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{ Fonctions utilitaires pour Turbo Pascal }
+ { Fonctions utilitaires pour Turbo Pascal }
 Function IntToStr(Value:LongInt):String;
 Var
  S:String;
@@ -212,7 +213,7 @@ End;
 {$ENDIF}
 
 {$IFDEF FPC}
-{ Fonction pour convertir une adresse DWORD en chaåne IP }
+ { Fonction pour convertir une adresse DWORD en chaåne IP }
 Function DWORDToIP(IPAddr:DWORD):String;Begin
  DWORDToIP:=IntToStr(IPAddr and $FF)+'.'+
            IntToStr((IPAddr shr 8) and $FF)+'.'+
@@ -225,7 +226,7 @@ Function NetworkToHostPort(NetPort:DWORD):DWORD;Begin
  NetworkToHostPort:=((NetPort and $FF) shl 8) or ((NetPort shr 8) and $FF);
 End;
 
-{ Fonction pour obtenir l'Çtat TCP en chaåne }
+{ Fonction pour obtenir l'Çtat TCP en chaåne de caractäres }
 Function GetTCPState(State:DWORD):String;Begin
  Case State Of
   MIB_TCP_STATE_CLOSED:GetTCPState:='CLOSED';
@@ -285,7 +286,7 @@ Begin
  TCPCount:=0;
  dwSize:=0;
  Try
-  { Premiäre appel pour obtenir la taille }
+   { Premiäre appel pour obtenir la taille }
   dwRetVal:=GetTcpTable(nil,dwSize,True);
   If dwRetVal<>ERROR_INSUFFICIENT_BUFFER Then Exit;
    { VÇrifier la taille minimum }
@@ -338,7 +339,7 @@ Begin
  UDPCount:=0;
  dwSize:=0;
  Try
-  { Premiäre appel pour obtenir la taille }
+   { Premiäre appel pour obtenir la taille }
   dwRetVal:=GetUdpTable(nil,dwSize,True);
   If dwRetVal<>ERROR_INSUFFICIENT_BUFFER Then Exit;
   { VÇrifier la taille minimum }
@@ -346,7 +347,7 @@ Begin
    { Allouer la mÇmoire }
   GetMem(pUdpTable,dwSize);
   Try
-   { Obtenir la table UDP }
+    { Obtenir la table UDP }
    dwRetVal:=GetUdpTable(pUdpTable,dwSize,True);
    If dwRetVal=NO_ERROR Then Begin
     UDPCount:=pUdpTable^.dwNumEntries;
@@ -442,7 +443,7 @@ Begin
  WriteLn('Erreur lors de la rÇcupÇration des connexions UDP');
 End;
 
- { ProcÇdure pour afficher les ports en √©coute }
+ { ProcÇdure pour afficher les ports en Çcoute }
 Procedure ShowListeningPorts;
 Var
  I:Integer;
@@ -752,7 +753,7 @@ BEGIN
    WriteLn('  -r, --route            Afficher la table de routage');
    WriteLn('  -i, --interfaces       Afficher les statistiques d''interface');
    WriteLn('  -s, --statistics       Afficher les statistiques par protocole');
-   WriteLn('  -n, --numeric          Affichage num√©rique (pas de rÇsolution)');
+   WriteLn('  -n, --numeric          Affichage numÇrique (pas de rÇsolution)');
    WriteLn;
    WriteLn('Exemples :');
    WriteLn('  NETSTAT                # Toutes les connexions TCP et UDP');

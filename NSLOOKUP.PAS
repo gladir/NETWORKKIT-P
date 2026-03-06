@@ -21,29 +21,29 @@ Type
 
  { Structure pour un enregistrement DNS }
  TNSLookupRecord = Record
-  Name: String[255];         { Nom de domaine }
+  Name: String[255];               { Nom de domaine }
   RecordType: TNSLookupRecordType; { Type d'enregistrement }
-  RecordClass: Word;         { Classe (g√©n√©ralement IN=1) }
-  TTL: LongInt;              { Time To Live }
-  DataLength: Word;          { Longueur des donn√©es }
-  Data: String[255];         { Donn√©es de l'enregistrement }
+  RecordClass: Word;               { Classe (gÇnÇralement IN=1) }
+  TTL: LongInt;                    { Time To Live }
+  DataLength: Word;                { Longueur des donnÇes }
+  Data: String[255];               { DonnÇes de l'enregistrement }
  End;
 
- { Structure pour une r√©ponse DNS compl√®te }
+  { Structure pour une rÇponse DNS compläte }
  TNSLookupResponse = Record
-  QueryName: String[255];    { Nom interrog√© }
-  QueryType: TNSLookupRecordType; { Type de requ√™te }
-  AnswerCount: Integer;      { Nombre de r√©ponses }
-  Answers: Array[0..31] of TNSLookupRecord; { R√©ponses }
-  AuthorityCount: Integer;   { Nombre d'autorit√©s }
+  QueryName: String[255];    { Nom interrogÇ }
+  QueryType: TNSLookupRecordType; { Type de requàte }
+  AnswerCount: Integer;      { Nombre de rÇponses }
+  Answers: Array[0..31] of TNSLookupRecord; { RÇponses }
+  AuthorityCount: Integer;   { Nombre d'autoritÇs }
   AdditionalCount: Integer;  { Nombre d'additionnels }
-  ResponseCode: Integer;     { Code de r√©ponse (0=NOERROR) }
-  QueryTime: LongInt;        { Temps de requ√™te en millisecondes }
-  Server: String[64];        { Serveur DNS utilis√© }
+  ResponseCode: Integer;     { Code de rÇponse (0=NOERROR) }
+  QueryTime: LongInt;        { Temps de requàte en millisecondes }
+  Server: String[64];        { Serveur DNS utilisÇ }
  End;
 
 Var
- { Variables globales }
+  { Variables globales }
  WSAInitialized: Boolean;
  DefaultServer: String[64];
  InteractiveMode: Boolean;
@@ -57,7 +57,7 @@ Var
  Search: Boolean;
  Port: Word;
 
-{ Initialisation Winsock }
+ { Initialisation Winsock }
 Function InitializeWinsock: Boolean;
 Var
  WSData: TWSAData;
@@ -75,18 +75,16 @@ Begin
  End;
 End;
 
-{ Nettoyage Winsock }
-Procedure CleanupWinsock;
-Begin
+ { Nettoyage Winsock }
+Procedure CleanupWinsock;Begin
  If WSAInitialized Then Begin
   WSACleanup;
   WSAInitialized := False;
  End;
 End;
 
-{ Convertir un type d'enregistrement en cha√Æne }
-Function RecordTypeToString(RecType: TNSLookupRecordType): String;
-Begin
+ { Convertir un type d'enregistrement en chaåne }
+Function RecordTypeToString(RecType: TNSLookupRecordType): String;Begin
  Case RecType Of
   NS_A: RecordTypeToString := 'A';
   NS_AAAA: RecordTypeToString := 'AAAA';
@@ -103,37 +101,28 @@ Begin
  End;
 End;
 
-{ Convertir une cha√Æne en type d'enregistrement }
-Function StringToRecordType(TypeStr: String): TNSLookupRecordType;
+ { Convertir une chaåne en type d'enregistrement }
+Function StringToRecordType(TypeStr:String):TNSLookupRecordType;
 Var
  UpperStr: String;
 Begin
  UpperStr := UpperCase(TypeStr);
- If UpperStr = 'A' Then
-  StringToRecordType := NS_A
- Else If UpperStr = 'AAAA' Then
-  StringToRecordType := NS_AAAA
- Else If UpperStr = 'NS' Then
-  StringToRecordType := NS_NS
- Else If UpperStr = 'MX' Then
-  StringToRecordType := NS_MX
- Else If UpperStr = 'CNAME' Then
-  StringToRecordType := NS_CNAME
- Else If UpperStr = 'TXT' Then
-  StringToRecordType := NS_TXT
- Else If UpperStr = 'PTR' Then
-  StringToRecordType := NS_PTR
- Else If UpperStr = 'SRV' Then
-  StringToRecordType := NS_SRV
- Else If UpperStr = 'SOA' Then
-  StringToRecordType := NS_SOA
- Else If (UpperStr = 'ANY') or (UpperStr = '*') Then
+ If UpperStr = 'A' Then StringToRecordType := NS_A Else
+ If UpperStr = 'AAAA' Then StringToRecordType := NS_AAAA Else
+ If UpperStr = 'NS' Then StringToRecordType := NS_NS Else
+ If UpperStr = 'MX' Then StringToRecordType := NS_MX Else
+ If UpperStr = 'CNAME' Then StringToRecordType := NS_CNAME Else
+ If UpperStr = 'TXT' Then StringToRecordType := NS_TXT Else
+ If UpperStr = 'PTR' Then StringToRecordType := NS_PTR Else
+ If UpperStr = 'SRV' Then StringToRecordType := NS_SRV Else
+ If UpperStr = 'SOA' Then StringToRecordType := NS_SOA Else
+ If (UpperStr = 'ANY') or (UpperStr = '*') Then
   StringToRecordType := NS_ANY
  Else
-  StringToRecordType := NS_A; { Par d√©faut }
+  StringToRecordType := NS_A; { Par dÇfaut }
 End;
 
-{ Valider un nom de domaine }
+ { Valider un nom de domaine }
 Function IsValidDomainName(Domain: String): Boolean;
 Var
  I: Integer;
@@ -141,7 +130,6 @@ Var
 Begin
  IsValidDomainName := False;
  If (Length(Domain) = 0) or (Length(Domain) > 253) Then Exit;
- 
  DotCount := 0;
  For I := 1 To Length(Domain) Do Begin
   If Domain[I] = '.' Then Begin
@@ -150,12 +138,11 @@ Begin
   End Else If not (Domain[I] in ['a'..'z', 'A'..'Z', '0'..'9', '-']) Then
    Exit;
  End;
- 
  IsValidDomainName := True;
 End;
 
-{ Valider une adresse IP }
-Function IsValidIPAddress(IP: String): Boolean;
+ { Valider une adresse IP }
+Function IsValidIPAddress(IP:String):Boolean;
 Var
  I, Dots, Num: Integer;
  S: String;
@@ -163,11 +150,9 @@ Var
 Begin
  IsValidIPAddress := False;
  If Length(IP) = 0 Then Exit;
- 
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -182,11 +167,10 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
  IsValidIPAddress := (Dots = 4);
 End;
 
-{ R√©solution DNS r√©elle utilisant les fonctions syst√®me }
+ { RÇsolution DNS rÇelle utilisant les fonctions systäme }
 Function ResolveNSLookup(Name: String; RecType: TNSLookupRecordType; var Response: TNSLookupResponse): Boolean;
 Var
  HostEnt: PHostEnt;
@@ -202,14 +186,11 @@ Begin
  Response.QueryType := RecType;
  Response.Server := DefaultServer;
  Response.ResponseCode := 0;
- 
  If Not WSAInitialized Then Begin
   If Not InitializeWinsock Then Exit;
  End;
- 
  StartTime := GetTickCount;
- 
- { Pour les enregistrements A (IPv4) }
+  { Pour les enregistrements A (IPv4) }
  If RecType = NS_A Then Begin
   Try
    HostEnt := gethostbyname(PChar(AnsiString(Name)));
@@ -219,35 +200,34 @@ Begin
     While (AddrPtr <> nil) and (I < 32) Do Begin
      Move(AddrPtr^, Addr, 4);
      AddrStr := StrPas(inet_ntoa(Addr));
-     
      With Response.Answers[Response.AnswerCount] Do Begin
       Name := Response.QueryName;
       RecordType := NS_A;
       RecordClass := 1; { IN }
-      TTL := 3600; { 1 heure par d√©faut }
+      TTL := 3600; { 1 heure par dÇfaut }
       Data := AddrStr;
       DataLength := Length(Data);
      End;
      Inc(Response.AnswerCount);
      Inc(I);
-     
-     { Passer au suivant }
+      { Passer au suivant }
      Inc(PtrUInt(HostEnt^.h_addr_list), SizeOf(Pointer));
      AddrPtr := HostEnt^.h_addr_list^;
     End;
     ResolveNSLookup := (Response.AnswerCount > 0);
-   End Else Begin
+   End
+    Else
+   Begin
     Response.ResponseCode := 3; { NXDOMAIN }
    End;
   Except
    Response.ResponseCode := 2; { SERVFAIL }
   End;
  End
- 
- { Pour les enregistrements PTR (r√©solution inverse) }
+  { Pour les enregistrements PTR (rÇsolution inverse) }
  Else If RecType = NS_PTR Then Begin
   Try
-   { Convertir l'IP en format in-addr.arpa si n√©cessaire }
+   { Convertir l'IP en format in-addr.arpa si nÇcessaire }
    If Pos('.', Name) > 0 Then Begin
     Addr.s_addr := inet_addr(PChar(AnsiString(Name)));
     HostEnt := gethostbyaddr(@Addr, 4, AF_INET);
@@ -270,9 +250,9 @@ Begin
    Response.ResponseCode := 2; { SERVFAIL }
   End;
  End
- 
- { Pour les autres types, utiliser une simulation bas√©e sur des donn√©es communes }
- Else Begin
+  { Pour les autres types, utiliser une simulation basÇe sur des donnÇes communes }
+  Else
+ Begin
   Case RecType Of
    NS_NS: Begin
     { Simuler des serveurs de noms pour des domaines connus }
@@ -295,7 +275,9 @@ Begin
      End;
      Response.AnswerCount := 2;
      ResolveNSLookup := True;
-    End Else If Pos('example.com', LowerCase(Name)) > 0 Then Begin
+    End
+     Else
+    If Pos('example.com', LowerCase(Name)) > 0 Then Begin
      With Response.Answers[0] Do Begin
       Name := Response.QueryName;
       RecordType := NS_NS;
@@ -308,9 +290,8 @@ Begin
      ResolveNSLookup := True;
     End;
    End;
-   
    NS_MX: Begin
-    { Simuler des enregistrements MX }
+     { Simuler des enregistrements MX }
     If Pos('google.com', LowerCase(Name)) > 0 Then Begin
      With Response.Answers[0] Do Begin
       Name := Response.QueryName;
@@ -322,7 +303,9 @@ Begin
      End;
      Response.AnswerCount := 1;
      ResolveNSLookup := True;
-    End Else Begin
+    End
+     Else
+    Begin
      With Response.Answers[0] Do Begin
       Name := Response.QueryName;
       RecordType := NS_MX;
@@ -335,9 +318,8 @@ Begin
      ResolveNSLookup := True;
     End;
    End;
-   
    NS_TXT: Begin
-    { Simuler des enregistrements TXT }
+     { Simuler des enregistrements TXT }
     With Response.Answers[0] Do Begin
      Name := Response.QueryName;
      RecordType := NS_TXT;
@@ -349,7 +331,6 @@ Begin
     Response.AnswerCount := 1;
     ResolveNSLookup := True;
    End;
-   
    NS_CNAME: Begin
     { Simuler CNAME }
     With Response.Answers[0] Do Begin
@@ -363,7 +344,6 @@ Begin
     Response.AnswerCount := 1;
     ResolveNSLookup := True;
    End;
-   
    NS_ANY: Begin
     { Pour ANY, essayer une r√©solution A d'abord }
     If ResolveNSLookup(Name, NS_A, Response) Then Begin
@@ -372,11 +352,10 @@ Begin
    End;
   End;
  End;
- 
  Response.QueryTime := GetTickCount - StartTime;
 End;
 
-{ Affichage des r√©sultats en format nslookup }
+ { Affichage des r√©sultats en format nslookup }
 Procedure DisplayNSLookupResults(var Response: TNSLookupResponse);
 Var
  I: Integer;
@@ -389,20 +368,16 @@ Begin
   3: ErrorMsg := 'Non-Existent Domain';
   4: ErrorMsg := 'Not Implemented';
   5: ErrorMsg := 'Query Refused';
- Else
-  ErrorMsg := 'Unknown Error';
+  Else ErrorMsg := 'Unknown Error';
  End;
- 
  If ErrorMsg <> '' Then Begin
   WriteLn('*** ', DefaultServer, ' can''t find ', Response.QueryName, ': ', ErrorMsg);
   Exit;
  End;
- 
  If Response.AnswerCount = 0 Then Begin
   WriteLn('*** ', DefaultServer, ' can''t find ', Response.QueryName, ': Non-existent domain');
   Exit;
  End;
- 
  If not InteractiveMode Then Begin
   WriteLn('Server:  ', Response.Server);
   WriteLn('Address: ', Response.Server, '#53');
@@ -413,7 +388,6 @@ Begin
    WriteLn('Non-authoritative answer:');
   End;
  End;
- 
  For I := 0 To Response.AnswerCount - 1 Do Begin
   With Response.Answers[I] Do Begin
    Case RecordType Of
@@ -428,20 +402,17 @@ Begin
    End;
   End;
  End;
- 
- If not InteractiveMode Then
-  WriteLn;
+ If not InteractiveMode Then WriteLn;
 End;
 
-{ Affichage des informations de serveur par d√©faut }
-Procedure ShowDefaultServer;
-Begin
+ { Affichage des informations de serveur par dÇfaut }
+Procedure ShowDefaultServer;Begin
  WriteLn('Default server: ', DefaultServer);
  WriteLn('Address: ', DefaultServer, '#', Port);
  WriteLn;
 End;
 
-{ Mode interactif nslookup }
+ { Mode interactif nslookup }
 Procedure InteractiveNSLookup;
 Var
  Input, Command, Param: String;
@@ -450,15 +421,14 @@ Var
  NewType: TNSLookupRecordType;
 Begin
  ShowDefaultServer;
- 
  Repeat
   Write('> ');
   ReadLn(Input);
   Input := Trim(Input);
-  
+
   If Input = '' Then Continue;
   If (LowerCase(Input) = 'exit') or (LowerCase(Input) = 'quit') Then Break;
-  
+
   { Analyser la commande }
   SpacePos := Pos(' ', Input);
   If SpacePos > 0 Then Begin
@@ -468,37 +438,38 @@ Begin
    Command := LowerCase(Input);
    Param := '';
   End;
-  
-  { Commandes sp√©ciales }
+
+  { Commandes spÇciales }
   If Command = 'help' Then Begin
    WriteLn('Commands:');
    WriteLn('  help           - afficher cette aide');
-   WriteLn('  set type=TYPE  - d√©finir le type de requ√™te (A, NS, MX, etc.)');
-   WriteLn('  set class=CLASS- d√©finir la classe (IN)');
-   WriteLn('  set timeout=N  - d√©finir le timeout en secondes');
-   WriteLn('  set retry=N    - d√©finir le nombre de tentatives');
+   WriteLn('  set type=TYPE  - dÇfinir le type de requàte (A, NS, MX, etc.)');
+   WriteLn('  set class=CLASS- dÇfinir la classe (IN)');
+   WriteLn('  set timeout=N  - dÇfinir le timeout en secondes');
+   WriteLn('  set retry=N    - dÇfinir le nombre de tentatives');
    WriteLn('  set debug      - activer le mode debug');
-   WriteLn('  set nodebug    - d√©sactiver le mode debug');
+   WriteLn('  set nodebug    - dÇsactiver le mode debug');
    WriteLn('  server NAME    - changer de serveur DNS');
    WriteLn('  lserver NAME   - changer de serveur DNS (lookup)');
-   WriteLn('  root           - d√©finir le serveur racine');
+   WriteLn('  root           - dÇfinir le serveur racine');
    WriteLn('  finger         - finger le nom courant');
    WriteLn('  ls [opt] DOMAIN- lister un domaine');
    WriteLn('  view FILE      - trier et voir le fichier avec more');
    WriteLn('  exit           - quitter nslookup');
    WriteLn('  HOSTNAME       - rechercher des informations sur HOSTNAME');
   End
-  Else If Copy(Command, 1, 4) = 'set ' Then Begin
+   Else
+  If Copy(Command, 1, 4) = 'set ' Then Begin
    Param := Copy(Input, 5, Length(Input));
    If Copy(LowerCase(Param), 1, 5) = 'type=' Then Begin
     NewType := StringToRecordType(Copy(Param, 6, Length(Param)));
     QueryType := NewType;
-    WriteLn('Type d√©fini √† ', RecordTypeToString(QueryType));
+    WriteLn('Type dÇfini Ö ', RecordTypeToString(QueryType));
    End
    Else If Copy(LowerCase(Param), 1, 8) = 'timeout=' Then Begin
     Try
      Timeout := StrToInt(Copy(Param, 9, Length(Param)));
-     WriteLn('Timeout d√©fini √† ', Timeout, ' secondes');
+     WriteLn('Timeout dÇfini Ö ', Timeout, ' secondes');
     Except
      WriteLn('Timeout invalide');
     End;
@@ -506,18 +477,18 @@ Begin
    Else If Copy(LowerCase(Param), 1, 6) = 'retry=' Then Begin
     Try
      Retries := StrToInt(Copy(Param, 7, Length(Param)));
-     WriteLn('Retries d√©fini √† ', Retries);
+     WriteLn('Retries dÇfini Ö ', Retries);
     Except
      WriteLn('Retry invalide');
     End;
    End
    Else If LowerCase(Param) = 'debug' Then Begin
     Debug := True;
-    WriteLn('Mode debug activ√©');
+    WriteLn('Mode debug activÇ');
    End
    Else If LowerCase(Param) = 'nodebug' Then Begin
     Debug := False;
-    WriteLn('Mode debug d√©sactiv√©');
+    WriteLn('Mode debug dÇsactivÇ');
    End
    Else Begin
     WriteLn('Option inconnue: ', Param);
@@ -526,45 +497,47 @@ Begin
   Else If Command = 'server' Then Begin
    If Param <> '' Then Begin
     DefaultServer := Param;
-    WriteLn('Serveur par d√©faut maintenant : ', DefaultServer);
+    WriteLn('Serveur par dÇfaut maintenant : ', DefaultServer);
     ShowDefaultServer;
    End Else Begin
     WriteLn('Usage: server <nom_serveur>');
    End;
   End
-  Else If Command = 'lserver' Then Begin
+   Else
+  If Command = 'lserver' Then Begin
    If Param <> '' Then Begin
     DefaultServer := Param;
-    WriteLn('Serveur par d√©faut maintenant : ', DefaultServer);
+    WriteLn('Serveur par dÇfaut maintenant : ', DefaultServer);
     ShowDefaultServer;
    End Else Begin
     WriteLn('Usage: lserver <nom_serveur>');
    End;
   End
-  Else If Command = 'root' Then Begin
+   Else
+  If Command = 'root' Then Begin
    DefaultServer := '198.41.0.4'; { a.root-servers.net }
-   WriteLn('Serveur racine d√©fini');
+   WriteLn('Serveur racine dÇfini');
    ShowDefaultServer;
   End
   Else Begin
-   { Requ√™te DNS normale }
+   { Requàte DNS normale }
    If IsValidDomainName(Input) or IsValidIPAddress(Input) Then Begin
     If ResolveNSLookup(Input, QueryType, Response) Then Begin
      DisplayNSLookupResults(Response);
-    End Else Begin
+    End
+     Else
+    Begin
      WriteLn('*** ', DefaultServer, ' can''t find ', Input, ': Non-existent domain');
     End;
    End Else Begin
     WriteLn('*** Invalid domain name: ', Input);
    End;
   End;
-  
   WriteLn;
-  
  Until False;
 End;
 
-{ Requ√™te simple non-interactive }
+ { Requàte simple non-interactive }
 Procedure SimpleNSLookup(QueryName: String; RecType: TNSLookupRecordType);
 Var
  Response: TNSLookupResponse;
@@ -576,16 +549,14 @@ Begin
  End;
 End;
 
-{ Obtenir le serveur DNS par d√©faut du syst√®me }
-Function GetDefaultDNSServer: String;
-Begin
- { Pour cette impl√©mentation, utiliser des serveurs DNS publics connus }
+ { Obtenir le serveur DNS par dÇfaut du systäme }
+Function GetDefaultDNSServer: String;Begin
+ { Pour cette implÇmentation, utiliser des serveurs DNS publics connus }
  GetDefaultDNSServer := '8.8.8.8'; { Google Public DNS }
 End;
 
-{ Initialisation des variables globales }
-Procedure InitializeNSLookup;
-Begin
+ { Initialisation des variables globales }
+Procedure InitializeNSLookup;Begin
  WSAInitialized := False;
  DefaultServer := GetDefaultDNSServer;
  InteractiveMode := False;
@@ -600,7 +571,7 @@ Begin
  Port := 53;
 End;
 
-{ Analyser la ligne de commande }
+ { Analyser la ligne de commande }
 Procedure ParseNSLookupCommandLine;
 Var
  I: Integer;
@@ -610,20 +581,20 @@ Var
 Begin
  QueryName := '';
  QueryTypeStr := '';
- 
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-type') and (I < ParamCount) Then Begin
    Inc(I);
    QueryTypeStr := ParamStr(I);
   End
-  Else If (LowerCase(Param) = '-class') and (I < ParamCount) Then Begin
+   Else
+  If (LowerCase(Param) = '-class') and (I < ParamCount) Then Begin
    Inc(I);
    { Ignorer pour l'instant }
   End
-  Else If (LowerCase(Param) = '-timeout') and (I < ParamCount) Then Begin
+   Else
+  If (LowerCase(Param) = '-timeout') and (I < ParamCount) Then Begin
    Inc(I);
    Try
     Timeout := StrToInt(ParamStr(I));
@@ -632,7 +603,8 @@ Begin
     Halt(1);
    End;
   End
-  Else If (LowerCase(Param) = '-retry') and (I < ParamCount) Then Begin
+   Else
+  If (LowerCase(Param) = '-retry') and (I < ParamCount) Then Begin
    Inc(I);
    Try
     Retries := StrToInt(ParamStr(I));
@@ -641,59 +613,77 @@ Begin
     Halt(1);
    End;
   End
-  Else If LowerCase(Param) = '-debug' Then Begin
+   Else
+  If LowerCase(Param) = '-debug' Then Begin
    Debug := True;
   End
-  Else If LowerCase(Param) = '-nodebug' Then Begin
+   Else
+  If LowerCase(Param) = '-nodebug' Then Begin
    Debug := False;
   End
-  Else If LowerCase(Param) = '-recurse' Then Begin
+   Else
+  If LowerCase(Param) = '-recurse' Then Begin
    Recurse := True;
   End
-  Else If LowerCase(Param) = '-norecurse' Then Begin
+   Else
+  If LowerCase(Param) = '-norecurse' Then Begin
    Recurse := False;
   End
-  Else If Copy(Param, 1, 1) <> '-' Then Begin
+   Else
+  If Copy(Param, 1, 1) <> '-' Then Begin
    If QueryName = '' Then Begin
     QueryName := Param;
    End Else If ParamStr(I+1) = '' Then Begin
-    { Deuxi√®me param√®tre peut √™tre le serveur DNS }
+    { Deuxiäme paramätre peut àtre le serveur DNS }
     DefaultServer := Param;
    End;
   End;
-  
   Inc(I);
  End;
- 
- { D√©finir le type de requ√™te si sp√©cifi√© }
- If QueryTypeStr <> '' Then
-  QueryType := StringToRecordType(QueryTypeStr);
- 
- { Mode de fonctionnement }
+  { DÇfinir le type de requàte si spÇcifiÇ }
+ If QueryTypeStr <> '' Then QueryType := StringToRecordType(QueryTypeStr);
+  { Mode de fonctionnement }
  If QueryName = '' Then Begin
   InteractiveMode := True;
   InteractiveNSLookup;
- End Else Begin
+ End
+  Else
+ Begin
   InteractiveMode := False;
-  
-  { D√©tection automatique du type pour r√©solution inverse }
+   { DÇtection automatique du type pour rÇsolution inverse }
   If IsValidIPAddress(QueryName) and (QueryType = NS_A) Then
    QueryType := NS_PTR;
-  
   SimpleNSLookup(QueryName, QueryType);
  End;
 End;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{ Simulation pour Turbo Pascal }
+Function UpperCase(S:String):String;
+Var
+ I:Integer;
+Begin
+ For I:=1 To Length(S) Do
+  If S[I] in ['a'..'z'] Then S[I]:=Chr(Ord(S[I])-32);
+ UpperCase:=S;
+End;
+
+Function LowerCase(S:String):String;
+Var
+ I:Integer;
+Begin
+ For I:=1 To Length(S) Do
+  If S[I] in ['A'..'Z'] Then S[I]:=Chr(Ord(S[I])+32);
+ LowerCase:=S;
+End;
+
+ { Simulation pour Turbo Pascal }
 Procedure ShowSimulatedNSLookup(Name, RecordType: String);
 Begin
  WriteLn('Server:  8.8.8.8');
  WriteLn('Address: 8.8.8.8#53');
  WriteLn;
  WriteLn('Non-authoritative answer:');
- 
  If UpperCase(RecordType) = 'A' Then Begin
   If LowerCase(Name) = 'google.com' Then Begin
    WriteLn('Name: google.com');
@@ -713,8 +703,7 @@ Begin
  End;
 End;
 
-Procedure ShowSimulatedInteractive;
-Begin
+Procedure ShowSimulatedInteractive;Begin
  WriteLn('Default server: 8.8.8.8');
  WriteLn('Address: 8.8.8.8#53');
  WriteLn;
@@ -746,72 +735,74 @@ BEGIN
   Halt(3);
  End;
  {$ENDIF}
- 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('NSLOOKUP : Outil de requ√™te DNS interactif');
+  WriteLn('NSLOOKUP : Cette commande permet de lancer l''outil de ',
+          'requàte DNS interactif');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  NSLOOKUP                              # Mode interactif');
-  WriteLn('  NSLOOKUP nom_de_domaine               # Requ√™te simple');
-  WriteLn('  NSLOOKUP nom_de_domaine serveur_dns   # Avec serveur sp√©cifique');
+  WriteLn('  NSLOOKUP nom_de_domaine               # Requàte simple');
+  WriteLn('  NSLOOKUP nom_de_domaine serveur_dns   # Avec serveur spÇcifique');
   WriteLn('  NSLOOKUP [options] nom_de_domaine');
   WriteLn;
   WriteLn('Options :');
   WriteLn('  -type TYPE        Type d''enregistrement (A, NS, MX, CNAME, TXT, etc.)');
-  WriteLn('  -class CLASS      Classe de requ√™te (IN par d√©faut)');
-  WriteLn('  -timeout N        Timeout en secondes (d√©faut: 5)');
-  WriteLn('  -retry N          Nombre de tentatives (d√©faut: 4)');
+  WriteLn('  -class CLASS      Classe de requàte (IN par dÇfaut)');
+  WriteLn('  -timeout N        Timeout en secondes (dÇfaut: 5)');
+  WriteLn('  -retry N          Nombre de tentatives (dÇfaut: 4)');
   WriteLn('  -debug            Activer le mode debug');
-  WriteLn('  -nodebug          D√©sactiver le mode debug');
-  WriteLn('  -recurse          Requ√™te r√©cursive (d√©faut)');
-  WriteLn('  -norecurse        Requ√™te non-r√©cursive');
+  WriteLn('  -nodebug          DÇsactiver le mode debug');
+  WriteLn('  -recurse          Requàte rÇcursive (dÇfaut)');
+  WriteLn('  -norecurse        Requàte non-rÇcursive');
   WriteLn;
-  WriteLn('Types d''enregistrements support√©s :');
+  WriteLn('Types d''enregistrements supportÇs :');
   WriteLn('  A      Adresse IPv4');
   WriteLn('  AAAA   Adresse IPv6');
   WriteLn('  NS     Serveur de noms');
   WriteLn('  MX     Serveur de messagerie');
   WriteLn('  CNAME  Nom canonique (alias)');
   WriteLn('  TXT    Enregistrement texte');
-  WriteLn('  PTR    Pointeur (r√©solution inverse)');
+  WriteLn('  PTR    Pointeur (rÇsolution inverse)');
   WriteLn('  SRV    Service');
   WriteLn('  SOA    Start of Authority');
   WriteLn('  ANY    Tous les types');
   WriteLn;
   WriteLn('Commandes en mode interactif :');
   WriteLn('  help                    Afficher l''aide');
-  WriteLn('  set type=TYPE           D√©finir le type de requ√™te');
-  WriteLn('  set timeout=N           D√©finir le timeout');
-  WriteLn('  set retry=N             D√©finir le nombre de tentatives');
+  WriteLn('  set type=TYPE           DÇfinir le type de requàte');
+  WriteLn('  set timeout=N           DÇfinir le timeout');
+  WriteLn('  set retry=N             DÇfinir le nombre de tentatives');
   WriteLn('  set debug               Activer le debug');
-  WriteLn('  set nodebug             D√©sactiver le debug');
+  WriteLn('  set nodebug             DÇsactiver le debug');
   WriteLn('  server NOM_SERVEUR      Changer de serveur DNS');
   WriteLn('  root                    Utiliser le serveur racine');
   WriteLn('  exit                    Quitter nslookup');
-  WriteLn('  NOM_DE_DOMAINE          Faire une requ√™te');
+  WriteLn('  NOM_DE_DOMAINE          Faire une requàte');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  NSLOOKUP                            # Mode interactif');
-  WriteLn('  NSLOOKUP google.com                 # R√©solution A par d√©faut');
-  WriteLn('  NSLOOKUP google.com 8.8.4.4         # Avec serveur sp√©cifique');
+  WriteLn('  NSLOOKUP google.com                 # RÇsolution A par dÇfaut');
+  WriteLn('  NSLOOKUP google.com 8.8.4.4         # Avec serveur spÇcifique');
   WriteLn('  NSLOOKUP -type MX gmail.com         # Serveurs de messagerie');
   WriteLn('  NSLOOKUP -type NS example.com       # Serveurs de noms');
-  WriteLn('  NSLOOKUP 8.8.8.8                   # R√©solution inverse');
+  WriteLn('  NSLOOKUP 8.8.8.8                    # RÇsolution inverse');
   WriteLn('  NSLOOKUP -debug -type A github.com  # Mode debug');
   WriteLn;
-  WriteLn('Note: En Free Pascal, utilise la r√©solution DNS r√©elle du syst√®me.');
+  WriteLn('Note: En Free Pascal, utilise la rÇsolution DNS rÇelle du systäme.');
   WriteLn('En Turbo Pascal, fonctionne en mode simulation.');
   WriteLn;
   WriteLn('Compatible avec la commande nslookup de Linux/Unix.');
  End
- Else If ParamStr(1) = '--version' Then Begin
+  Else
+ If ParamStr(1) = '--version' Then Begin
   WriteLn('NSLOOKUP 1.00 - Name Server Lookup Tool, NETWORKKIT-P');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
- Else Begin
+  Else
+ Begin
   {$IFDEF FPC}
   InitializeNSLookup;
   ParseNSLookupCommandLine;
@@ -829,7 +820,6 @@ BEGIN
   End;
   {$ENDIF}
  End;
- 
  {$IFDEF FPC}
  { Nettoyer Winsock }
  CleanupWinsock;
