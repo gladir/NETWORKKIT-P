@@ -14,8 +14,15 @@ Program NAMEIF;
  Uses DOS;
 {$ENDIF}
 
-{$IFDEF FPC}
 Type
+ {$IFNDEF FPC}
+ AnsiChar=Char;
+ DWORD=LongInt;
+ UINT=LongInt;
+ BOOL=Boolean;
+ Int64=COMP;
+ {$ENDIF}
+
  { Structure pour les informations d'interface }
  TInterfaceMapping = Record
   NewName:String;
@@ -65,15 +72,16 @@ Const
  NO_ERROR = 0;
  ERROR_BUFFER_OVERFLOW = 111;
 
-Var
- MappingList:Array[0..31] of TInterfaceMapping;
- MappingCount:Integer;
- ConfigFile:String;
- SimulateMode:Boolean;
-
+{$IFDEF FPC}
 { Fonctions externes }
 Function GetAdaptersInfo(pAdapterInfo:PIP_ADAPTER_INFO;Var pOutBufLen:ULONG):DWORD;stdcall;external 'iphlpapi.dll';
 {$ENDIF}
+
+Var
+ MappingList:Array[0..31] of TInterfaceMapping;
+ ConfigFile:String;
+ SimulateMode:Boolean;
+ MappingCount:Integer;
 
 {$IFNDEF FPC}
 { Fonctions utilitaires pour Turbo Pascal }
@@ -152,10 +160,10 @@ Var
 Begin
  Start:=1;
  Finish:=Length(S);
- 
+
  While (Start<=Finish) and (S[Start]=' ') Do Inc(Start);
  While (Finish>=Start) and (S[Finish]=' ') Do Dec(Finish);
- 
+
  If Start<=Finish Then
   Trim:=Copy(S,Start,Finish-Start+1)
  Else
@@ -201,7 +209,7 @@ Begin
  CompareMACAddress:=NormalizeMAC(MAC1)=NormalizeMAC(MAC2);
 End;
 
-{ Proc√©dure pour lire le fichier de configuration }
+{ ProcÇdure pour lire le fichier de configuration }
 Function ReadConfigFile(FileName:String):Boolean;
 Var
  F:Text;
@@ -210,32 +218,25 @@ Var
 Begin
  ReadConfigFile:=False;
  MappingCount:=0;
- 
  If Not FileExists(FileName) Then Exit;
- 
  Assign(F,FileName);
  {$I-}
  Reset(F);
  {$I+}
  If IOResult<>0 Then Exit;
- 
  Try
   While (Not EOF(F)) and (MappingCount<32) Do Begin
    ReadLn(F,Line);
    Line:=Trim(Line);
-   
-   { Ignorer les commentaires et lignes vides }
+    { Ignorer les commentaires et lignes vides }
    If (Length(Line)=0) or (Line[1]='#') Then Continue;
-   
-   { Format: nom_interface adresse_mac }
+    { Format: nom_interface adresse_mac }
    SpacePos:=Pos(' ',Line);
    If SpacePos=0 Then SpacePos:=Pos(#9,Line);  { Tabulation }
-   
-   If SpacePos>0 Then Begin
+    If SpacePos>0 Then Begin
     NewName:=Trim(Copy(Line,1,SpacePos-1));
     MACAddr:=Trim(Copy(Line,SpacePos+1,Length(Line)));
-    
-    If (Length(NewName)>0) and (Length(MACAddr)>0) Then Begin
+     If (Length(NewName)>0) and (Length(MACAddr)>0) Then Begin
      With MappingList[MappingCount] Do Begin
       MappingList[MappingCount].NewName:=NewName;
       MappingList[MappingCount].MACAddress:=NormalizeMAC(MACAddr);
@@ -253,7 +254,7 @@ Begin
  End;
 End;
 
-{ Proc√©dure pour obtenir les interfaces r√©seau }
+{ ProcÇdure pour obtenir les interfaces rÇseau }
 Function GetNetworkInterfaces:Boolean;
 Var
  pAdapterInfo,pAdapter:PIP_ADAPTER_INFO;
@@ -264,12 +265,10 @@ Var
 Begin
  GetNetworkInterfaces:=False;
  OutBufLen:=0;
- 
- { Premi√®re appel pour obtenir la taille }
+  { Premiäre appel pour obtenir la taille }
  RetVal:=GetAdaptersInfo(nil,OutBufLen);
  If RetVal<>ERROR_BUFFER_OVERFLOW Then Exit;
- 
- { Allouer la m√©moire }
+  { Allouer la mÇmoire }
  GetMem(pAdapterInfo,OutBufLen);
  Try
   { Obtenir les informations des adaptateurs }
@@ -278,10 +277,10 @@ Begin
    pAdapter:=pAdapterInfo;
    While pAdapter<>nil Do Begin
     { Traiter seulement les interfaces Ethernet et WiFi }
-    If (pAdapter^.AdapterType=MIB_IF_TYPE_ETHERNET_CSMACD) or 
+    If (pAdapter^.AdapterType=MIB_IF_TYPE_ETHERNET_CSMACD) or
        (pAdapter^.AdapterType=MIB_IF_TYPE_IEEE80211) Then Begin
      CurrentMAC:=FormatMAC(pAdapter^.Address,pAdapter^.AddressLength);
-     
+
      { Chercher dans la liste des mappages }
      For I:=0 To MappingCount-1 Do Begin
       If CompareMACAddress(MappingList[I].MACAddress,CurrentMAC) Then Begin
@@ -303,16 +302,15 @@ Begin
  End;
 End;
 
-{ Proc√©dure pour afficher les mappages }
+ { ProcÇdure pour afficher les mappages }
 Procedure ShowMappings(ShowAll:Boolean);
 Var
  I:Integer;
 Begin
- WriteLn('Mappages d''interfaces r√©seau :');
+ WriteLn('Mappages d''interfaces rÇseau :');
  WriteLn;
  WriteLn('Interface  Adresse MAC       Ancienne    Description');
  WriteLn('---------- ----------------- ----------- -----------');
- 
  For I:=0 To MappingCount-1 Do Begin
   With MappingList[I] Do Begin
    If ShowAll or Found Then Begin
@@ -321,13 +319,11 @@ Begin
      Write(' ');
      NewName:=NewName+' ';
     End;
-    
     Write(MACAddress);
     While Length(MACAddress)<18 Do Begin
      Write(' ');
      MACAddress:=MACAddress+' ';
     End;
-    
     If Found Then Begin
      Write(OldName);
      While Length(OldName)<12 Do Begin
@@ -335,24 +331,23 @@ Begin
       OldName:=OldName+' ';
      End;
      WriteLn(Description);
-    End Else
-     WriteLn('???         Interface non trouv√©e');
+    End
+     Else
+    WriteLn('???         Interface non trouvÇe');
    End;
   End;
  End;
 End;
 
-{ Proc√©dure pour appliquer les renommages }
+ { ProcÇdure pour appliquer les renommages }
 Function ApplyRenaming:Boolean;
 Var
  I,Changes:Integer;
 Begin
  ApplyRenaming:=False;
  Changes:=0;
- 
  WriteLn('Application des renommages d''interfaces...');
  WriteLn;
- 
  For I:=0 To MappingCount-1 Do Begin
   With MappingList[I] Do Begin
    If Found Then Begin
@@ -360,43 +355,41 @@ Begin
      WriteLn('SIMULATION: Renommer ',OldName,' -> ',NewName,' (',MACAddress,')');
     End Else Begin
      WriteLn('Renommer ',OldName,' -> ',NewName,' (',MACAddress,')');
-     { Sous Windows, le renommage n√©cessite des droits administrateur }
+     { Sous Windows, le renommage nÇcessite des droits administrateur }
      { et l'utilisation du registre ou de netsh }
-     WriteLn('  Note: Le renommage r√©el n√©cessite des droits administrateur');
+     WriteLn('  Note: Le renommage rÇel nÇcessite des droits administrateur');
      WriteLn('        Utilisez netsh interface set interface name="',OldName,'" newname="',NewName,'"');
     End;
     Inc(Changes);
-   End Else
-    WriteLn('ERREUR: Interface avec MAC ',MACAddress,' non trouv√©e');
+   End
+    Else
+   WriteLn('ERREUR: Interface avec MAC ',MACAddress,' non trouvÇe');
   End;
  End;
- 
  WriteLn;
  If SimulateMode Then
-  WriteLn(Changes,' interface(s) √† renommer')
+  WriteLn(Changes,' interface(s) Ö renommer')
  Else
-  WriteLn(Changes,' interface(s) trait√©e(s)');
+  WriteLn(Changes,' interface(s) traitÇe(s)');
  ApplyRenaming:=(Changes>0);
 End;
 
-{ Proc√©dure pour cr√©er un fichier de configuration d'exemple }
+ { ProcÇdure pour crÇer un fichier de configuration d'exemple }
 Procedure CreateSampleConfig;
 Var
  F:Text;
  FileName:String;
 Begin
  FileName:='nameif.conf';
- WriteLn('Cr√©ation du fichier de configuration d''exemple : ',FileName);
- 
+ WriteLn('CrÇation du fichier de configuration d''exemple : ',FileName);
  Assign(F,FileName);
  {$I-}
  Rewrite(F);
  {$I+}
  If IOResult<>0 Then Begin
-  WriteLn('Erreur lors de la cr√©ation du fichier');
+  WriteLn('Erreur lors de la crÇation du fichier');
   Exit;
  End;
- 
  Try
   WriteLn(F,'# Configuration nameif - Mappage interface/MAC');
   WriteLn(F,'# Format: nom_interface adresse_mac');
@@ -407,8 +400,7 @@ Begin
   WriteLn(F);
   WriteLn(F,'# Ajoutez vos mappages ci-dessous:');
   WriteLn(F,'# eth0 00:1a:2b:3c:4d:5e');
-  
-  WriteLn('Fichier cr√©√© avec succ√®s');
+  WriteLn('Fichier crÇÇ avec succäs');
  Finally
   Close(F);
  End;
@@ -417,36 +409,33 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedMappings;
-Begin
- WriteLn('Mappages d''interfaces r√©seau (simulation) :');
+Procedure ShowSimulatedMappings;Begin
+ WriteLn('Mappages d''interfaces rÇseau (simulation) :');
  WriteLn;
  WriteLn('Interface  Adresse MAC       Ancienne    Description');
  WriteLn('---------- ----------------- ----------- -----------');
  WriteLn('eth0       00:1a:2b:3c:4d:5e eth17       Intel Ethernet Controller');
  WriteLn('wifi0      aa:bb:cc:dd:ee:ff eth18       IEEE 802.11 Wireless Adapter');
- WriteLn('lan0       12:34:56:78:9a:bc ???         Interface non trouv√©e');
+ WriteLn('lan0       12:34:56:78:9a:bc ???         Interface non trouvÇe');
 End;
 
-Procedure SimulateApplyRenaming;
-Begin
+Procedure SimulateApplyRenaming;Begin
  WriteLn('Application des renommages d''interfaces (simulation)...');
  WriteLn;
  WriteLn('SIMULATION: Renommer eth17 -> eth0 (00:1a:2b:3c:4d:5e)');
  WriteLn('SIMULATION: Renommer eth18 -> wifi0 (aa:bb:cc:dd:ee:ff)');
- WriteLn('ERREUR: Interface avec MAC 12:34:56:78:9a:bc non trouv√©e');
+ WriteLn('ERREUR: Interface avec MAC 12:34:56:78:9a:bc non trouvÇe');
  WriteLn;
- WriteLn('2 interface(s) √† renommer');
+ WriteLn('2 interface(s) Ö renommer');
 End;
 
-Procedure SimulateCreateConfig;
-Begin
- WriteLn('Cr√©ation du fichier de configuration d''exemple : nameif.conf');
- WriteLn('Fichier cr√©√© avec succ√®s (simulation)');
+Procedure SimulateCreateConfig;Begin
+ WriteLn('CrÇation du fichier de configuration d''exemple : nameif.conf');
+ WriteLn('Fichier crÇÇ avec succäs (simulation)');
 End;
 {$ENDIF}
 
-{ Proc√©dure pour analyser les param√®tres }
+{ ProcÇdure pour analyser les paramätres }
 Procedure ParseCommand;
 Var
  I:Integer;
@@ -458,12 +447,10 @@ Begin
  ShowAll:=False;
  ApplyChanges:=True;
  MappingCount:=0;
- 
- { Analyser les param√®tres de ligne de commande }
+  { Analyser les paramätres de ligne de commande }
  I:=1;
  While I<=ParamCount Do Begin
   Cmd:=UpperCase(ParamStr(I));
-  
   If (Cmd='-C') or (Cmd='--CONFIG') Then Begin
    If I<ParamCount Then Begin
     Inc(I);
@@ -472,28 +459,37 @@ Begin
     WriteLn('Erreur : nom de fichier manquant pour -c');
     Exit;
    End;
-  End Else If (Cmd='-S') or (Cmd='--SYSCONFIG') Then Begin
+  End
+   Else
+  If (Cmd='-S') or (Cmd='--SYSCONFIG') Then Begin
    ConfigFile:='/etc/nameif.conf';
-  End Else If (Cmd='-D') or (Cmd='--DRY-RUN') Then Begin
+  End
+   Else
+  If (Cmd='-D') or (Cmd='--DRY-RUN') Then Begin
    SimulateMode:=True;
-  End Else If (Cmd='-A') or (Cmd='--ALL') Then Begin
+  End
+   Else
+  If (Cmd='-A') or (Cmd='--ALL') Then Begin
    ShowAll:=True;
    ApplyChanges:=False;
-  End Else If (Cmd='--SAMPLE') Then Begin
+  End
+   Else
+  If (Cmd='--SAMPLE') Then Begin
    {$IFDEF FPC}
    CreateSampleConfig;
    {$ELSE}
    SimulateCreateConfig;
    {$ENDIF}
    Exit;
-  End Else If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
+  End
+   Else
+  If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
    { Format: interface MAC }
    If I<ParamCount Then Begin
     InterfaceName:=ParamStr(I);
     Inc(I);
     MACAddr:=ParamStr(I);
-    
-    { Ajouter √† la liste des mappages }
+     { Ajouter Ö la liste des mappages }
     If MappingCount<32 Then Begin
      With MappingList[MappingCount] Do Begin
       NewName:=InterfaceName;
@@ -504,52 +500,68 @@ Begin
      End;
      Inc(MappingCount);
     End;
-   End Else Begin
+   End
+    Else
+   Begin
     WriteLn('Erreur : adresse MAC manquante pour l''interface ',ParamStr(I));
     Exit;
    End;
   End;
-  
   Inc(I);
  End;
- 
- { Si aucun mappage en ligne de commande, lire le fichier de config }
+  { Si aucun mappage en ligne de commande, lire le fichier de config }
  If MappingCount=0 Then Begin
   {$IFDEF FPC}
   If Not ReadConfigFile(ConfigFile) Then Begin
    WriteLn('Erreur : impossible de lire le fichier de configuration : ',ConfigFile);
-   WriteLn('Utilisez --sample pour cr√©er un fichier d''exemple');
+   WriteLn('Utilisez --sample pour crÇer un fichier d''exemple');
    Exit;
   End;
   {$ELSE}
-  { Simulation pour Turbo Pascal }
+   { Simulation pour Turbo Pascal }
   MappingCount:=3;
-  With MappingList[0] Do Begin NewName:='eth0'; MACAddress:='00:1a:2b:3c:4d:5e'; Found:=False; End;
-  With MappingList[1] Do Begin NewName:='wifi0'; MACAddress:='aa:bb:cc:dd:ee:ff'; Found:=False; End;
-  With MappingList[2] Do Begin NewName:='lan0'; MACAddress:='12:34:56:78:9a:bc'; Found:=False; End;
+  With MappingList[0] Do Begin
+   NewName:='eth0';
+   MACAddress:='00:1a:2b:3c:4d:5e';
+   Found:=False;
+  End;
+  With MappingList[1] Do Begin
+   NewName:='wifi0';
+   MACAddress:='aa:bb:cc:dd:ee:ff';
+   Found:=False;
+  End;
+  With MappingList[2] Do Begin
+   NewName:='lan0';
+   MACAddress:='12:34:56:78:9a:bc';
+   Found:=False;
+  End;
   {$ENDIF}
  End;
- 
- { Obtenir les informations des interfaces }
+  { Obtenir les informations des interfaces }
  {$IFDEF FPC}
  If Not GetNetworkInterfaces Then Begin
-  WriteLn('Erreur lors de la r√©cup√©ration des interfaces r√©seau');
+  WriteLn('Erreur lors de la rÇcupÇration des interfaces rÇseau');
   Exit;
  End;
  {$ELSE}
- { Simulation pour Turbo Pascal }
- MappingList[0].Found:=True; MappingList[0].OldName:='eth17'; MappingList[0].Description:='Intel Ethernet Controller';
- MappingList[1].Found:=True; MappingList[1].OldName:='eth18'; MappingList[1].Description:='IEEE 802.11 Wireless Adapter';
+  { Simulation pour Turbo Pascal }
+ MappingList[0].Found:=True;
+ MappingList[0].OldName:='eth17';
+ MappingList[0].Description:='Intel Ethernet Controller';
+ MappingList[1].Found:=True;
+ MappingList[1].OldName:='eth18';
+ MappingList[1].Description:='IEEE 802.11 Wireless Adapter';
  {$ENDIF}
- 
- { Ex√©cuter l'action appropri√©e }
+  { ExÇcuter l'action appropriÇe }
  If ShowAll Then Begin
   {$IFDEF FPC}
   ShowMappings(True);
   {$ELSE}
   ShowSimulatedMappings;
   {$ENDIF}
- End Else If ApplyChanges Then Begin
+ End
+  Else
+ If ApplyChanges Then Begin
   {$IFDEF FPC}
   ApplyRenaming;
   {$ELSE}
@@ -561,19 +573,20 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('NAMEIF : Renommage des interfaces r√©seau bas√© sur l''adresse MAC');
+  WriteLn('NAMEIF : Cette commande permet d''effectuer un renommage ',
+          'des interfaces rÇseau basÇ sur l''adresse MAC');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  NAMEIF [options] [interface MAC...]');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -c, --config fichier   Fichier de configuration (d√©faut: nameif.conf)');
+  WriteLn('  -c, --config fichier   Fichier de configuration (dÇfaut: nameif.conf)');
   WriteLn('  -s, --sysconfig        Utiliser /etc/nameif.conf');
   WriteLn('  -d, --dry-run          Mode simulation (ne pas appliquer)');
   WriteLn('  -a, --all              Afficher tous les mappages');
-  WriteLn('      --sample           Cr√©er un fichier de config exemple');
+  WriteLn('      --sample           CrÇer un fichier de config exemple');
   WriteLn;
-  WriteLn('Param√®tres :');
+  WriteLn('Paramätres :');
   WriteLn('  interface   Nouveau nom d''interface');
   WriteLn('  MAC         Adresse MAC (format: xx:xx:xx:xx:xx:xx)');
   WriteLn;
@@ -587,16 +600,16 @@ BEGIN
   WriteLn('  NAMEIF eth0 00:11:22:33:44:55     # Renommer une interface');
   WriteLn('  NAMEIF -d                         # Mode simulation');
   WriteLn('  NAMEIF -a                         # Voir tous les mappages');
-  WriteLn('  NAMEIF --sample                   # Cr√©er fichier exemple');
+  WriteLn('  NAMEIF --sample                   # CrÇer fichier exemple');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (donn√©es r√©elles)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (donnÇes rÇelles)');
  End
   Else
  If ParamStr(1)='--version'Then Begin
-  WriteLn('NAMEIF 1.00 - Renommage d''interfaces r√©seau, NETWORKKIT-P, corail');
+  WriteLn('NAMEIF 1.00 - Renommage d''interfaces rÇseau, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
   Else
  Begin
