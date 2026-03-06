@@ -119,6 +119,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet d'afficher des connexions réseau et statistiques.</td>
 	</tr>
 	<tr>
+		<td><b>NSLOOKUP.PAS</b></td>
+		<td>Cette commande permet de lancer l'outil de requête DNS interactif.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
