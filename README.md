@@ -64,7 +64,7 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 	</tr>
 	<tr>
 		<td><b>IP.PAS</b></td>
-		<td>Cette commande permet d''afficher et manipuler la configuration réseau.</td>
+		<td>Cette commande permet d'afficher et manipuler la configuration réseau.</td>
 	</tr>
 	<tr>
 		<td><b>IPCONFIG.PAS</b></td>
