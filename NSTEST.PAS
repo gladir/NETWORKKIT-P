@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande nstest (Name Server Test))
+  @abstract(Target: Turbo Pascal 7, Free Pascal
+  @description: Commande nstest (Name Server Test))
 }
 
 Program NSTEST;
@@ -21,43 +22,43 @@ Type
 
  { Structure pour un test DNS }
  TNSTestQuery = Record
-  QueryName: String[255];    { Nom de domaine √† tester }
+  QueryName: String[255];       { Nom de domaine Ö tester }
   QueryType: TNSTestRecordType; { Type d'enregistrement }
-  Server: String[64];        { Serveur DNS √† tester }
-  Port: Word;                { Port du serveur DNS }
-  Timeout: Integer;          { Timeout en millisecondes }
-  Retries: Integer;          { Nombre de tentatives }
+  Server: String[64];           { Serveur DNS Ö tester }
+  Port: Word;                   { Port du serveur DNS }
+  Timeout: Integer;             { DÇpassement de dÇlai en millisecondes }
+  Retries: Integer;             { Nombre de tentatives }
  End;
 
- { Structure pour les r√©sultats d'un test }
+ { Structure pour les rÇsultats d'un test }
  TNSTestResult = Record
-  QueryName: String[255];    { Nom interrog√© }
-  Server: String[64];        { Serveur test√© }
-  Success: Boolean;          { Test r√©ussi }
-  ResponseTime: LongInt;     { Temps de r√©ponse en ms }
-  ErrorCode: Integer;        { Code d'erreur (0=succ√®s) }
+  QueryName: String[255];    { Nom interrogÇ }
+  Server: String[64];        { Serveur testÇ }
+  Success: Boolean;          { Test rÇussi }
+  ResponseTime: LongInt;     { Temps de rÇponse en ms }
+  ErrorCode: Integer;        { Code d'erreur (0=succäs) }
   ErrorMessage: String[128]; { Message d'erreur }
-  AnswerCount: Integer;      { Nombre de r√©ponses }
-  RecordsFound: Integer;     { Enregistrements trouv√©s }
-  AuthoritySection: Boolean; { Section autorit√© pr√©sente }
-  AdditionalSection: Boolean; { Section additionnelle pr√©sente }
+  AnswerCount: Integer;      { Nombre de rÇponses }
+  RecordsFound: Integer;     { Enregistrements trouvÇs }
+  AuthoritySection: Boolean; { Section autoritÇ prÇsente }
+  AdditionalSection: Boolean; { Section additionnelle prÇsente }
  End;
 
  { Structure pour les statistiques globales }
  TNSTestStats = Record
-  TotalQueries: Integer;     { Nombre total de requ√™tes }
-  SuccessfulQueries: Integer; { Requ√™tes r√©ussies }
-  FailedQueries: Integer;    { Requ√™tes √©chou√©es }
-  AverageResponseTime: LongInt; { Temps de r√©ponse moyen }
-  MinResponseTime: LongInt;  { Temps de r√©ponse minimum }
-  MaxResponseTime: LongInt;  { Temps de r√©ponse maximum }
-  TotalResponseTime: LongInt; { Temps total cumul√© }
-  TimeoutCount: Integer;     { Nombre de timeouts }
-  ErrorCount: Integer;       { Nombre d'erreurs }
+  TotalQueries: Integer;        { Nombre total de requàtes }
+  SuccessfulQueries: Integer;   { Requàtes rÇussies }
+  FailedQueries: Integer;       { Requàtes ÇchouÇes }
+  AverageResponseTime: LongInt; { Temps de rÇponse moyen }
+  MinResponseTime: LongInt;     { Temps de rÇponse minimum }
+  MaxResponseTime: LongInt;     { Temps de rÇponse maximum }
+  TotalResponseTime: LongInt;   { Temps total cumulÇ }
+  TimeoutCount: Integer;        { Nombre de timeouts }
+  ErrorCount: Integer;          { Nombre d'erreurs }
  End;
 
 Var
- { Variables globales }
+  { Variables globales }
  WSAInitialized: Boolean;
  DefaultServers: Array[0..9] of String[64];
  ServerCount: Integer;
@@ -96,7 +97,7 @@ Begin
  End;
 End;
 
-{ Convertir un type d'enregistrement en cha√Æne }
+ { Convertir un type d'enregistrement en chaåne }
 Function RecordTypeToString(RecType: TNSTestRecordType): String;
 Begin
  Case RecType Of
@@ -115,7 +116,7 @@ Begin
  End;
 End;
 
-{ Convertir une cha√Æne en type d'enregistrement }
+ { Convertir une chaåne en type d'enregistrement }
 Function StringToRecordType(TypeStr: String): TNSTestRecordType;
 Var
  UpperStr: String;
@@ -154,11 +155,11 @@ Var
 Begin
  IsValidIPAddress := False;
  If Length(IP) = 0 Then Exit;
- 
+
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
+
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -173,26 +174,24 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
+
  IsValidIPAddress := (Dots = 4);
 End;
 
-{ Valider un nom de domaine }
+ { Valider un nom de domaine }
 Function IsValidDomainName(Domain: String): Boolean;
 Var
  I: Integer;
 Begin
  IsValidDomainName := False;
  If (Length(Domain) = 0) or (Length(Domain) > 253) Then Exit;
- 
  For I := 1 To Length(Domain) Do Begin
   If not (Domain[I] in ['a'..'z', 'A'..'Z', '0'..'9', '-', '.']) Then Exit;
  End;
- 
  IsValidDomainName := True;
 End;
 
-{ Test DNS r√©el utilisant les fonctions syst√®me }
+ { Test DNS rÇel utilisant les fonctions systäme }
 Function PerformNSTest(var Query: TNSTestQuery; var TestResult: TNSTestResult): Boolean;
 Var
  HostEnt: PHostEnt;
@@ -207,7 +206,6 @@ Begin
  TestResult.Server := Query.Server;
  TestResult.Success := False;
  TestResult.ErrorCode := 0;
- 
  If Not WSAInitialized Then Begin
   If Not InitializeWinsock Then Begin
    TestResult.ErrorCode := 1;
@@ -215,9 +213,7 @@ Begin
    Exit;
   End;
  End;
- 
  StartTime := GetTickCount;
- 
  { Test selon le type d'enregistrement }
  Case Query.QueryType Of
   NT_A: Begin
@@ -225,7 +221,6 @@ Begin
     HostEnt := gethostbyname(PChar(AnsiString(Query.QueryName)));
     EndTime := GetTickCount;
     TestResult.ResponseTime := EndTime - StartTime;
-    
     If (HostEnt <> nil) and (HostEnt^.h_addr_list <> nil) Then Begin
      { Compter les adresses IP }
      I := 0;
@@ -235,7 +230,6 @@ Begin
       Inc(PtrUInt(HostEnt^.h_addr_list), SizeOf(Pointer));
       AddrPtr := HostEnt^.h_addr_list^;
      End;
-     
      TestResult.Success := True;
      TestResult.AnswerCount := I;
      TestResult.RecordsFound := I;
@@ -251,7 +245,6 @@ Begin
     TestResult.ErrorMessage := 'DNS resolution failed';
    End;
   End;
-  
   NT_PTR: Begin
    Try
     If IsValidIPAddress(Query.QueryName) Then Begin
@@ -259,7 +252,6 @@ Begin
      HostEnt := gethostbyaddr(@Addr, 4, AF_INET);
      EndTime := GetTickCount;
      TestResult.ResponseTime := EndTime - StartTime;
-     
      If HostEnt <> nil Then Begin
       TestResult.Success := True;
       TestResult.AnswerCount := 1;
@@ -282,13 +274,11 @@ Begin
     TestResult.ErrorMessage := 'Reverse DNS failed';
    End;
   End;
-  
  Else Begin
   { Pour les autres types, simuler un test basique }
   EndTime := GetTickCount;
-  TestResult.ResponseTime := EndTime - StartTime + (Random(50) + 10); { Simuler d√©lai }
-  
-  { Simuler des r√©ponses selon le type }
+  TestResult.ResponseTime := EndTime - StartTime + (Random(50) + 10); { Simuler dÇlai }
+   { Simuler des rÇponses selon le type }
   Case Query.QueryType Of
    NT_NS: Begin
     TestResult.Success := True;
@@ -311,12 +301,11 @@ Begin
    TestResult.ErrorCode := 4; { NOT IMPLEMENTED }
    TestResult.ErrorMessage := 'Record type not supported';
   End;
-  
   PerformNSTest := TestResult.Success;
  End;
  End;
- 
- { V√©rifier le timeout }
+
+ { VÇrifier le dÇpassement de dÇlai }
  If TestResult.ResponseTime > Query.Timeout Then Begin
   TestResult.ErrorCode := 5; { TIMEOUT }
   TestResult.ErrorMessage := 'Query timeout';
@@ -325,12 +314,11 @@ Begin
  End;
 End;
 
-{ Afficher les r√©sultats d'un test }
+ { Afficher les rÇsultats d'un test }
 Procedure DisplayTestResult(var TestResult: TNSTestResult; ShowDetails: Boolean);
 Begin
  If not QuietMode Then Begin
   Write(TestResult.QueryName, ' via ', TestResult.Server, ': ');
-  
   If TestResult.Success Then Begin
    WriteLn('OK (', TestResult.ResponseTime, 'ms, ', TestResult.AnswerCount, ' answers)');
    If ShowDetails and VerboseMode Then Begin
@@ -346,66 +334,60 @@ Begin
  End;
 End;
 
-{ Mettre √† jour les statistiques }
-Procedure UpdateStats(var TestResult: TNSTestResult);
-Begin
+ { Mettre Ö jour les statistiques }
+Procedure UpdateStats(var TestResult: TNSTestResult);Begin
  Inc(TestStats.TotalQueries);
  Inc(TestStats.TotalResponseTime, TestResult.ResponseTime);
- 
- If TestResult.Success Then Begin
-  Inc(TestStats.SuccessfulQueries);
-  
-  { Mettre √† jour min/max }
+ If TestResult.Success Then Begin Inc(TestStats.SuccessfulQueries);
+  { Mettre Ö jour min/max }
   If (TestStats.MinResponseTime = 0) or (TestResult.ResponseTime < TestStats.MinResponseTime) Then
    TestStats.MinResponseTime := TestResult.ResponseTime;
   If TestResult.ResponseTime > TestStats.MaxResponseTime Then
    TestStats.MaxResponseTime := TestResult.ResponseTime;
- End Else Begin
+ End
+  Else
+ Begin
   Inc(TestStats.FailedQueries);
   If TestResult.ErrorCode = 5 Then { TIMEOUT }
    Inc(TestStats.TimeoutCount)
   Else
    Inc(TestStats.ErrorCount);
  End;
- 
- { Calculer la moyenne }
+  { Calculer la moyenne }
  If TestStats.TotalQueries > 0 Then
   TestStats.AverageResponseTime := TestStats.TotalResponseTime div TestStats.TotalQueries;
 End;
 
-{ Afficher les statistiques finales }
+ { Afficher les statistiques finales }
 Procedure DisplayFinalStats;
 Var
  SuccessRate: Real;
 Begin
  If QuietMode Then Exit;
- 
  WriteLn;
  WriteLn('=== STATISTIQUES DES TESTS DNS ===');
- WriteLn('Total des requ√™tes    : ', TestStats.TotalQueries);
- WriteLn('Requ√™tes r√©ussies     : ', TestStats.SuccessfulQueries);
- WriteLn('Requ√™tes √©chou√©es     : ', TestStats.FailedQueries);
- 
+ WriteLn('Total des requàtes    : ', TestStats.TotalQueries);
+ WriteLn('Requàtes rÇussies     : ', TestStats.SuccessfulQueries);
+ WriteLn('Requàtes ÇchouÇes     : ', TestStats.FailedQueries);
  If TestStats.TotalQueries > 0 Then Begin
   SuccessRate := (TestStats.SuccessfulQueries * 100.0) / TestStats.TotalQueries;
-  WriteLn('Taux de r√©ussite      : ', SuccessRate:0:1, '%');
+  WriteLn('Taux de rÇussite      : ', SuccessRate:0:1, '%');
  End;
- 
- WriteLn('Temps de r√©ponse moyen: ', TestStats.AverageResponseTime, ' ms');
+
+ WriteLn('Temps de rÇponse moyen: ', TestStats.AverageResponseTime, ' ms');
  If TestStats.MinResponseTime > 0 Then
   WriteLn('Temps minimum         : ', TestStats.MinResponseTime, ' ms');
  If TestStats.MaxResponseTime > 0 Then
   WriteLn('Temps maximum         : ', TestStats.MaxResponseTime, ' ms');
- 
+
  If TestStats.TimeoutCount > 0 Then
   WriteLn('Timeouts              : ', TestStats.TimeoutCount);
  If TestStats.ErrorCount > 0 Then
   WriteLn('Erreurs               : ', TestStats.ErrorCount);
 End;
 
-{ Initialiser les serveurs DNS par d√©faut }
-Procedure InitializeDefaultServers;
-Begin
+{ Initialiser les serveurs DNS par dÇfaut }
+Procedure InitializeDefaultServers;Begin
  DefaultServers[0] := '8.8.8.8';         { Google Public DNS }
  DefaultServers[1] := '8.8.4.4';         { Google Public DNS Alternate }
  DefaultServers[2] := '1.1.1.1';         { Cloudflare DNS }
@@ -419,8 +401,8 @@ Begin
  ServerCount := 10;
 End;
 
-{ Tester un serveur DNS sp√©cifique }
-Procedure TestSingleServer(ServerIP, QueryName: String; QueryType: TNSTestRecordType; 
+{ Tester un serveur DNS spÇcifique }
+Procedure TestSingleServer(ServerIP, QueryName: String; QueryType: TNSTestRecordType;
                           Timeout, Retries: Integer);
 Var
  Query: TNSTestQuery;
@@ -433,7 +415,6 @@ Begin
  Query.Port := 53;
  Query.Timeout := Timeout;
  Query.Retries := Retries;
- 
  For I := 1 To Retries Do Begin
   If PerformNSTest(Query, TestResult) Then Begin
    DisplayTestResult(TestResult, True);
@@ -450,8 +431,8 @@ Begin
  End;
 End;
 
-{ Tester tous les serveurs par d√©faut }
-Procedure TestAllServers(QueryName: String; QueryType: TNSTestRecordType; 
+{ Tester tous les serveurs par dÇfaut }
+Procedure TestAllServers(QueryName: String; QueryType: TNSTestRecordType;
                         Timeout, Retries: Integer);
 Var
  I: Integer;
@@ -460,19 +441,17 @@ Begin
   WriteLn('Testing DNS servers with query: ', QueryName, ' (', RecordTypeToString(QueryType), ')');
   WriteLn('===============================================');
  End;
- 
  For I := 0 To ServerCount - 1 Do Begin
   TestSingleServer(DefaultServers[I], QueryName, QueryType, Timeout, Retries);
-  
-  { D√©lai entre les tests si en mode continu }
+   { DÇlai entre les tests si en mode continu }
   If ContinuousMode and (I < ServerCount - 1) Then Begin
-   Sleep(100); { 100ms de d√©lai }
+   Sleep(100); { 100ms de dÇlai }
   End;
  End;
 End;
 
-{ Test de performance comparative }
-Procedure PerformanceTest(QueryName: String; QueryType: TNSTestRecordType; 
+ { Test de performance comparative }
+Procedure PerformanceTest(QueryName: String; QueryType: TNSTestRecordType;
                          TestRounds: Integer);
 Var
  I, J: Integer;
@@ -489,19 +468,16 @@ Begin
   WriteLn('Performance test with ', TestRounds, ' rounds...');
   WriteLn('============================================');
  End;
- 
- { Initialiser les statistiques par serveur }
+  { Initialiser les statistiques par serveur }
  For I := 0 To ServerCount - 1 Do Begin
   ServerStats[I].TotalTime := 0;
   ServerStats[I].SuccessCount := 0;
   ServerStats[I].FailureCount := 0;
   ServerStats[I].AverageTime := 0;
  End;
- 
- { Effectuer les tests }
+  { Effectuer les tests }
  For J := 1 To TestRounds Do Begin
   If VerboseMode Then WriteLn('Round ', J, '/', TestRounds);
-  
   For I := 0 To ServerCount - 1 Do Begin
    Query.QueryName := QueryName;
    Query.QueryType := QueryType;
@@ -509,31 +485,25 @@ Begin
    Query.Port := 53;
    Query.Timeout := 5000; { 5 secondes }
    Query.Retries := 1;
-   
    If PerformNSTest(Query, TestResult) Then Begin
     Inc(ServerStats[I].SuccessCount);
     Inc(ServerStats[I].TotalTime, TestResult.ResponseTime);
    End Else Begin
     Inc(ServerStats[I].FailureCount);
    End;
-   
    UpdateStats(TestResult);
   End;
-  
-  Sleep(50); { Petit d√©lai entre les rounds }
+  Sleep(50); { Petit dÇlai entre les rounds }
  End;
- 
- { Calculer et afficher les r√©sultats }
+  { Calculer et afficher les rÇsultats }
  WriteLn;
- WriteLn('R√âSULTATS DU TEST DE PERFORMANCE');
+ WriteLn('RêSULTATS DU TEST DE PERFORMANCE');
  WriteLn('=================================');
- WriteLn('Serveur DNS          Succ√®s  √âchecs  Temps Moy.');
+ WriteLn('Serveur DNS          Succäs  êchecs  Temps Moy.');
  WriteLn('-------------------  ------  ------  ----------');
- 
  For I := 0 To ServerCount - 1 Do Begin
   If ServerStats[I].SuccessCount > 0 Then
    ServerStats[I].AverageTime := ServerStats[I].TotalTime div ServerStats[I].SuccessCount;
-  
   Write(Copy(DefaultServers[I] + '                   ', 1, 17), '  ');
   Write(ServerStats[I].SuccessCount:6, '  ');
   Write(ServerStats[I].FailureCount:6, '  ');
@@ -544,8 +514,8 @@ Begin
  End;
 End;
 
-{ Test de disponibilit√© continue }
-Procedure ContinuousAvailabilityTest(QueryName: String; QueryType: TNSTestRecordType; 
+ { Test de disponibilitÇ continue }
+Procedure ContinuousAvailabilityTest(QueryName: String; QueryType: TNSTestRecordType;
                                     Interval: Integer; MaxTests: Integer);
 Var
  TestNum: Integer;
@@ -557,21 +527,17 @@ Begin
   WriteLn('Press Ctrl+C to stop');
   WriteLn('=================================================');
  End;
- 
  TestNum := 0;
  While (MaxTests = 0) or (TestNum < MaxTests) Do Begin
   Inc(TestNum);
-  
   If not QuietMode Then
    Write('[', FormatDateTime('hh:nn:ss', Now), '] Test #', TestNum, ': ');
-  
   Query.QueryName := QueryName;
   Query.QueryType := QueryType;
   Query.Server := DefaultServers[0]; { Utiliser le premier serveur }
   Query.Port := 53;
   Query.Timeout := 3000;
   Query.Retries := 2;
-  
   If PerformNSTest(Query, TestResult) Then Begin
    If not QuietMode Then
     WriteLn('OK (', TestResult.ResponseTime, 'ms)')
@@ -583,33 +549,28 @@ Begin
    Else
     Write('F');
   End;
-  
   UpdateStats(TestResult);
-  
-  { Attendre l'intervalle sp√©cifi√© }
+   { Attendre l'intervalle spÇcifiÇe }
   Sleep(Interval * 1000);
  End;
 End;
 
-{ Initialiser les variables globales }
-Procedure InitializeNSTest;
-Begin
+ { Initialiser les variables globales }
+Procedure InitializeNSTest;Begin
  WSAInitialized := False;
  VerboseMode := False;
  QuietMode := False;
  ContinuousMode := False;
- TestInterval := 10; { 10 secondes par d√©faut }
- MaxTests := 0; { Pas de limite par d√©faut }
+ TestInterval := 10; { 10 secondes par dÇfaut }
+ MaxTests := 0; { Pas de limite par dÇfaut }
  TestCount := 0;
- 
- { Initialiser les statistiques }
+  { Initialiser les statistiques }
  FillChar(TestStats, SizeOf(TestStats), 0);
- 
- { Initialiser les serveurs par d√©faut }
+  { Initialiser les serveurs par dÇfaut }
  InitializeDefaultServers;
 End;
 
-{ Analyser la ligne de commande }
+ { Analyser la ligne de commande }
 Procedure ParseNSTestCommandLine;
 Var
  I: Integer;
@@ -622,18 +583,16 @@ Var
  Retries: Integer;
  Rounds: Integer;
 Begin
- QueryName := 'google.com'; { Par d√©faut }
+ QueryName := 'google.com'; { Par dÇfaut }
  QueryType := NT_A;
  TargetServer := '';
  TestMode := 'basic';
  Timeout := 5000; { 5 secondes }
  Retries := 3;
  Rounds := 5;
- 
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--verbose') Then Begin
    VerboseMode := True;
   End
@@ -720,17 +679,14 @@ Begin
   Else If Copy(Param, 1, 1) <> '-' Then Begin
    QueryName := Param;
   End;
-  
   Inc(I);
  End;
- 
- { Validation }
+  { Validation }
  If not IsValidDomainName(QueryName) and not IsValidIPAddress(QueryName) Then Begin
   WriteLn('nstest: "', QueryName, '" n''est pas un nom de domaine ou une adresse IP valide');
   Halt(1);
  End;
- 
- { Ex√©cuter le test selon le mode }
+  { ExÇcuter le test selon le mode }
  Case TestMode Of
   'basic': Begin
    If TargetServer <> '' Then
@@ -750,15 +706,13 @@ Begin
    TestAllServers(QueryName, NT_MX, Timeout, Retries);
   End;
  End;
- 
  DisplayFinalStats;
 End;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{ Simulation pour Turbo Pascal }
-Procedure ShowSimulatedNSTest(QueryName, TestMode: String);
-Begin
+ { Simulation pour Turbo Pascal }
+Procedure ShowSimulatedNSTest(QueryName, TestMode: String);Begin
  WriteLn('Testing DNS servers with query: ', QueryName, ' (A)');
  WriteLn('===============================================');
  WriteLn(QueryName, ' via 8.8.8.8: OK (45ms, 1 answers)');
@@ -769,17 +723,16 @@ Begin
  WriteLn(QueryName, ' via 208.67.220.220: OK (72ms, 1 answers)');
  WriteLn;
  WriteLn('=== STATISTIQUES DES TESTS DNS ===');
- WriteLn('Total des requ√™tes    : 6');
- WriteLn('Requ√™tes r√©ussies     : 6');
- WriteLn('Requ√™tes √©chou√©es     : 0');
- WriteLn('Taux de r√©ussite      : 100.0%');
- WriteLn('Temps de r√©ponse moyen: 52 ms');
+ WriteLn('Total des requàtes    : 6');
+ WriteLn('Requàtes rÇussies     : 6');
+ WriteLn('Requàtes ÇchouÇes     : 0');
+ WriteLn('Taux de rÇussite      : 100.0%');
+ WriteLn('Temps de rÇponse moyen: 52 ms');
  WriteLn('Temps minimum         : 38 ms');
  WriteLn('Temps maximum         : 72 ms');
 End;
 
-Procedure ShowSimulatedPerformance;
-Begin
+Procedure ShowSimulatedPerformance;Begin
  WriteLn('Performance test with 5 rounds...');
  WriteLn('============================================');
  WriteLn('Round 1/5');
@@ -788,9 +741,9 @@ Begin
  WriteLn('Round 4/5');
  WriteLn('Round 5/5');
  WriteLn;
- WriteLn('R√âSULTATS DU TEST DE PERFORMANCE');
+ WriteLn('RêSULTATS DU TEST DE PERFORMANCE');
  WriteLn('=================================');
- WriteLn('Serveur DNS          Succ√®s  √âchecs  Temps Moy.');
+ WriteLn('Serveur DNS          Succäs  êchecs  Temps Moy.');
  WriteLn('-------------------  ------  ------  ----------');
  WriteLn('8.8.8.8                  5       0      45 ms');
  WriteLn('8.8.4.4                  5       0      52 ms');
@@ -809,36 +762,36 @@ BEGIN
   Halt(3);
  End;
  {$ENDIF}
- 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('NSTEST : Outil de test de serveurs DNS');
+  WriteLn('NSTEST : Cette commande permet de lancer l''outil de test ',
+          'de serveurs DNS');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  NSTEST [options] nom_de_domaine');
   WriteLn('  NSTEST [options] adresse_ip');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -t, --type TYPE       Type d''enregistrement √† tester (A, NS, MX, etc.)');
-  WriteLn('  -s, --server IP       Serveur DNS sp√©cifique √† tester');
-  WriteLn('  -v, --verbose         Mode verbeux avec d√©tails');
+  WriteLn('  -t, --type TYPE       Type d''enregistrement Ö tester (A, NS, MX, etc.)');
+  WriteLn('  -s, --server IP       Serveur DNS spÇcifique Ö tester');
+  WriteLn('  -v, --verbose         Mode verbeux avec dÇtails');
   WriteLn('  -q, --quiet           Mode silencieux');
   WriteLn('  -a, --all             Tester tous les types d''enregistrements');
   WriteLn('  -p, --performance     Test de performance comparative');
-  WriteLn('  -c, --continuous      Test de disponibilit√© continue');
-  WriteLn('  --timeout N           Timeout en secondes (d√©faut: 5)');
-  WriteLn('  --retry N             Nombre de tentatives (d√©faut: 3)');
+  WriteLn('  -c, --continuous      Test de disponibilitÇ continue');
+  WriteLn('  --timeout N           Timeout en secondes (dÇfaut: 5)');
+  WriteLn('  --retry N             Nombre de tentatives (dÇfaut: 3)');
   WriteLn('  --rounds N            Nombre de rounds pour le test de performance');
   WriteLn('  --interval N          Intervalle en secondes pour le mode continu');
   WriteLn('  --count N             Nombre maximum de tests en mode continu');
   WriteLn;
   WriteLn('Modes de test :');
-  WriteLn('  Par d√©faut            Test tous les serveurs DNS publics');
+  WriteLn('  Par dÇfaut            Test tous les serveurs DNS publics');
   WriteLn('  --performance         Compare les performances des serveurs');
-  WriteLn('  --continuous          Surveillance continue de la disponibilit√©');
+  WriteLn('  --continuous          Surveillance continue de la disponibilitÇ');
   WriteLn('  --all                 Test tous les types d''enregistrements');
   WriteLn;
-  WriteLn('Serveurs DNS test√©s par d√©faut :');
+  WriteLn('Serveurs DNS testÇs par dÇfaut :');
   WriteLn('  8.8.8.8               Google Public DNS');
   WriteLn('  8.8.4.4               Google Public DNS Alternate');
   WriteLn('  1.1.1.1               Cloudflare DNS');
@@ -850,7 +803,7 @@ BEGIN
   WriteLn('  64.6.64.6             Verisign');
   WriteLn('  64.6.65.6             Verisign Alternate');
   WriteLn;
-  WriteLn('Types d''enregistrements support√©s :');
+  WriteLn('Types d''enregistrements supportÇs :');
   WriteLn('  A      Adresse IPv4');
   WriteLn('  AAAA   Adresse IPv6');
   WriteLn('  NS     Serveur de noms');
@@ -864,14 +817,14 @@ BEGIN
   WriteLn('Exemples :');
   WriteLn('  NSTEST google.com                    # Test basique');
   WriteLn('  NSTEST -t MX gmail.com               # Test des serveurs MX');
-  WriteLn('  NSTEST -s 8.8.8.8 example.com       # Test d''un serveur sp√©cifique');
+  WriteLn('  NSTEST -s 8.8.8.8 example.com        # Test d''un serveur spÇcifique');
   WriteLn('  NSTEST -p google.com                 # Test de performance');
   WriteLn('  NSTEST -c --interval 30 github.com   # Surveillance continue');
   WriteLn('  NSTEST -v -a stackoverflow.com       # Test complet verbeux');
   WriteLn('  NSTEST --timeout 10 --retry 5 slow.example.com');
   WriteLn;
-  WriteLn('Note: Effectue de vrais tests DNS avec les serveurs sp√©cifi√©s.');
-  WriteLn('Mesure les temps de r√©ponse et la disponibilit√© en temps r√©el.');
+  WriteLn('Note: Effectue de vrais tests DNS avec les serveurs spÇcifiÇs.');
+  WriteLn('Mesure les temps de rÇponse et la disponibilitÇ en temps rÇel.');
  End
  Else If ParamStr(1) = '--version' Then Begin
   WriteLn('NSTEST 1.00 - Name Server Test Tool, NETWORKKIT-P');
@@ -887,14 +840,15 @@ BEGIN
   { Version Turbo Pascal - Simulation }
   If ParamCount = 0 Then Begin
    ShowSimulatedNSTest('google.com', 'basic');
-  End Else If (ParamStr(1) = '-p') or (ParamStr(1) = '--performance') Then Begin
+  End
+   Else
+  If (ParamStr(1) = '-p') or (ParamStr(1) = '--performance') Then Begin
    ShowSimulatedPerformance;
   End Else Begin
    ShowSimulatedNSTest(ParamStr(1), 'basic');
   End;
   {$ENDIF}
  End;
- 
  {$IFDEF FPC}
  { Nettoyer Winsock }
  CleanupWinsock;
