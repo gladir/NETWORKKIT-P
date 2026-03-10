@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande pine (Pine Is Not Elm))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande pine (Pine Is Not Elm))
 }
 
 Program PINE;
@@ -16,52 +17,52 @@ Program PINE;
 
 {$IFDEF FPC}
 Type
- { Structure d'un message Ã©lectronique Pine }
+  { Structure d'un message ‚lectronique Pine }
  TPineMessage = Record
   MessageID: Integer;         { ID unique du message }
-  FromAddr: String[255];      { Adresse expÃ©diteur }
-  FromName: String[255];      { Nom expÃ©diteur }
+  FromAddr: String[255];      { Adresse exp‚diteur }
+  FromName: String[255];      { Nom exp‚diteur }
   ToAddr: String[255];        { Adresse destinataire }
   ToName: String[255];        { Nom destinataire }
   CcAddr: String[255];        { Copie carbone }
   BccAddr: String[255];       { Copie carbone invisible }
-  ReplyTo: String[255];       { Adresse de rÃ©ponse }
+  ReplyTo: String[255];       { Adresse de r‚ponse }
   Subject: String[255];       { Sujet }
   DateSent: TDateTime;        { Date d'envoi }
-  DateReceived: TDateTime;    { Date de rÃ©ception }
-  Priority: Integer;          { PrioritÃ© (1=haute, 2=normale, 3=basse) }
-  Status: String[32];         { Ã‰tat (new, read, replied, forwarded, deleted) }
+  DateReceived: TDateTime;    { Date de r‚ception }
+  Priority: Integer;          { Priorit‚ (1=haute, 2=normale, 3=basse) }
+  Status: String[32];         { tat (new, read, replied, forwarded, deleted) }
   Size: LongInt;              { Taille en octets }
   Lines: Integer;             { Nombre de lignes }
   ContentType: String[64];    { Type de contenu }
   Encoding: String[32];       { Encodage }
   MessageBody: TStringList;   { Corps du message }
-  Headers: TStringList;       { En-tÃªtes complÃ¨tes }
-  Attachments: Array[0..31] of String[255]; { PiÃ¨ces jointes }
-  AttachmentCount: Integer;   { Nombre de piÃ¨ces jointes }
+  Headers: TStringList;       { Entˆtes complŠtes }
+  Attachments: Array[0..31] of String[255]; { PiŠces jointes }
+  AttachmentCount: Integer;   { Nombre de piŠces jointes }
   IsRead: Boolean;            { Message lu }
-  IsDeleted: Boolean;         { Message supprimÃ© }
-  IsReplied: Boolean;         { RÃ©ponse envoyÃ©e }
-  IsForwarded: Boolean;       { Message transfÃ©rÃ© }
-  IsFlagged: Boolean;         { Message marquÃ© }
+  IsDeleted: Boolean;         { Message supprim‚ }
+  IsReplied: Boolean;         { R‚ponse envoy‚e }
+  IsForwarded: Boolean;       { Message transf‚r‚ }
+  IsFlagged: Boolean;         { Message marqu‚ }
   IsImportant: Boolean;       { Message important }
   IsPersonal: Boolean;        { Message personnel }
-  ThreadID: Integer;          { ID de thread }
-  ThreadLevel: Integer;       { Niveau de thread }
+  ThreadID: Integer;          { ID de processus l‚ger }
+  ThreadLevel: Integer;       { Niveau de processus l‚ger }
  End;
 
  { Configuration Pine }
  TPineConfig = Record
   UserName: String[64];       { Nom utilisateur }
-  UserEmail: String[255];     { Adresse email }
+  UserEmail: String[255];     { Adresse de courriel }
   FullName: String[255];      { Nom complet }
   Domain: String[255];        { Domaine }
   MailDir: String[255];       { RÃ©pertoire mail }
-  InboxFile: String[255];     { Fichier boÃ®te de rÃ©ception }
-  SentFile: String[255];      { Fichier messages envoyÃ©s }
+  InboxFile: String[255];     { Fichier boŒte de r‚ception }
+  SentFile: String[255];      { Fichier messages envoy‚s }
   DraftFile: String[255];     { Fichier brouillons }
   TrashFile: String[255];     { Fichier corbeille }
-  PostponeFile: String[255];  { Fichier messages reportÃ©s }
+  PostponeFile: String[255];  { Fichier messages reportŠs }
   SMTPServer: String[255];    { Serveur SMTP }
   SMTPPort: Word;             { Port SMTP }
   POP3Server: String[255];    { Serveur POP3 }
@@ -71,33 +72,33 @@ Type
   NNTPServer: String[255];    { Serveur NNTP (news) }
   NNTPPort: Word;             { Port NNTP }
   UseSSL: Boolean;            { Utiliser SSL/TLS }
-  AuthMethod: String[32];     { MÃ©thode d'authentification }
+  AuthMethod: String[32];     { M‚thode d'authentification }
   Password: String[255];      { Mot de passe }
-  Editor: String[255];        { Ã‰diteur par dÃ©faut }
+  Editor: String[255];        { diteur par d‚faut }
   Speller: String[255];       { Correcteur orthographique }
   Pager: String[255];         { Programme de pagination }
   PrintCommand: String[255];  { Commande d'impression }
   Signature: String[255];     { Fichier signature }
-  ReplyPrefix: String[16];    { PrÃ©fixe rÃ©ponse (Re:) }
-  ForwardPrefix: String[16];  { PrÃ©fixe transfert (Fwd:) }
+  ReplyPrefix: String[16];    { Pr‚fixe r‚ponse (Re:) }
+  ForwardPrefix: String[16];  { Pr‚fixe transfert (Fwd:) }
   DateFormat: String[32];     { Format de date }
   SortBy: String[16];         { Tri (arrival, date, subject, thread, size, from) }
   SortOrder: String[16];      { Ordre (ascending, descending) }
   ThreadMode: Boolean;        { Mode thread }
-  ShowNumbers: Boolean;       { Afficher numÃ©ros de message }
+  ShowNumbers: Boolean;       { Afficher num‚ros de message }
   ShowSizes: Boolean;         { Afficher tailles }
   ShowStatus: Boolean;        { Afficher statut }
   AutoSave: Boolean;          { Sauvegarde automatique }
   AutoSaveInterval: Integer;  { Intervalle sauvegarde (min) }
-  ShowHeaders: Boolean;       { Afficher en-tÃªtes }
-  WrapLines: Integer;         { Retour Ã  la ligne }
+  ShowHeaders: Boolean;       { Afficher entˆtes }
+  WrapLines: Integer;         { Retour … la ligne }
   PageSize: Integer;          { Taille de page }
   ConfirmDelete: Boolean;     { Confirmer suppression }
   ConfirmQuit: Boolean;       { Confirmer sortie }
   BeepOnNewMail: Boolean;     { Bip nouveau message }
-  CheckInterval: Integer;     { Intervalle vÃ©rification (min) }
+  CheckInterval: Integer;     { Intervalle v‚rification (min) }
   UseColors: Boolean;         { Utiliser les couleurs }
-  ColorTheme: String[16];     { ThÃ¨me de couleur }
+  ColorTheme: String[16];     { ThŠme de couleur }
   MenuBar: Boolean;           { Barre de menu }
   KeyBar: Boolean;            { Barre de touches }
   StatusLine: Boolean;        { Ligne de statut }
@@ -125,7 +126,7 @@ Type
   CurrentFolder: Integer;     { Index dossier actuel }
   CurrentMessage: Integer;    { Message actuel }
   CurrentLine: Integer;       { Ligne actuelle }
-  PageStart: Integer;         { DÃ©but de page }
+  PageStart: Integer;         { D‚but de page }
   PageEnd: Integer;           { Fin de page }
   ViewMode: String[16];       { Mode vue (full, headers, attachments) }
   SearchPattern: String[255]; { Motif de recherche }
@@ -133,13 +134,13 @@ Type
   FilterPattern: String[255]; { Motif de filtre }
   MenuLevel: Integer;         { Niveau de menu }
   StatusMessage: String[255]; { Message de statut }
-  LastCommand: String[32];    { DerniÃ¨re commande }
+  LastCommand: String[32];    { DerniŠre commande }
   HelpVisible: Boolean;       { Aide visible }
   CommandPrompt: String[255]; { Invite de commande }
   ErrorMessage: String[255];  { Message d'erreur }
-  SelectionStart: Integer;    { DÃ©but sÃ©lection }
-  SelectionEnd: Integer;      { Fin sÃ©lection }
-  EditMode: Boolean;          { Mode Ã©dition }
+  SelectionStart: Integer;    { D‚but s‚lection }
+  SelectionEnd: Integer;      { Fin s‚lection }
+  EditMode: Boolean;          { Mode ‚dition }
   ComposeMode: Boolean;       { Mode composition }
  End;
 
@@ -149,18 +150,18 @@ Type
   NewMessages: Integer;       { Nouveaux messages }
   ReadMessages: Integer;      { Messages lus }
   UnreadMessages: Integer;    { Messages non lus }
-  DeletedMessages: Integer;   { Messages supprimÃ©s }
-  RepliedMessages: Integer;   { Messages avec rÃ©ponse }
-  ForwardedMessages: Integer; { Messages transfÃ©rÃ©s }
-  FlaggedMessages: Integer;   { Messages marquÃ©s }
+  DeletedMessages: Integer;   { Messages supprim‚s }
+  RepliedMessages: Integer;   { Messages avec r‚ponse }
+  ForwardedMessages: Integer; { Messages transf‚r‚s }
+  FlaggedMessages: Integer;   { Messages marqu‚s }
   ThreadedMessages: Integer;  { Messages en thread }
   TotalSize: Int64;           { Taille totale }
   TotalFolders: Integer;      { Total dossiers }
   ActiveFolders: Integer;     { Dossiers actifs }
-  LastCheck: TDateTime;       { DerniÃ¨re vÃ©rification }
-  SessionStart: TDateTime;    { DÃ©but de session }
+  LastCheck: TDateTime;       { DerniŠre v‚rification }
+  SessionStart: TDateTime;    { D‚but de session }
   MessagesRead: Integer;      { Messages lus cette session }
-  MessagesSent: Integer;      { Messages envoyÃ©s cette session }
+  MessagesSent: Integer;      { Messages envoy‚s cette session }
  End;
 
 Var
@@ -172,15 +173,14 @@ Var
  FolderCount: Integer;
  PineStats: TPineStats;
  PineInterface: TPineInterface;
- 
- { Ã‰tats et commandes }
+
+ { tats et commandes }
  QuitRequested: Boolean;
  DataChanged: Boolean;
  LastErrorMessage: String[255];
 
-{ Initialiser la configuration Pine }
-Procedure InitializePineConfig;
-Begin
+ { Initialiser la configuration Pine }
+Procedure InitializePineConfig;Begin
  With PineConfig Do Begin
   UserName := 'user';
   UserEmail := 'user@localhost';
@@ -233,8 +233,7 @@ Begin
   StatusLine := True;
   EnableMouse := False;
  End;
- 
- { Initialiser l'interface }
+  { Initialiser l'interface }
  With PineInterface Do Begin
   CurrentView := 'main';
   CurrentFolder := 0;
@@ -257,8 +256,7 @@ Begin
   EditMode := False;
   ComposeMode := False;
  End;
- 
- { Initialiser les variables globales }
+  { Initialiser les variables globales }
  MessageCount := 0;
  FolderCount := 0;
  QuitRequested := False;
@@ -266,10 +264,9 @@ Begin
  LastErrorMessage := '';
 End;
 
-{ CrÃ©er les dossiers Pine par dÃ©faut }
-Procedure CreateDefaultFolders;
-Begin
- { INBOX }
+ { Cr‚er les dossiers Pine par d‚faut }
+Procedure CreateDefaultFolders;Begin
+  { INBOX }
  With PineFolders[FolderCount] Do Begin
   Name := 'INBOX';
   DisplayName := 'INBOX';
@@ -284,8 +281,7 @@ Begin
   IsWriteable := True;
  End;
  Inc(FolderCount);
- 
- { sent-mail }
+  { sent-mail }
  With PineFolders[FolderCount] Do Begin
   Name := 'sent-mail';
   DisplayName := 'sent-mail';
@@ -300,8 +296,7 @@ Begin
   IsWriteable := True;
  End;
  Inc(FolderCount);
- 
- { saved-messages }
+  { saved-messages }
  With PineFolders[FolderCount] Do Begin
   Name := 'saved-messages';
   DisplayName := 'saved-messages';
@@ -316,8 +311,7 @@ Begin
   IsWriteable := True;
  End;
  Inc(FolderCount);
- 
- { drafts }
+  { drafts }
  With PineFolders[FolderCount] Do Begin
   Name := 'drafts';
   DisplayName := 'drafts';
@@ -332,8 +326,7 @@ Begin
   IsWriteable := True;
  End;
  Inc(FolderCount);
- 
- { Trash }
+  { Trash }
  With PineFolders[FolderCount] Do Begin
   Name := 'Trash';
   DisplayName := 'Trash';
@@ -350,10 +343,9 @@ Begin
  Inc(FolderCount);
 End;
 
-{ CrÃ©er des messages d'exemple pour Pine }
-Procedure CreatePineSampleMessages;
-Begin
- { Message 1: Email urgent du systÃ¨me }
+ { Cr‚er des messages d'exemple pour Pine }
+Procedure CreatePineSampleMessages;Begin
+  { Message 1: Courriel urgent du systŠme }
  With PineMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
   FromAddr := 'sysadmin@company.com';
@@ -363,7 +355,7 @@ Begin
   CcAddr := '';
   BccAddr := '';
   ReplyTo := 'sysadmin@company.com';
-  Subject := '[URGENT] Maintenance serveur programmÃ©e';
+  Subject := '[URGENT] Maintenance serveur programm‚e';
   DateSent := Now - 0.3; { Il y a 7 heures }
   DateReceived := Now - 0.25;
   Priority := 1; { Haute }
@@ -384,31 +376,28 @@ Begin
   IsPersonal := False;
   ThreadID := 1;
   ThreadLevel := 0;
-  
-  { Corps du message }
+   { Corps du message }
   MessageBody.Add('Cher(e) utilisateur/trice,');
   MessageBody.Add('');
   MessageBody.Add('Une maintenance critique du serveur de messagerie');
-  MessageBody.Add('est programmÃ©e pour ce week-end :');
+  MessageBody.Add('est programm‚e pour cette fin de semaine :');
   MessageBody.Add('');
-  MessageBody.Add('Date : Samedi 22 fÃ©vrier 2026');
+  MessageBody.Add('Date : Samedi 22 f‚vrier 2026');
   MessageBody.Add('Heure : 02:00 - 06:00 (GMT+1)');
   MessageBody.Add('');
-  MessageBody.Add('Services impactÃ©s :');
+  MessageBody.Add('Services impact‚s :');
   MessageBody.Add('- Serveur de messagerie (SMTP/IMAP/POP3)');
   MessageBody.Add('- Serveur web interne');
-  MessageBody.Add('- Base de donnÃ©es utilisateurs');
+  MessageBody.Add('- Base de donn‚es utilisateurs');
   MessageBody.Add('');
-  MessageBody.Add('Veuillez planifier vos activitÃ©s en consÃ©quence.');
-  MessageBody.Add('Un email de confirmation sera envoyÃ© Ã  la fin de la maintenance.');
+  MessageBody.Add('Veuillez planifier vos activit‚s en cons‚quence.');
+  MessageBody.Add('Un courriel de confirmation sera envoy‚ … la fin de la maintenance.');
   MessageBody.Add('');
   MessageBody.Add('Cordialement,');
-  MessageBody.Add('L''Ã©quipe technique');
-  
-  { PiÃ¨ce jointe }
+  MessageBody.Add('L''‚©quipe technique');
+   { PiŠce jointe }
   Attachments[0] := 'maintenance-details.pdf';
-  
-  { En-tÃªtes }
+   { En-tˆtes }
   Headers.Add('Return-Path: <sysadmin@company.com>');
   Headers.Add('From: System Administrator <sysadmin@company.com>');
   Headers.Add('To: ' + PineConfig.FullName + ' <' + PineConfig.UserEmail + '>');
@@ -419,8 +408,7 @@ Begin
   Headers.Add('X-Mailer: Pine 4.64');
  End;
  Inc(MessageCount);
- 
- { Message 2: RÃ©ponse Ã  un thread }
+  { Message 2: R‚ponse … un processus l‚ger }
  With PineMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
   FromAddr := 'marie.martin@company.com';
@@ -430,7 +418,7 @@ Begin
   CcAddr := 'team@company.com';
   BccAddr := '';
   ReplyTo := 'marie.martin@company.com';
-  Subject := 'Re: Projet Q1 - Planning Ã©quipe';
+  Subject := 'Re: Projet Q1 - Planning ‚quipe';
   DateSent := Now - 1.2; { Il y a 1.2 jour }
   DateReceived := Now - 1.15;
   Priority := 2; { Normale }
@@ -451,34 +439,31 @@ Begin
   IsPersonal := True;
   ThreadID := 2;
   ThreadLevel := 1;
-  
-  { Corps du message }
+   { Corps du message }
   MessageBody.Add('Bonjour,');
   MessageBody.Add('');
-  MessageBody.Add('> Peux-tu confirmer ta disponibilitÃ© pour le projet Q1 ?');
+  MessageBody.Add('> Peux-tu confirmer ta disponibilit‚ pour le projet Q1 ?');
   MessageBody.Add('');
-  MessageBody.Add('Oui, je confirme ma disponibilitÃ© Ã  100% pour ce projet.');
-  MessageBody.Add('J''ai dÃ©jÃ  bloquÃ© les crÃ©neaux suivants dans mon agenda :');
+  MessageBody.Add('Oui, je confirme ma disponibilit‚ … 100% pour ce projet.');
+  MessageBody.Add('J''ai d‚j… bloqu‚ les cr‚neaux suivants dans mon agenda :');
   MessageBody.Add('');
-  MessageBody.Add('- Lundi 24/02 : RÃ©union de lancement (9h-11h)');
+  MessageBody.Add('- Lundi 24/02 : R‚union de lancement (9h-11h)');
   MessageBody.Add('- Mercredi 26/02 : Point d''avancement (14h-15h30)');
   MessageBody.Add('- Vendredi 28/02 : Revue technique (10h-12h)');
   MessageBody.Add('');
-  MessageBody.Add('Ã€ bientÃ´t,');
+  MessageBody.Add('A bient“t,');
   MessageBody.Add('Marie');
-  
-  { En-tÃªtes }
+   { En-tˆtes }
   Headers.Add('From: Marie Martin <marie.martin@company.com>');
   Headers.Add('To: ' + PineConfig.FullName + ' <' + PineConfig.UserEmail + '>');
   Headers.Add('Cc: team@company.com');
-  Headers.Add('Subject: Re: Projet Q1 - Planning Ã©quipe');
+  Headers.Add('Subject: Re: Projet Q1 - Planning ‚quipe');
   Headers.Add('Date: ' + FormatDateTime('ddd, dd mmm yyyy hh:nn:ss +0100', DateSent));
   Headers.Add('In-Reply-To: <project-q1-planning@company.com>');
   Headers.Add('References: <project-q1-planning@company.com>');
  End;
  Inc(MessageCount);
- 
- { Message 3: Newsletter technique }
+  { Message 3: Newsletter technique }
  With PineMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
   FromAddr := 'newsletter@devtech.org';
@@ -509,40 +494,38 @@ Begin
   IsPersonal := False;
   ThreadID := 3;
   ThreadLevel := 0;
-  
-  { Corps du message }
-  MessageBody.Add('â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—');
-  MessageBody.Add('â•‘                   DEVTECH WEEKLY #47                    â•‘');
-  MessageBody.Add('â•‘            Free Pascal & Networking Focus               â•‘');
-  MessageBody.Add('â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+   { Corps du message }
+  MessageBody.Add('ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿');
+  MessageBody.Add('³                   DEVTECH WEEKLY #47                    ³');
+  MessageBody.Add('³            Free Pascal & Networking Focus               ³');
+  MessageBody.Add('ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ');
   MessageBody.Add('');
-  MessageBody.Add('Bonjour cher dÃ©veloppeur !');
+  MessageBody.Add('Bonjour cher d‚veloppeur !');
   MessageBody.Add('');
   MessageBody.Add('Au programme cette semaine :');
   MessageBody.Add('');
-  MessageBody.Add('ğŸ“ˆ TENDANCES');
-  MessageBody.Add('â€¢ Free Pascal 3.2.4 : nouvelles fonctionnalitÃ©s rÃ©seau');
-  MessageBody.Add('â€¢ Lazarus IDE : amÃ©lioration debugger distant');
-  MessageBody.Add('â€¢ Protocoles rÃ©seau : HTTP/2 et WebSocket');
+  MessageBody.Add('ş TENDANCES');
+  MessageBody.Add('ú Free Pascal 3.2.4 : nouvelles fonctionnalit‚s r‚seau');
+  MessageBody.Add('ú Lazarus IDE : am‚lioration debugger distant');
+  MessageBody.Add('ú Protocoles r‚seau : HTTP/2 et WebSocket');
   MessageBody.Add('');
-  MessageBody.Add('ğŸ”§ OUTILS & TECHNIQUES');
-  MessageBody.Add('â€¢ Sockets TCP/UDP en Free Pascal');
-  MessageBody.Add('â€¢ Clients mail : Pine vs ELM comparaison');
-  MessageBody.Add('â€¢ SÃ©curitÃ© rÃ©seau : SSL/TLS implÃ©mentation');
+  MessageBody.Add('ş OUTILS & TECHNIQUES');
+  MessageBody.Add('ú Sockets TCP/UDP en Free Pascal');
+  MessageBody.Add('ú Clients courriel : Pine vs ELM comparaison');
+  MessageBody.Add('ú S‚curit‚ r‚seau : SSL/TLS impl‚mentation');
   MessageBody.Add('');
-  MessageBody.Add('ğŸ“š RESSOURCES');
-  MessageBody.Add('â€¢ GitHub: Awesome Free Pascal Networking');
-  MessageBody.Add('â€¢ Documentation: RFC SMTP mise Ã  jour');
-  MessageBody.Add('â€¢ Tutoriel: DNS resolver from scratch');
+  MessageBody.Add('ş RESSOURCES');
+  MessageBody.Add('ú GitHub: Awesome Free Pascal Networking');
+  MessageBody.Add('ú Documentation: RFC SMTP mise … jour');
+  MessageBody.Add('ú Tutoriel: DNS resolver from scratch');
   MessageBody.Add('');
-  MessageBody.Add('ğŸ¯ PROJET DE LA SEMAINE');
-  MessageBody.Add('NetworkKit-P : Suite d''outils rÃ©seau en Pascal');
-  MessageBody.Add('â†’ https://github.com/gladir/networkkit-p');
+  MessageBody.Add('ş PROJET DE LA SEMAINE');
+  MessageBody.Add('NetworkKit-P : Suite d''outils r‚seau en Pascal');
+  MessageBody.Add('ú https://github.com/gladir/networkkit-p');
   MessageBody.Add('');
   MessageBody.Add('Bonne programmation !');
-  MessageBody.Add('L''Ã©quipe DevTech');
-  
-  { En-tÃªtes }
+  MessageBody.Add('L''‚quipe DevTech');
+   { En-tˆtes }
   Headers.Add('From: DevTech Weekly <newsletter@devtech.org>');
   Headers.Add('To: ' + PineConfig.UserEmail);
   Headers.Add('Subject: DevTech Weekly #47 - Free Pascal & Networking');
@@ -551,8 +534,7 @@ Begin
   Headers.Add('List-Unsubscribe: <mailto:unsubscribe@devtech.org>');
  End;
  Inc(MessageCount);
- 
- { Message 4: Brouillon }
+  { Message 4: Brouillon }
  With PineMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
   FromAddr := PineConfig.UserEmail;
@@ -562,7 +544,7 @@ Begin
   CcAddr := '';
   BccAddr := '';
   ReplyTo := PineConfig.UserEmail;
-  Subject := 'Proposition dÃ©veloppement application rÃ©seau';
+  Subject := 'Proposition d‚veloppement application r‚seau';
   DateSent := 0; { Pas encore envoyÃ© }
   DateReceived := Now - 0.05;
   Priority := 2;
@@ -583,33 +565,30 @@ Begin
   IsPersonal := True;
   ThreadID := 4;
   ThreadLevel := 0;
-  
-  { Corps du message }
+   { Corps du message }
   MessageBody.Add('Bonjour,');
   MessageBody.Add('');
-  MessageBody.Add('Suite Ã  notre Ã©change tÃ©lÃ©phonique, je vous propose');
-  MessageBody.Add('mes services pour le dÃ©veloppement de votre application');
-  MessageBody.Add('de gestion rÃ©seau en Free Pascal.');
+  MessageBody.Add('Suite … notre ‚change t‚l‚phonique, je vous propose');
+  MessageBody.Add('mes services pour le d‚veloppement de votre application');
+  MessageBody.Add('de gestion r‚seau en Free Pascal.');
   MessageBody.Add('');
-  MessageBody.Add('FonctionnalitÃ©s proposÃ©es :');
-  MessageBody.Add('- Surveillance rÃ©seau temps rÃ©el');
+  MessageBody.Add('Fonctionnalit‚s propos‚es :');
+  MessageBody.Add('- Surveillance r‚seau temps r‚el');
   MessageBody.Add('- Outils de diagnostic (ping, traceroute, nslookup)');
   MessageBody.Add('- Interface utilisateur intuitive');
   MessageBody.Add('- Reporting automatique');
   MessageBody.Add('');
-  MessageBody.Add('[Ã€ complÃ©ter : tarifs et planning]');
+  MessageBody.Add('A compl‚ter : tarifs et planning]');
   MessageBody.Add('');
   MessageBody.Add('Cordialement,');
-  
-  { En-tÃªtes }
+   { Entˆtes }
   Headers.Add('From: ' + PineConfig.FullName + ' <' + PineConfig.UserEmail + '>');
   Headers.Add('To: Nouveau Client <contact@freelance-client.com>');
-  Headers.Add('Subject: Proposition dÃ©veloppement application rÃ©seau');
-  Headers.Add('Date: [Ã€ dÃ©finir lors de l''envoi]');
+  Headers.Add('Subject: Proposition d‚veloppement application r‚seau');
+  Headers.Add('Date: A d‚finir lors de l''envoi]');
  End;
  Inc(MessageCount);
- 
- { Message 5: Message supprimÃ© }
+  { Message 5: Message supprim‚ }
  With PineMessages[MessageCount] Do Begin
   MessageID := MessageCount + 1;
   FromAddr := 'promo@spamsite.example';
@@ -619,7 +598,7 @@ Begin
   CcAddr := '';
   BccAddr := '';
   ReplyTo := 'noreply@spamsite.example';
-  Subject := 'ğŸ‰ GAGNEZ 5000â‚¬ IMMÃ‰DIATEMENT ! Cliquez ici !!! ğŸ‰';
+  Subject := 'ğA GAGNEZ 5000 $ IMMDIATEMENT ! Cliquez ici !!! ğ';
   DateSent := Now - 0.8;
   DateReceived := Now - 0.75;
   Priority := 1; { Fausse haute prioritÃ© }
@@ -640,19 +619,19 @@ Begin
   IsPersonal := False;
   ThreadID := 5;
   ThreadLevel := 0;
-  
+
   { Corps du message }
-  MessageBody.Add('FÃ‰LICITATIONS !!! VOUS AVEZ GAGNÃ‰ !!!');
+  MessageBody.Add('FLICITATIONS !!! VOUS AVEZ GAGN !!!');
   MessageBody.Add('');
-  MessageBody.Add('Cliquez sur le lien ci-dessous pour rÃ©cupÃ©rer vos 5000â‚¬');
-  MessageBody.Add('ATTENTION : Offre limitÃ©e dans le temps !!!');
+  MessageBody.Add('Cliquez sur le lien ci-dessous pour r‚cup‚rer vos 5000$');
+  MessageBody.Add('ATTENTION : Offre limit‚e dans le temps !!!');
   MessageBody.Add('');
-  MessageBody.Add('[Message identifiÃ© comme SPAM et supprimÃ© automatiquement]');
-  
+  MessageBody.Add('[Message identifi‚ comme SPAM et supprim‚ automatiquement]');
+
   { En-tÃªtes }
   Headers.Add('From: Offre Exceptionnelle <promo@spamsite.example>');
   Headers.Add('To: ' + PineConfig.UserEmail);
-  Headers.Add('Subject: ğŸ‰ GAGNEZ 5000â‚¬ IMMÃ‰DIATEMENT ! Cliquez ici !!! ğŸ‰');
+  Headers.Add('Subject: ğA GAGNEZ 5000$ IMMDIATEMENT ! Cliquez ici !!! ğ');
   Headers.Add('X-Spam-Score: 15.2');
   Headers.Add('X-Spam-Status: Yes, score=15.2 required=5.0');
  End;
@@ -665,12 +644,10 @@ Var
  I: Integer;
 Begin
  FillChar(PineStats, SizeOf(PineStats), 0);
- 
  For I := 0 To MessageCount - 1 Do Begin
   With PineMessages[I] Do Begin
    Inc(PineStats.TotalMessages);
    PineStats.TotalSize := PineStats.TotalSize + Size;
-   
    If Status = 'new' Then Inc(PineStats.NewMessages);
    If IsRead Then Inc(PineStats.ReadMessages) Else Inc(PineStats.UnreadMessages);
    If IsDeleted Then Inc(PineStats.DeletedMessages);
@@ -680,7 +657,6 @@ Begin
    If ThreadID > 0 Then Inc(PineStats.ThreadedMessages);
   End;
  End;
- 
  PineStats.TotalFolders := FolderCount;
  PineStats.ActiveFolders := FolderCount;
  PineStats.LastCheck := Now;
@@ -689,9 +665,8 @@ Begin
  PineStats.MessagesSent := 0;
 End;
 
-{ Afficher l'Ã©cran principal Pine }
-Procedure DisplayPineMainScreen;
-Begin
+{ Afficher l'‚cran principal Pine }
+Procedure DisplayPineMainScreen;Begin
  WriteLn('PINE 4.64   MAIN MENU                   Folder: INBOX  ', MessageCount, ' Messages');
  WriteLn;
  WriteLn('           ?     HELP               -  Get help using Pine');
@@ -701,10 +676,6 @@ Begin
  WriteLn('           A     ADDRESS BOOK      -  Update address book');
  WriteLn('           S     SETUP             -  Configure Pine Options');
  WriteLn('           Q     QUIT              -  Quit Pine');
- WriteLn;
- WriteLn('                  Copyright 1989-2005 University of Washington');
- WriteLn('                            Pine and Pico are trademarks of the');
- WriteLn('                           University of Washington.');
  WriteLn;
  WriteLn(' [Folder "INBOX" opened with ', MessageCount, ' messages]');
  If PineStats.NewMessages > 0 Then
@@ -728,13 +699,12 @@ Begin
  WriteLn('PINE 4.64   MESSAGE INDEX     Folder: INBOX             ', MessageCount, ' Messages');
  WriteLn;
  WriteLn('+ N  ', MessageCount:3, '  Feb 21  System Administrato (1,280)  [URGENT] Maintenance serveur prog');
- WriteLn('    ', MessageCount-1:3, '  Feb 20  Marie Martin       (  768)  Re: Projet Q1 - Planning Ã©quipe');
+ WriteLn('    ', MessageCount-1:3, '  Feb 20  Marie Martin       (  768)  Re: Projet Q1 - Planning ‚quipe');
  WriteLn(' F  ', MessageCount-2:3, '  Feb 19  DevTech Weekly     (3,072)  DevTech Weekly #47 - Free Pascal');
- WriteLn(' D  ', MessageCount-3:3, '  Feb 21  [DRAFT]           (  512)  Proposition dÃ©veloppement appli');
- WriteLn(' D  ', MessageCount-4:3, '  Feb 21  Offre Exception.   (2,048) [SPAM] GAGNEZ 5000â‚¬ IMMÃ‰DIA');
+ WriteLn(' D  ', MessageCount-3:3, '  Feb 21  [DRAFT]           (  512)  Proposition d‚veloppement appli');
+ WriteLn(' D  ', MessageCount-4:3, '  Feb 21  Offre Exception.   (2,048) [SPAM] GAGNEZ 5000$ IMMDIA');
  WriteLn;
- 
- { Affichage dÃ©taillÃ© des messages }
+  { Affichage d‚taill‚ des messages }
  WriteLn('Message List (', PineInterface.PageStart, '-');
  If PineInterface.PageEnd < MessageCount Then
   Write(PineInterface.PageEnd)
@@ -744,10 +714,9 @@ Begin
  WriteLn(StringOfChar('-', 80));
  WriteLn('  # St  Date    From               Size   Subject');
  WriteLn(StringOfChar('-', 80));
- 
+
  For I := PineInterface.PageStart - 1 To PineInterface.PageEnd - 1 Do Begin
   If I >= MessageCount Then Break;
-  
   With PineMessages[I] Do Begin
    { Indicateur de statut }
    If IsDeleted Then StatusChar := 'D'
@@ -757,22 +726,18 @@ Begin
    Else If Status = 'draft' Then StatusChar := 'B' { B pour brouillon }
    Else If IsRead Then StatusChar := ' '
    Else StatusChar := 'U';
-   
    { Indentation pour les threads }
    ThreadIndent := StringOfChar(' ', ThreadLevel * 2);
-   
    { Formatage des champs }
    FromDisplay := Copy(FromName + '               ', 1, 15);
    SubjectDisplay := Copy(Subject + '                                          ', 1, 40);
    DateDisplay := FormatDateTime('mm/dd', DateReceived);
    SizeDisplay := IntToStr(Size);
-   
    { Indicateur de message courant }
    If I + 1 = PineInterface.CurrentMessage Then
     Write('>')
    Else
     Write(' ');
-   
    { Affichage de la ligne }
    Write(I + 1:3, ' ', StatusChar, ' ');
    If IsFlagged Then Write('*') Else Write(' ');
@@ -780,7 +745,6 @@ Begin
    WriteLn(DateDisplay, ' ', ThreadIndent, FromDisplay, ' (', SizeDisplay:5, ') ', SubjectDisplay);
   End;
  End;
- 
  WriteLn(StringOfChar('-', 80));
  WriteLn('? Help     < FldrList     P PrevMsg     - PrevPage     Space NextPage');
  WriteLn('O OTHER CMDS: [ViewMsg] [Reply] [Forward] [Delete] [Undelete] [Flag]');
@@ -795,7 +759,6 @@ Begin
   WriteLn('Message not found');
   Exit;
  End;
- 
  With PineMessages[MessageIndex] Do Begin
   WriteLn('PINE 4.64   MESSAGE TEXT      Folder: INBOX  Message ', MessageID, ' of ', MessageCount);
   WriteLn(StringOfChar('-', 80));
@@ -812,7 +775,6 @@ Begin
   End;
   WriteLn(StringOfChar('-', 80));
   WriteLn;
-  
   { Afficher le corps du message }
   If MessageBody <> nil Then Begin
    For I := 0 To MessageBody.Count - 1 Do
@@ -820,12 +782,10 @@ Begin
   End Else Begin
    WriteLn('[Message body not available]');
   End;
-  
   WriteLn;
   WriteLn(StringOfChar('-', 80));
   WriteLn('? Help     < MsgIndex     P PrevMsg     N NextMsg     - PrevPage');
   WriteLn('O OTHER CMDS: [Reply] [Forward] [Flag] [Delete] [Undelete] [Print]');
-  
   { Marquer comme lu }
   If not IsRead Then Begin
    IsRead := True;
@@ -849,14 +809,12 @@ Begin
  WriteLn(StringOfChar('-', 80));
  WriteLn('        Folder Name      (Message Count)');
  WriteLn(StringOfChar('-', 80));
- 
  For I := 0 To FolderCount - 1 Do Begin
   With PineFolders[I] Do Begin
    If I = PineInterface.CurrentFolder Then
     Write(' -->  ')
    Else
     Write('      ');
-   
    Write(DisplayName);
    If NewMessages > 0 Then
     Write(' (', MessageCount, ', ', NewMessages, ' new)')
@@ -867,15 +825,13 @@ Begin
    WriteLn;
   End;
  End;
- 
  WriteLn(StringOfChar('-', 80));
  WriteLn('? Help     < MainMenu     P PrevFldr     N NextFldr     Space [Select]');
  WriteLn('O OTHER CMDS: [ViewFldr] [AddFldr] [DelFldr] [RenameFldr] [Export]');
 End;
 
 { Composer un nouveau message }
-Procedure DisplayPineCompose;
-Begin
+Procedure DisplayPineCompose;Begin
  WriteLn('PINE 4.64   COMPOSE MESSAGE                             Folder: INBOX');
  WriteLn(StringOfChar('-', 80));
  WriteLn('To      : [Enter recipient address]');
@@ -929,8 +885,7 @@ Begin
 End;
 
 { Afficher l'aide Pine }
-Procedure DisplayPineHelp;
-Begin
+Procedure DisplayPineHelp;Begin
  WriteLn('PINE 4.64   HELP TEXT                                          (MAIN)');
  WriteLn(StringOfChar('-', 80));
  WriteLn;
@@ -966,65 +921,56 @@ Begin
  WriteLn('? Help     < Exit Help     P PrevPage     Space NextPage');
 End;
 
-{ Interface interactive Pine simulÃ©e }
-Procedure RunPineInterface;
-Begin
+{ Interface interactive Pine simul‚e }
+Procedure RunPineInterface;Begin
  WriteLn('=== Pine Interactive Interface Simulation ===');
  WriteLn;
  WriteLn('Simulation of Pine 4.64 interface with automatic command execution:');
  WriteLn;
- 
- { Ã‰cran principal }
+  { cran principal }
  WriteLn('> Main Menu Screen');
  DisplayPineMainScreen;
  WriteLn;
  WriteLn('[Press any key to continue...]');
  WriteLn;
- 
- { Index des messages }
+  { Index des messages }
  WriteLn('> Message Index (I)');
  DisplayPineMessageIndex;
  WriteLn;
  WriteLn('[Press any key to continue...]');
  WriteLn;
- 
- { Lecture d'un message }
+  { Lecture d'un message }
  WriteLn('> Reading Message 1 (Enter)');
  DisplayPineMessage(0);
  WriteLn;
  WriteLn('[Press any key to continue...]');
  WriteLn;
- 
- { Liste des dossiers }
+  { Liste des dossiers }
  WriteLn('> Folder List (L)');
  DisplayPineFolderList;
  WriteLn;
  WriteLn('[Press any key to continue...]');
  WriteLn;
- 
- { Composition }
+  { Composition }
  WriteLn('> Compose Message (C)');
  DisplayPineCompose;
  WriteLn;
  WriteLn('[Press any key to continue...]');
  WriteLn;
- 
- { Configuration }
+  { Configuration }
  WriteLn('> Setup Configuration (S)');
  DisplayPineSetup;
  WriteLn;
  WriteLn('[Press any key to continue...]');
  WriteLn;
- 
- { Aide }
+  { Aide }
  WriteLn('> Help System (?)');
  DisplayPineHelp;
  WriteLn;
- 
  WriteLn('=== End of Pine Interface Simulation ===');
 End;
 
-{ Analyser les arguments de ligne de commande }
+ { Analyser les arguments de ligne de commande }
 Procedure ParsePineCommandLine;
 Var
  I: Integer;
@@ -1032,11 +978,9 @@ Var
  Action: String;
 Begin
  Action := 'interactive';
- 
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--version') Then Begin
    Action := 'version';
   End
@@ -1062,24 +1006,20 @@ Begin
   Else If Copy(Param, 1, 1) <> '-' Then Begin
    { ParamÃ¨tre non reconnu }
   End;
-  
   Inc(I);
  End;
- 
- { CrÃ©er les donnÃ©es d'exemple }
+  { Cr‚er les donn‚es d'exemple }
  CreateDefaultFolders;
  CreatePineSampleMessages;
  UpdatePineStats;
- 
- { Mettre Ã  jour les statistiques des dossiers }
+ { Mettre … jour les statistiques des dossiers }
  With PineFolders[0] Do Begin { INBOX }
   MessageCount := PineStats.TotalMessages;
   NewMessages := PineStats.NewMessages;
   UnreadMessages := PineStats.UnreadMessages;
   Size := PineStats.TotalSize;
  End;
- 
- { ExÃ©cuter l'action }
+  { Ex‚cuter l'action }
  Case Action Of
   'version': Begin
    WriteLn('Pine 4.64 - Program for Internet News & Email');
@@ -1089,7 +1029,6 @@ Begin
    WriteLn('Built: Feb 21, 2026');
    WriteLn('Version: 4.64 (NETWORKKIT-P variant)');
   End;
-  
   'index': DisplayPineMessageIndex;
   'config': DisplayPineSetup;
   'folders': DisplayPineFolderList;
@@ -1138,7 +1077,8 @@ End;
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('PINE : Program for Internet News & Email');
+  WriteLn('PINE : Cette commande permet de lancer le programme de ',
+          'nouvelles Internet et courriel.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  PINE [options]');
@@ -1154,15 +1094,15 @@ BEGIN
   WriteLn;
   WriteLn('FonctionnalitÃ©s principales :');
   WriteLn('  - Interface utilisateur intuitive en mode texte');
-  WriteLn('  - Lecture et gestion des emails avec threads');
-  WriteLn('  - Composition avec Ã©diteur intÃ©grÃ© (Pico)');
-  WriteLn('  - Carnet d''adresses intÃ©grÃ©');
+  WriteLn('  - Lecture et gestion des courriels avec processus l‚gers');
+  WriteLn('  - Composition avec ‚diteur int‚gr‚ (Pico)');
+  WriteLn('  - Carnet d''adresses int‚gr‚');
   WriteLn('  - Support SMTP, POP3, IMAP et NNTP');
-  WriteLn('  - Gestion avancÃ©e des dossiers');
-  WriteLn('  - Filtres et rÃ¨gles de classement');
-  WriteLn('  - Support des piÃ¨ces jointes');
+  WriteLn('  - Gestion avanc‚e des dossiers');
+  WriteLn('  - Filtres et rŠgles de classement');
+  WriteLn('  - Support des piŠces jointes');
   WriteLn('  - Correcteur orthographique');
-  WriteLn('  - Personnalisation complÃ¨te');
+  WriteLn('  - Personnalisation complŠte');
   WriteLn;
   WriteLn('Commandes principales :');
   WriteLn('  Menu principal :');
@@ -1175,19 +1115,19 @@ BEGIN
   WriteLn('    Q     Quitter');
   WriteLn;
   WriteLn('  Index des messages :');
-  WriteLn('    Enter   Lire le message sÃ©lectionnÃ©');
-  WriteLn('    R       RÃ©pondre au message');
-  WriteLn('    F       TransfÃ©rer le message');
+  WriteLn('    Enter   Lire le message s‚lectionn‚');
+  WriteLn('    R       R‚pondre au message');
+  WriteLn('    F       Transf‚rer le message');
   WriteLn('    D       Supprimer le message');
   WriteLn('    U       Restaurer le message');
-  WriteLn('    N/P     Message suivant/prÃ©cÃ©dent');
+  WriteLn('    N/P     Message suivant/pr‚c‚dent');
   WriteLn('    Space   Page suivante');
-  WriteLn('    -       Page prÃ©cÃ©dente');
+  WriteLn('    -       Page pr‚c‚dente');
   WriteLn;
   WriteLn('  Lecture de message :');
-  WriteLn('    N/P     Message suivant/prÃ©cÃ©dent');
-  WriteLn('    R       RÃ©pondre');
-  WriteLn('    F       TransfÃ©rer');
+  WriteLn('    N/P     Message suivant/pr‚c‚dent');
+  WriteLn('    R       R‚pondre');
+  WriteLn('    F       Transf‚rer');
   WriteLn('    D       Supprimer');
   WriteLn('    S       Sauvegarder dans dossier');
   WriteLn('    E       Exporter');
@@ -1197,13 +1137,13 @@ BEGIN
   WriteLn('    ^X      Envoyer le message');
   WriteLn('    ^C      Annuler');
   WriteLn('    ^R      Lire fichier');
-  WriteLn('    ^O      Ã‰crire fichier');
-  WriteLn('    ^T      VÃ©rifier orthographe');
+  WriteLn('    ^O      crire fichier');
+  WriteLn('    ^T      V‚rifier orthographe');
   WriteLn('    ^J      Justifier paragraphe');
   WriteLn;
-  WriteLn('Gestion des threads :');
-  WriteLn('  Pine organise automatiquement les messages par thread');
-  WriteLn('  (conversation). Les rÃ©ponses sont indentÃ©es sous le');
+  WriteLn('Gestion des processus l‚gers :');
+  WriteLn('  Pine organise automatiquement les messages par processus l‚ger');
+  WriteLn('  (conversation). Les r‚ponses sont indent‚es sous le');
   WriteLn('  message original pour faciliter le suivi.');
   WriteLn;
   WriteLn('Configuration :');
@@ -1211,12 +1151,12 @@ BEGIN
   WriteLn('  ~/.pine-debug[1-4] Fichiers de debug');
   WriteLn('  ~/.signature      Signature automatique');
   WriteLn('  ~/.addressbook    Carnet d''adresses personnel');
-  WriteLn('  ~/mail/           RÃ©pertoire des dossiers mail');
+  WriteLn('  ~/mail/           R‚pertoire des dossiers de courriel');
   WriteLn;
-  WriteLn('Dossiers par dÃ©faut :');
-  WriteLn('  INBOX             BoÃ®te de rÃ©ception');
-  WriteLn('  sent-mail         Messages envoyÃ©s');
-  WriteLn('  saved-messages    Messages sauvegardÃ©s');
+  WriteLn('Dossiers par d‚faut :');
+  WriteLn('  INBOX             BoŒte de r‚ception');
+  WriteLn('  sent-mail         Messages envoy‚s');
+  WriteLn('  saved-messages    Messages sauvegard‚s');
   WriteLn('  drafts            Brouillons');
   WriteLn('  Trash             Corbeille');
   WriteLn;
@@ -1227,19 +1167,19 @@ BEGIN
   WriteLn('  PINE --config     # Voir configuration');
   WriteLn('  PINE --stats      # Statistiques mail');
   WriteLn;
-  WriteLn('Note: Client de messagerie avancÃ© compatible avec');
-  WriteLn('Pine de l''University of Washington. Interface complÃ¨te');
-  WriteLn('avec support threads, piÃ¨ces jointes et configuration.');
+  WriteLn('Note: Client de messagerie avanc‚ compatible avec');
+  WriteLn('Pine de l''University of Washington. Interface complŠte');
+  WriteLn('avec support threads, piŠces jointes et configuration.');
  End
  Else If ParamStr(1) = '--version' Then Begin
   WriteLn('Pine 4.64 - Program for Internet News & Email');
   WriteLn('NETWORKKIT-P Implementation');
-  WriteLn('Licence compatible University of Washington Pine');
   WriteLn;
   WriteLn('Compatible avec Pine standard Unix/Linux');
-  WriteLn('Ã‰crit par Sylvain Maltais pour NETWORKKIT-P');
+  WriteLn('crit par Sylvain Maltais pour NETWORKKIT-P');
  End
- Else Begin
+  Else
+ Begin
   {$IFDEF FPC}
   InitializePineConfig;
   ParsePineCommandLine;
