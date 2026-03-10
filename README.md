@@ -127,6 +127,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer l'outil de requête DNS avancé.</td>
 	</tr>
 	<tr>
+		<td><b>NSTEST.PAS</b></td>
+		<td>Cette commande permet de lancer l'outil de test de serveurs DNS.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
