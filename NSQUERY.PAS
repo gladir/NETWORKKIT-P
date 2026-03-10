@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande nsquery (Name Server Query))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande nsquery (Name Server Query))
 }
 
 Program NSQUERY;
@@ -11,75 +12,75 @@ Program NSQUERY;
  {$mode objfpc}
  Uses SysUtils, WinSock, Strings;
 {$ELSE}
- { Turbo Pascal 7 }
+ Uses DOS;
 {$ENDIF}
 
 {$IFDEF FPC}
 Type
- { Types de requ√™tes DNS pour nsquery }
+ { Types de requàtes DNS pour nsquery }
  TNSQueryType = (NSQ_A, NSQ_AAAA, NSQ_NS, NSQ_MX, NSQ_CNAME, NSQ_TXT, NSQ_PTR, NSQ_SRV, NSQ_SOA, NSQ_ANY);
 
  { Structure pour un enregistrement DNS }
  TNSQueryRecord = Record
   Name: String[255];         { Nom de domaine }
   RecordType: TNSQueryType;  { Type d'enregistrement }
-  RecordClass: Word;         { Classe (g√©n√©ralement IN=1) }
+  RecordClass: Word;         { Classe (gÇnÇralement IN=1) }
   TTL: LongInt;              { Time To Live }
-  DataLength: Word;          { Longueur des donn√©es }
-  Data: String[255];         { Donn√©es de l'enregistrement }
-  Priority: Word;            { Priorit√© (pour MX, SRV) }
+  DataLength: Word;          { Longueur des donnÇes }
+  Data: String[255];         { DonnÇes de l'enregistrement }
+  Priority: Word;            { PrioritÇ (pour MX, SRV) }
   Weight: Word;              { Poids (pour SRV) }
   Port: Word;                { Port (pour SRV) }
  End;
 
- { Structure pour une requ√™te DNS compl√®te }
+  { Structure pour une requàte DNS compläte }
  TNSQueryRequest = Record
-  QueryName: String[255];    { Nom interrog√© }
-  QueryType: TNSQueryType;   { Type de requ√™te }
-  QueryClass: Word;          { Classe de requ√™te }
-  Server: String[64];        { Serveur DNS √† utiliser }
-  Port: Word;                { Port DNS (d√©faut 53) }
+  QueryName: String[255];    { Nom interrogÇ }
+  QueryType: TNSQueryType;   { Type de requàte }
+  QueryClass: Word;          { Classe de requàte }
+  Server: String[64];        { Serveur DNS Ö utiliser }
+  Port: Word;                { Port DNS (dÇfaut 53) }
   Timeout: Integer;          { Timeout en millisecondes }
   Retries: Integer;          { Nombre de tentatives }
-  Recursive: Boolean;        { Requ√™te r√©cursive }
+  Recursive: Boolean;        { Requàte rÇcursive }
   UseCache: Boolean;         { Utiliser le cache DNS }
  End;
 
- { Structure pour une r√©ponse DNS compl√®te }
+ { Structure pour une rÇponse DNS compläte }
  TNSQueryResponse = Record
-  QueryName: String[255];    { Nom interrog√© }
-  QueryType: TNSQueryType;   { Type de requ√™te }
-  Server: String[64];        { Serveur DNS utilis√© }
-  ResponseCode: Integer;     { Code de r√©ponse (0=NOERROR) }
-  ResponseFlags: Word;       { Drapeaux de r√©ponse }
-  AnswerCount: Integer;      { Nombre de r√©ponses }
-  Answers: Array[0..31] of TNSQueryRecord; { R√©ponses }
-  AuthorityCount: Integer;   { Nombre d'autorit√©s }
-  Authorities: Array[0..15] of TNSQueryRecord; { Enregistrements d'autorit√© }
+  QueryName: String[255];    { Nom interrogÇ }
+  QueryType: TNSQueryType;   { Type de requàte }
+  Server: String[64];        { Serveur DNS utilisÇ }
+  ResponseCode: Integer;     { Code de rÇponse (0=NOERROR) }
+  ResponseFlags: Word;       { Drapeaux de rÇponse }
+  AnswerCount: Integer;      { Nombre de rÇponses }
+  Answers: Array[0..31] of TNSQueryRecord; { RÇponses }
+  AuthorityCount: Integer;   { Nombre d'autoritÇs }
+  Authorities: Array[0..15] of TNSQueryRecord; { Enregistrements d'autoritÇ }
   AdditionalCount: Integer;  { Nombre d'additionnels }
   Additional: Array[0..15] of TNSQueryRecord; { Enregistrements additionnels }
-  QueryTime: LongInt;        { Temps de requ√™te en millisecondes }
-  Truncated: Boolean;        { R√©ponse tronqu√©e }
-  Authoritative: Boolean;    { R√©ponse autoritaire }
-  RecursionAvailable: Boolean; { R√©cursion disponible }
-  Authenticated: Boolean;    { Donn√©es authentifi√©es }
+  QueryTime: LongInt;        { Temps de requàte en millisecondes }
+  Truncated: Boolean;        { RÇponse tronquÇe }
+  Authoritative: Boolean;    { RÇponse autoritaire }
+  RecursionAvailable: Boolean; { RÇcursion disponible }
+  Authenticated: Boolean;    { DonnÇes authentifiÇes }
  End;
 
 Var
- { Variables globales }
+  { Variables globales }
  WSAInitialized: Boolean;
  DefaultServer: String[64];
  VerboseMode: Integer;      { 0=normal, 1=verbose, 2=debug }
  QuietMode: Boolean;
- RawMode: Boolean;          { Affichage brut des donn√©es }
+ RawMode: Boolean;          { Affichage brut des donnÇes }
  ShowStats: Boolean;        { Afficher les statistiques }
  ShowFlags: Boolean;        { Afficher les drapeaux }
- ShowHeaders: Boolean;      { Afficher les en-t√™tes }
+ ShowHeaders: Boolean;      { Afficher les entàtes }
  UseIPv6: Boolean;          { Utiliser IPv6 }
  FollowCNAME: Boolean;      { Suivre les CNAME }
- CheckReverse: Boolean;     { V√©rifier la r√©solution inverse }
+ CheckReverse: Boolean;     { VÇrifier la rÇsolution inverse }
 
-{ Initialisation Winsock }
+ { Initialisation Winsock }
 Function InitializeWinsock: Boolean;
 Var
  WSData: TWSAData;
@@ -97,16 +98,15 @@ Begin
  End;
 End;
 
-{ Nettoyage Winsock }
-Procedure CleanupWinsock;
-Begin
+ { Nettoyage Winsock }
+Procedure CleanupWinsock;Begin
  If WSAInitialized Then Begin
   WSACleanup;
   WSAInitialized := False;
  End;
 End;
 
-{ Convertir un type d'enregistrement en cha√Æne }
+ { Convertir un type d'enregistrement en chaåne }
 Function RecordTypeToString(RecType: TNSQueryType): String;
 Begin
  Case RecType Of
@@ -125,7 +125,7 @@ Begin
  End;
 End;
 
-{ Convertir une cha√Æne en type d'enregistrement }
+ { Convertir une chaåne en type d'enregistrement }
 Function StringToRecordType(TypeStr: String): TNSQueryType;
 Var
  UpperStr: String;
@@ -155,7 +155,7 @@ Begin
   StringToRecordType := NSQ_A; { Par d√©faut }
 End;
 
-{ Obtenir le message d'erreur DNS }
+ { Obtenir le message d'erreur DNS }
 Function GetDNSErrorMessage(ErrorCode: Integer): String;
 Begin
  Case ErrorCode Of
@@ -175,7 +175,7 @@ Begin
  End;
 End;
 
-{ Valider une adresse IP }
+ { Valider une adresse IP }
 Function IsValidIPAddress(IP: String): Boolean;
 Var
  I, Dots, Num: Integer;
@@ -184,11 +184,9 @@ Var
 Begin
  IsValidIPAddress := False;
  If Length(IP) = 0 Then Exit;
- 
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -203,26 +201,23 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
  IsValidIPAddress := (Dots = 4);
 End;
 
-{ Valider un nom de domaine }
+ { Valider un nom de domaine }
 Function IsValidDomainName(Domain: String): Boolean;
 Var
  I: Integer;
 Begin
  IsValidDomainName := False;
  If (Length(Domain) = 0) or (Length(Domain) > 253) Then Exit;
- 
  For I := 1 To Length(Domain) Do Begin
   If not (Domain[I] in ['a'..'z', 'A'..'Z', '0'..'9', '-', '.', '_']) Then Exit;
  End;
- 
  IsValidDomainName := True;
 End;
 
-{ Convertir une adresse IP en format in-addr.arpa }
+ { Convertir une adresse IP en format in-addr.arpa }
 Function IPToInAddrArpa(IP: String): String;
 Var
  Parts: Array[1..4] of String;
@@ -231,8 +226,7 @@ Var
 Begin
  IPToInAddrArpa := '';
  If not IsValidIPAddress(IP) Then Exit;
- 
- { D√©couper l'adresse IP }
+  { DÇcouper l'adresse IP }
  S := IP + '.';
  P := 1;
  PartCount := 0;
@@ -244,13 +238,12 @@ Begin
    P := I + 1;
   End;
  End;
- 
- { Construire l'adresse invers√©e }
+  { Construire l'adresse inversÇe }
  If PartCount = 4 Then
   IPToInAddrArpa := Parts[4] + '.' + Parts[3] + '.' + Parts[2] + '.' + Parts[1] + '.in-addr.arpa';
 End;
 
-{ Requ√™te DNS r√©elle utilisant les fonctions syst√®me }
+ { Requàte DNS rÇelle utilisant les fonctions systäme }
 Function PerformNSQuery(var Request: TNSQueryRequest; var Response: TNSQueryResponse): Boolean;
 Var
  HostEnt: PHostEnt;
@@ -267,29 +260,24 @@ Begin
  Response.Server := Request.Server;
  Response.ResponseCode := 0;
  Response.RecursionAvailable := True;
- 
  If Not WSAInitialized Then Begin
   If Not InitializeWinsock Then Begin
    Response.ResponseCode := 2; { SERVFAIL }
    Exit;
   End;
  End;
- 
  StartTime := GetTickCount;
  QueryName := Request.QueryName;
- 
- { Pour les enregistrements A (IPv4) }
+  { Pour les enregistrements A (IPv4) }
  If Request.QueryType = NSQ_A Then Begin
   Try
    HostEnt := gethostbyname(PChar(AnsiString(QueryName)));
    Response.QueryTime := GetTickCount - StartTime;
-   
    If (HostEnt <> nil) and (HostEnt^.h_addr_list <> nil) Then Begin
     I := 0;
     AddrPtr := HostEnt^.h_addr_list^;
     While (AddrPtr <> nil) and (I < 32) Do Begin
      Move(AddrPtr^, Addr, 4);
-     
      With Response.Answers[Response.AnswerCount] Do Begin
       Name := Response.QueryName;
       RecordType := NSQ_A;
@@ -303,12 +291,10 @@ Begin
      End;
      Inc(Response.AnswerCount);
      Inc(I);
-     
-     { Passer au suivant }
+      { Passer au suivant }
      Inc(PtrUInt(HostEnt^.h_addr_list), SizeOf(Pointer));
      AddrPtr := HostEnt^.h_addr_list^;
     End;
-    
     Response.Authoritative := False;
     PerformNSQuery := (Response.AnswerCount > 0);
    End Else Begin
@@ -319,27 +305,27 @@ Begin
    Response.ResponseCode := 2; { SERVFAIL }
   End;
  End
- 
- { Pour les enregistrements PTR (r√©solution inverse) }
- Else If Request.QueryType = NSQ_PTR Then Begin
+ { Pour les enregistrements PTR (rÇsolution inverse) }
+  Else
+ If Request.QueryType = NSQ_PTR Then Begin
   Try
-   { V√©rifier si c'est une IP ou d√©j√† au format in-addr.arpa }
+   { VÇrifier si c'est une IP ou dÇjÖ au format in-addr.arpa }
    If IsValidIPAddress(QueryName) Then Begin
     QueryName := IPToInAddrArpa(QueryName);
     Addr.s_addr := inet_addr(PChar(AnsiString(Request.QueryName)));
     HostEnt := gethostbyaddr(@Addr, 4, AF_INET);
-   End Else If Pos('.in-addr.arpa', LowerCase(QueryName)) > 0 Then Begin
+   End
+    Else
+   If Pos('.in-addr.arpa', LowerCase(QueryName)) > 0 Then Begin
     { Extraire l'IP du format in-addr.arpa }
     { Format: 4.3.2.1.in-addr.arpa -> 1.2.3.4 }
-    { Impl√©mentation simplifi√©e }
+    { ImplÇmentation simplifiÇe }
     Addr.s_addr := inet_addr(PChar(AnsiString(Request.QueryName)));
     HostEnt := gethostbyaddr(@Addr, 4, AF_INET);
    End Else Begin
     HostEnt := nil;
    End;
-   
    Response.QueryTime := GetTickCount - StartTime;
-   
    If HostEnt <> nil Then Begin
     With Response.Answers[Response.AnswerCount] Do Begin
      Name := Response.QueryName;
@@ -355,7 +341,9 @@ Begin
     Response.AnswerCount := 1;
     Response.Authoritative := False;
     PerformNSQuery := True;
-   End Else Begin
+   End
+    Else
+   Begin
     Response.ResponseCode := 3; { NXDOMAIN }
    End;
   Except
@@ -363,11 +351,10 @@ Begin
    Response.ResponseCode := 2; { SERVFAIL }
   End;
  End
- 
  { Pour les autres types, utiliser une simulation enrichie }
- Else Begin
+  Else
+ Begin
   Response.QueryTime := GetTickCount - StartTime + (Random(50) + 20);
-  
   Case Request.QueryType Of
    NSQ_NS: Begin
     { Simuler des serveurs de noms }
@@ -421,7 +408,6 @@ Begin
     Response.Authoritative := False;
     PerformNSQuery := True;
    End;
-   
    NSQ_MX: Begin
     { Simuler des enregistrements MX }
     If Pos('google.com', LowerCase(QueryName)) > 0 Then Begin
@@ -470,7 +456,6 @@ Begin
     Response.Authoritative := False;
     PerformNSQuery := True;
    End;
-   
    NSQ_TXT: Begin
     { Simuler des enregistrements TXT }
     If Pos('google.com', LowerCase(QueryName)) > 0 Then Begin
@@ -497,7 +482,6 @@ Begin
     Response.Authoritative := False;
     PerformNSQuery := True;
    End;
-   
    NSQ_CNAME: Begin
     { Simuler des enregistrements CNAME }
     With Response.Answers[0] Do Begin
@@ -512,7 +496,6 @@ Begin
     Response.Authoritative := False;
     PerformNSQuery := True;
    End;
-   
    NSQ_SRV: Begin
     { Simuler des enregistrements SRV }
     With Response.Answers[0] Do Begin
@@ -530,7 +513,6 @@ Begin
     Response.Authoritative := False;
     PerformNSQuery := True;
    End;
-   
    NSQ_SOA: Begin
     { Simuler un enregistrement SOA }
     With Response.Answers[0] Do Begin
@@ -545,26 +527,22 @@ Begin
     Response.Authoritative := True;
     PerformNSQuery := True;
    End;
-   
    NSQ_ANY: Begin
-    { Pour ANY, essayer de r√©soudre A d'abord }
+    { Pour ANY, essayer de rÇsoudre A d'abord }
     Request.QueryType := NSQ_A;
     If PerformNSQuery(Request, Response) Then Begin
      Response.QueryType := NSQ_ANY;
     End;
    End;
-   
   Else
    Response.ResponseCode := 4; { NOT IMPLEMENTED }
   End;
  End;
 End;
 
-{ Afficher les en-t√™tes de r√©ponse DNS }
-Procedure DisplayResponseHeader(var Response: TNSQueryResponse);
-Begin
+ { Afficher les entàtes de rÇponse DNS }
+Procedure DisplayResponseHeader(var Response:TNSQueryResponse);Begin
  If not ShowHeaders Then Exit;
- 
  WriteLn(';; Got answer:');
  WriteLn(';; ->>HEADER<<- opcode: QUERY, status: ', GetDNSErrorMessage(Response.ResponseCode));
  Write(';; flags:');
@@ -572,27 +550,26 @@ Begin
  If Response.Authoritative Then Write(' aa');
  If Response.Truncated Then Write(' tc');
  If Response.Authenticated Then Write(' ad');
- WriteLn('; QUERY: 1, ANSWER: ', Response.AnswerCount, 
+ WriteLn('; QUERY: 1, ANSWER: ', Response.AnswerCount,
          ', AUTHORITY: ', Response.AuthorityCount,
          ', ADDITIONAL: ', Response.AdditionalCount);
  WriteLn;
 End;
 
-{ Afficher la section QUESTION }
-Procedure DisplayQuestionSection(var Response: TNSQueryResponse);
-Begin
+ { Afficher la section QUESTION }
+Procedure DisplayQuestionSection(var Response: TNSQueryResponse);Begin
  WriteLn(';; QUESTION SECTION:');
  WriteLn(';', Response.QueryName, '.		IN	', RecordTypeToString(Response.QueryType));
  WriteLn;
 End;
 
-{ Afficher les r√©sultats d'une requ√™te DNS }
+ { Afficher les rÇsultats d'une requàte DNS }
 Procedure DisplayNSQueryResults(var Response: TNSQueryResponse);
 Var
  I: Integer;
 Begin
  If QuietMode Then Begin
-  { Mode silencieux - afficher seulement les donn√©es }
+  { Mode silencieux - afficher seulement les donnÇes }
   For I := 0 To Response.AnswerCount - 1 Do Begin
    With Response.Answers[I] Do Begin
     Case RecordType Of
@@ -606,27 +583,21 @@ Begin
   End;
   Exit;
  End;
- 
- { V√©rifier les erreurs }
+  { VÇrifier les erreurs }
  If Response.ResponseCode <> 0 Then Begin
   WriteLn(';; Got answer:');
   WriteLn(';; ->>HEADER<<- opcode: QUERY, status: ', GetDNSErrorMessage(Response.ResponseCode));
   WriteLn;
   Exit;
  End;
- 
- { Afficher l'en-t√™te si demand√© }
+  { Afficher l'en-tàte si demandÇ }
  DisplayResponseHeader(Response);
- 
- { Afficher la question }
- If ShowHeaders Then
-  DisplayQuestionSection(Response);
- 
- { Afficher les r√©ponses }
+  { Afficher la question }
+ If ShowHeaders Then DisplayQuestionSection(Response);
+  { Afficher les rÇponses }
  If Response.AnswerCount > 0 Then Begin
   If ShowHeaders Then
    WriteLn(';; ANSWER SECTION:');
-  
   For I := 0 To Response.AnswerCount - 1 Do Begin
    With Response.Answers[I] Do Begin
     If RawMode Then Begin
@@ -654,8 +625,7 @@ Begin
   End;
   WriteLn;
  End;
- 
- { Afficher les statistiques si demand√©es }
+  { Afficher les statistiques si demandÇes }
  If ShowStats Then Begin
   WriteLn(';; Query time: ', Response.QueryTime, ' msec');
   WriteLn(';; SERVER: ', Response.Server, '#53(', Response.Server, ')');
@@ -665,7 +635,7 @@ Begin
  End;
 End;
 
-{ Suivre les redirections CNAME }
+ { Suivre les redirections CNAME }
 Function FollowCNAMEChain(var Request: TNSQueryRequest; var FinalResponse: TNSQueryResponse): Boolean;
 Var
  Response: TNSQueryResponse;
@@ -673,43 +643,38 @@ Var
  MaxRedirects, Redirects: Integer;
 Begin
  FollowCNAMEChain := False;
- MaxRedirects := 10; { Limite pour √©viter les boucles }
+ MaxRedirects := 10; { Limite pour Çviter les boucles }
  Redirects := 0;
  OriginalName := Request.QueryName;
  CurrentName := Request.QueryName;
- 
  Repeat
   Request.QueryName := CurrentName;
   If not PerformNSQuery(Request, Response) Then Exit;
-  
-  { Si on a une r√©ponse directe, c'est fini }
+   { Si on a une rÇponse directe, c'est fini }
   If (Response.AnswerCount > 0) and (Response.Answers[0].RecordType = Request.QueryType) Then Begin
    FinalResponse := Response;
    FollowCNAMEChain := True;
    Exit;
   End;
-  
-  { Chercher un CNAME dans les r√©ponses }
+   { Chercher un CNAME dans les rÇponses }
   If (Response.AnswerCount > 0) and (Response.Answers[0].RecordType = NSQ_CNAME) Then Begin
    CurrentName := Response.Answers[0].Data;
    Inc(Redirects);
    If VerboseMode > 0 Then
     WriteLn(';; Following CNAME: ', OriginalName, ' -> ', CurrentName);
   End Else Begin
-   { Pas de CNAME trouv√© }
+   { Pas de CNAME trouvÇ }
    FinalResponse := Response;
    FollowCNAMEChain := True;
    Exit;
   End;
-  
  Until Redirects >= MaxRedirects;
- 
- { Trop de redirections }
+  { Trop de redirections }
  If VerboseMode > 0 Then
   WriteLn(';; Too many CNAME redirections (', MaxRedirects, ')');
 End;
 
-{ Effectuer une v√©rification de coh√©rence DNS }
+ { Effectuer une vÇrification de cohÇrence DNS }
 Procedure PerformConsistencyCheck(QueryName: String; QueryType: TNSQueryType);
 Var
  Request: TNSQueryRequest;
@@ -718,15 +683,12 @@ Var
  I: Integer;
 Begin
  If VerboseMode = 0 Then Exit;
- 
- { Serveurs √† tester }
+  { Serveurs Ö tester }
  Servers[0] := '8.8.8.8';      { Google }
  Servers[1] := '1.1.1.1';      { Cloudflare }
  Servers[2] := '208.67.222.222'; { OpenDNS }
  Servers[3] := '9.9.9.9';      { Quad9 }
- 
  WriteLn(';; Consistency check across multiple servers:');
- 
  For I := 0 To 3 Do Begin
   FillChar(Request, SizeOf(Request), 0);
   Request.QueryName := QueryName;
@@ -738,7 +700,6 @@ Begin
   Request.Retries := 2;
   Request.Recursive := True;
   Request.UseCache := False;
-  
   If PerformNSQuery(Request, Response) Then Begin
    Write(';; ', Servers[I], ': ');
    If Response.AnswerCount > 0 Then
@@ -752,16 +713,14 @@ Begin
  WriteLn;
 End;
 
-{ Obtenir le serveur DNS par d√©faut du syst√®me }
-Function GetSystemDNSServer: String;
-Begin
- { Pour cette impl√©mentation, retourner un serveur DNS public }
+{ Obtenir le serveur DNS par dÇfaut du systäme }
+Function GetSystemDNSServer:String;Begin
+  { Pour cette implÇmentation, retourner un serveur DNS public }
  GetSystemDNSServer := '8.8.8.8'; { Google Public DNS }
 End;
 
-{ Initialiser les variables globales }
-Procedure InitializeNSQuery;
-Begin
+ { Initialiser les variables globales }
+Procedure InitializeNSQuery;Begin
  WSAInitialized := False;
  DefaultServer := GetSystemDNSServer;
  VerboseMode := 0;
@@ -775,7 +734,7 @@ Begin
  CheckReverse := False;
 End;
 
-{ Analyser la ligne de commande }
+ { Analyser la ligne de commande }
 Procedure ParseNSQueryCommandLine;
 Var
  I: Integer;
@@ -787,87 +746,92 @@ Var
 Begin
  QueryName := '';
  QueryType := NSQ_A;
- 
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-v') or (LowerCase(Param) = '--verbose') Then Begin
    Inc(VerboseMode);
   End
-  Else If (LowerCase(Param) = '-q') or (LowerCase(Param) = '--quiet') Then Begin
+   Else
+  If (LowerCase(Param) = '-q') or (LowerCase(Param) = '--quiet') Then Begin
    QuietMode := True;
    ShowStats := False;
    ShowHeaders := False;
   End
-  Else If (LowerCase(Param) = '-r') or (LowerCase(Param) = '--raw') Then Begin
+   Else
+  If (LowerCase(Param) = '-r') or (LowerCase(Param) = '--raw') Then Begin
    RawMode := True;
    ShowHeaders := False;
    ShowStats := False;
   End
-  Else If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--stats') Then Begin
+   Else
+  If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--stats') Then Begin
    ShowStats := True;
   End
-  Else If (LowerCase(Param) = '-f') or (LowerCase(Param) = '--flags') Then Begin
+   Else
+  If (LowerCase(Param) = '-f') or (LowerCase(Param) = '--flags') Then Begin
    ShowFlags := True;
   End
-  Else If (LowerCase(Param) = '-h') or (LowerCase(Param) = '--headers') Then Begin
+   Else
+  If (LowerCase(Param) = '-h') or (LowerCase(Param) = '--headers') Then Begin
    ShowHeaders := True;
   End
-  Else If (LowerCase(Param) = '-6') or (LowerCase(Param) = '--ipv6') Then Begin
+   Else
+  If (LowerCase(Param) = '-6') or (LowerCase(Param) = '--ipv6') Then Begin
    UseIPv6 := True;
    QueryType := NSQ_AAAA;
   End
-  Else If (LowerCase(Param) = '-c') or (LowerCase(Param) = '--consistency') Then Begin
+   Else
+  If (LowerCase(Param) = '-c') or (LowerCase(Param) = '--consistency') Then Begin
    CheckReverse := True;
   End
-  Else If (LowerCase(Param) = '-t') or (LowerCase(Param) = '--type') Then Begin
+   Else
+  If (LowerCase(Param) = '-t') or (LowerCase(Param) = '--type') Then Begin
    If I < ParamCount Then Begin
     Inc(I);
     QueryType := StringToRecordType(ParamStr(I));
    End;
   End
-  Else If (LowerCase(Param) = '@') and (I < ParamCount) Then Begin
+   Else
+  If (LowerCase(Param) = '@') and (I < ParamCount) Then Begin
    Inc(I);
    DefaultServer := ParamStr(I);
   End
-  Else If Copy(Param, 1, 1) = '@' Then Begin
+   Else
+  If Copy(Param, 1, 1) = '@' Then Begin
    DefaultServer := Copy(Param, 2, Length(Param) - 1);
   End
-  Else If (LowerCase(Param) = '--server') Then Begin
+   Else
+  If (LowerCase(Param) = '--server') Then Begin
    If I < ParamCount Then Begin
     Inc(I);
     DefaultServer := ParamStr(I);
    End;
   End
-  Else If Copy(Param, 1, 1) <> '-' Then Begin
+   Else
+  If Copy(Param, 1, 1) <> '-' Then Begin
    QueryName := Param;
   End;
-  
   Inc(I);
  End;
- 
- { Validation }
+  { Validation }
  If QueryName = '' Then Begin
   WriteLn('nsquery: Nom de domaine ou adresse IP requis');
   WriteLn('Usage: nsquery [options] nom_de_domaine');
   WriteLn('Utilisez nsquery --help pour plus d''informations');
   Halt(1);
  End;
- 
  If not IsValidDomainName(QueryName) and not IsValidIPAddress(QueryName) Then Begin
   WriteLn('nsquery: "', QueryName, '" n''est pas un nom de domaine ou une adresse IP valide');
   Halt(1);
  End;
- 
- { D√©tection automatique du type pour r√©solution inverse }
+  { DÇtection automatique du type pour rÇsolution inverse }
  If IsValidIPAddress(QueryName) and (QueryType = NSQ_A) Then Begin
   QueryType := NSQ_PTR;
   If VerboseMode > 0 Then
    WriteLn(';; Detected IP address, switching to PTR query');
  End;
- 
- { Pr√©parer la requ√™te }
+  { PrÇparer la requàte }
  FillChar(Request, SizeOf(Request), 0);
  Request.QueryName := QueryName;
  Request.QueryType := QueryType;
@@ -878,40 +842,113 @@ Begin
  Request.Retries := 3;
  Request.Recursive := True;
  Request.UseCache := True;
- 
- { Affichage informatif }
+  { Affichage informatif }
  If VerboseMode > 0 Then Begin
   WriteLn(';; nsquery version 1.00');
   WriteLn(';; Server: ', DefaultServer, '#53(', DefaultServer, ')');
   WriteLn(';; Query: ', QueryName, ' IN ', RecordTypeToString(QueryType));
   WriteLn;
  End;
- 
- { Effectuer la requ√™te }
+  { Effectuer la requàte }
  If FollowCNAME and (QueryType <> NSQ_CNAME) and (QueryType <> NSQ_PTR) Then Begin
   If FollowCNAMEChain(Request, Response) Then Begin
    DisplayNSQueryResults(Response);
   End Else Begin
    WriteLn(';; Query failed');
   End;
- End Else Begin
+ End
+  Else
+ Begin
   If PerformNSQuery(Request, Response) Then Begin
    DisplayNSQueryResults(Response);
-  End Else Begin
+  End
+   Else
+  Begin
    WriteLn(';; Query failed: ', GetDNSErrorMessage(Response.ResponseCode));
   End;
  End;
- 
- { V√©rifications suppl√©mentaires }
+  { VÇrifications supplÇmentaires }
  If CheckReverse and (VerboseMode > 0) Then
   PerformConsistencyCheck(QueryName, QueryType);
 End;
 {$ENDIF}
 
 {$IFNDEF FPC}
-{ Simulation pour Turbo Pascal }
-Procedure ShowSimulatedNSQuery(Name, RecordType: String);
+Function UpperCase(S:String):String;
+Var
+ I:Integer;
 Begin
+ For I:=1 To Length(S) Do
+  If S[I] in ['a'..'z'] Then S[I]:=Chr(Ord(S[I])-32);
+ UpperCase:=S;
+End;
+
+Function LowerCase(S:String):String;
+Var
+ I:Integer;
+Begin
+ For I:=1 To Length(S) Do
+  If S[I] in ['A'..'Z'] Then S[I]:=Chr(Ord(S[I])+32);
+ LowerCase:=S;
+End;
+
+Function IsValidIPAddress(IP:String):Boolean;
+Var
+ I,Dots,Num,Code:Integer;
+ S,Part:String;
+ P:Integer;
+Begin
+ IsValidIPAddress:=False;
+ If Length(IP)=0 Then Exit;
+ Dots:=0;
+ S:=IP+'.';
+ P:=1;
+ For I:=1 To Length(S) Do Begin
+  If S[I]='.' Then Begin
+   If P=I Then Exit;
+   Part:=Copy(S,P,I-P);
+   Val(Part,Num,Code);
+   If (Code<>0) or (Num<0) or (Num>255) Then Exit;
+   Inc(Dots);
+   P:=I+1;
+  End Else If not (S[I] in ['0'..'9']) Then
+   Exit;
+ End;
+ IsValidIPAddress:=(Dots=4);
+End;
+
+Function TwoDigits(Value:Word):String;
+Var
+ S:String;
+Begin
+ Str(Value:0,S);
+ If Value<10 Then S:='0'+S;
+ TwoDigits:=S;
+End;
+
+Function Now:LongInt;Begin
+ { Valeur factice pour compatibilit√© Turbo Pascal }
+ Now:=0;
+End;
+
+Function FormatDateTime(FormatMask:String;DateValue:LongInt):String;
+Const
+ DayNames:Array[0..6] of String[3]=('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
+ MonthNames:Array[1..12] of String[3]=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec');
+Var
+ Year,Month,Day,DayOfWeek:Word;
+ Hour,Minute,Second,Hundredth:Word;
+ YearStr:String;
+Begin
+ GetDate(Year,Month,Day,DayOfWeek);
+ GetTime(Hour,Minute,Second,Hundredth);
+ Str(Year:0,YearStr);
+ FormatDateTime:=DayNames[DayOfWeek]+' '+MonthNames[Month]+' '+TwoDigits(Day)+' '+
+                 TwoDigits(Hour)+':'+TwoDigits(Minute)+':'+TwoDigits(Second)+' '+YearStr;
+End;
+
+{ Simulation pour Turbo Pascal }
+Procedure ShowSimulatedNSQuery(Name, RecordType: String);Begin
  WriteLn(';; Got answer:');
  WriteLn(';; ->>HEADER<<- opcode: QUERY, status: NOERROR');
  WriteLn(';; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0');
@@ -920,7 +957,7 @@ Begin
  WriteLn(';', Name, '.		IN	', UpperCase(RecordType));
  WriteLn;
  WriteLn(';; ANSWER SECTION:');
- 
+
  If UpperCase(RecordType) = 'A' Then Begin
   If LowerCase(Name) = 'google.com' Then Begin
    WriteLn(Name, '.		300	IN	A	142.250.185.46');
@@ -935,7 +972,7 @@ Begin
   WriteLn(Name, '.		86400	IN	NS	ns1.', Name, '.');
   WriteLn(Name, '.		86400	IN	NS	ns2.', Name, '.');
  End;
- 
+
  WriteLn;
  WriteLn(';; Query time: 45 msec');
  WriteLn(';; SERVER: 8.8.8.8#53(8.8.8.8)');
@@ -943,8 +980,7 @@ Begin
  WriteLn(';; MSG SIZE  rcvd: 64 bytes');
 End;
 
-Procedure ShowSimulatedReverse(IP: String);
-Begin
+Procedure ShowSimulatedReverse(IP:String);Begin
  WriteLn(';; Got answer:');
  WriteLn(';; ->>HEADER<<- opcode: QUERY, status: NOERROR');
  WriteLn(';; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0');
@@ -974,10 +1010,10 @@ BEGIN
   Halt(3);
  End;
  {$ENDIF}
- 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('NSQUERY : Outil de requ√™te DNS avanc√©');
+  WriteLn('NSQUERY : Cette commande permet de lancer l''outil de ',
+          'requàte DNS avancÇ.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  NSQUERY [options] nom_de_domaine');
@@ -986,62 +1022,63 @@ BEGIN
   WriteLn;
   WriteLn('Options :');
   WriteLn('  -t, --type TYPE       Type d''enregistrement (A, NS, MX, CNAME, TXT, etc.)');
-  WriteLn('  @serveur              Serveur DNS √† utiliser (ex: @8.8.8.8)');
-  WriteLn('  --server SERVEUR      Serveur DNS √† utiliser');
-  WriteLn('  -v, --verbose         Mode verbeux (utiliser -vv pour plus de d√©tails)');
-  WriteLn('  -q, --quiet           Mode silencieux (donn√©es seulement)');
+  WriteLn('  @serveur              Serveur DNS Ö utiliser (ex: @8.8.8.8)');
+  WriteLn('  --server SERVEUR      Serveur DNS Ö utiliser');
+  WriteLn('  -v, --verbose         Mode verbeux (utiliser -vv pour plus de dÇtails)');
+  WriteLn('  -q, --quiet           Mode silencieux (donnÇes seulement)');
   WriteLn('  -r, --raw             Mode brut (pas de formatage)');
-  WriteLn('  -s, --stats           Afficher les statistiques de requ√™te');
-  WriteLn('  -f, --flags           Afficher les drapeaux de r√©ponse');
-  WriteLn('  -h, --headers         Afficher les en-t√™tes complets');
-  WriteLn('  -6, --ipv6            Utiliser IPv6 (requ√™te AAAA par d√©faut)');
-  WriteLn('  -c, --consistency     V√©rifier la coh√©rence entre serveurs');
+  WriteLn('  -s, --stats           Afficher les statistiques de requàte');
+  WriteLn('  -f, --flags           Afficher les drapeaux de rÇponse');
+  WriteLn('  -h, --headers         Afficher les entàtes complets');
+  WriteLn('  -6, --ipv6            Utiliser IPv6 (requàte AAAA par dÇfaut)');
+  WriteLn('  -c, --consistency     VÇrifier la cohÇrence entre serveurs');
   WriteLn;
-  WriteLn('Types d''enregistrements support√©s :');
+  WriteLn('Types d''enregistrements supportÇs :');
   WriteLn('  A      Adresse IPv4');
   WriteLn('  AAAA   Adresse IPv6');
   WriteLn('  NS     Serveur de noms');
   WriteLn('  MX     Serveur de messagerie');
   WriteLn('  CNAME  Nom canonique (alias)');
   WriteLn('  TXT    Enregistrement texte');
-  WriteLn('  PTR    Pointeur (r√©solution inverse)');
+  WriteLn('  PTR    Pointeur (rÇsolution inverse)');
   WriteLn('  SRV    Enregistrement de service');
   WriteLn('  SOA    Start of Authority');
   WriteLn('  ANY    Tous les types disponibles');
   WriteLn;
-  WriteLn('Fonctionnalit√©s avanc√©es :');
+  WriteLn('FonctionnalitÇs avancÇes :');
   WriteLn('  - Suivi automatique des redirections CNAME');
-  WriteLn('  - D√©tection automatique de r√©solution inverse');
-  WriteLn('  - V√©rification de coh√©rence entre serveurs DNS');
+  WriteLn('  - DÇtection automatique de rÇsolution inverse');
+  WriteLn('  - VÇrification de cohÇrence entre serveurs DNS');
   WriteLn('  - Support des formats de sortie multiples');
-  WriteLn('  - Statistiques d√©taill√©es de performance');
+  WriteLn('  - Statistiques dÇtaillÇes de performance');
   WriteLn;
   WriteLn('Exemples :');
-  WriteLn('  NSQUERY google.com                   # R√©solution A par d√©faut');
-  WriteLn('  NSQUERY @8.8.8.8 google.com         # Serveur DNS sp√©cifique');
+  WriteLn('  NSQUERY google.com                   # RÇsolution A par dÇfaut');
+  WriteLn('  NSQUERY @8.8.8.8 google.com         # Serveur DNS spÇcifique');
   WriteLn('  NSQUERY -t MX gmail.com              # Serveurs de messagerie');
   WriteLn('  NSQUERY -t NS example.com            # Serveurs de noms');
-  WriteLn('  NSQUERY 8.8.8.8                     # R√©solution inverse auto');
+  WriteLn('  NSQUERY 8.8.8.8                     # RÇsolution inverse auto');
   WriteLn('  NSQUERY -v -t A github.com           # Mode verbeux');
-  WriteLn('  NSQUERY -q -r stackoverflow.com     # Donn√©es brutes seulement');
-  WriteLn('  NSQUERY -c -v example.com            # V√©rification coh√©rence');
+  WriteLn('  NSQUERY -q -r stackoverflow.com     # DonnÇes brutes seulement');
+  WriteLn('  NSQUERY -c -v example.com            # VÇrification cohÇrence');
   WriteLn('  NSQUERY -6 google.com                # IPv6 (AAAA)');
   WriteLn('  NSQUERY -t TXT _dmarc.google.com     # Enregistrement TXT');
   WriteLn;
   WriteLn('Formats de sortie :');
-  WriteLn('  Par d√©faut : Format nsquery avec en-t√™tes');
-  WriteLn('  --quiet    : Donn√©es seulement, une par ligne');
-  WriteLn('  --raw      : Donn√©es brutes sans formatage');
-  WriteLn('  --verbose  : Informations d√©taill√©es et diagnostics');
+  WriteLn('  Par dÇfaut : Format nsquery avec entàtes');
+  WriteLn('  --quiet    : DonnÇes seulement, une par ligne');
+  WriteLn('  --raw      : DonnÇes brutes sans formatage');
+  WriteLn('  --verbose  : Informations dÇtaillÇes et diagnostics');
   WriteLn;
-  WriteLn('Note: Effectue de vraies requ√™tes DNS avec r√©solution syst√®me.');
+  WriteLn('Note: Effectue de vraies requàtes DNS avec rÇsolution systäme.');
   WriteLn('Compatible avec les outils nsquery/dig standard de Linux.');
  End
- Else If ParamStr(1) = '--version' Then Begin
+  Else
+ If ParamStr(1) = '--version' Then Begin
   WriteLn('NSQUERY 1.00 - Advanced DNS Query Tool, NETWORKKIT-P');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
  Else Begin
   {$IFDEF FPC}
@@ -1065,7 +1102,6 @@ BEGIN
   End;
   {$ENDIF}
  End;
- 
  {$IFDEF FPC}
  { Nettoyer Winsock }
  CleanupWinsock;
