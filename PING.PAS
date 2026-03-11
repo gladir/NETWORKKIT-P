@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande Ping ICMP)
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande Ping ICMP
 }
 
 Program PING;
@@ -276,7 +277,7 @@ Begin
  {$IFDEF FPC}
  PingCount:=4;      { Nombre de pings par d‚faut }
  PingSize:=32;      { Taille des donn‚es par d‚faut }
- PingTimeout:=4000; { Timeout par d‚faut (4 secondes) }
+ PingTimeout:=4000; { D‚passement de d‚lai par d‚faut (4 secondes) }
  TargetHost:='';
  I:=1;
  While I<=ParamCount Do Begin
