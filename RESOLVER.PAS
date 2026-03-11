@@ -2,7 +2,9 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande resolver (DNS Resolution Testing))
+  @abstract(Target: Turbo Pascal 7, Free Pascal
+  @description: Commande resolver (DNS Resolution Testing))
+  @licence: MIT
 }
 
 Program RESOLVER;
@@ -16,76 +18,96 @@ Program RESOLVER;
 
 {$IFDEF FPC}
 Type
- { Types de r√©solution DNS }
+ { Types de rÇsolution DNS }
  TResolverType = (RES_FORWARD, RES_REVERSE, RES_MX, RES_NS, RES_CNAME, RES_TXT, RES_ANY);
- 
- { Modes de r√©solution }
+
+ { Modes de rÇsolution }
  TResolverMode = (MODE_SYSTEM, MODE_DIRECT, MODE_CUSTOM, MODE_TRACE, MODE_BENCHMARK);
- 
- { Structure d'un r√©sultat DNS }
+
+ { Structure d'un rÇsultat DNS }
  TDNSResult = Record
-  QueryName: String[255];     { Nom interrog√© }
-  ResultType: TResolverType;  { Type de r√©sultat }
-  ResultData: String[255];    { Donn√©es du r√©sultat }
-  ServerUsed: String[64];     { Serveur utilis√© }
-  ResponseTime: LongInt;      { Temps de r√©ponse en ms }
+  QueryName: String[255];     { Nom interrogÇ }
+  ResultType: TResolverType;  { Type de rÇsultat }
+  ResultData: String[255];    { DonnÇes du rÇsultat }
+  ServerUsed: String[64];     { Serveur utilisÇ }
+  ResponseTime: LongInt;      { Temps de rÇponse en ms }
   TTL: LongInt;               { Time To Live }
   ErrorCode: Integer;         { Code d'erreur }
   ErrorMessage: String[128];  { Message d'erreur }
   Timestamp: TDateTime;       { Horodatage }
  End;
- 
+
  { Configuration du resolver }
  TResolverConfig = Record
-  DefaultServer: String[64];  { Serveur DNS par d√©faut }
+  DefaultServer: String[64];  { Serveur DNS par dÇfaut }
   Timeout: Integer;           { Timeout en millisecondes }
   Retries: Integer;           { Nombre de tentatives }
-  UseRecursion: Boolean;      { Utiliser la r√©cursion }
+  UseRecursion: Boolean;      { Utiliser la rÇcursion }
   UseTCP: Boolean;            { Utiliser TCP au lieu d'UDP }
-  Port: Word;                 { Port DNS (d√©faut 53) }
-  VerboseMode: Integer;       { Niveau de verbosit√© }
+  Port: Word;                 { Port DNS (dÇfaut 53) }
+  VerboseMode: Integer;       { Niveau de verbositÇ }
   ShowStats: Boolean;         { Afficher les statistiques }
   TraceMode: Boolean;         { Mode trace }
   DebugMode: Boolean;         { Mode debug }
   BatchMode: Boolean;         { Mode batch }
   QuietMode: Boolean;         { Mode silencieux }
   ContinueOnError: Boolean;   { Continuer en cas d'erreur }
-  UseSystemResolver: Boolean; { Utiliser le resolver syst√®me }
-  CustomServers: Array[0..7] of String[64]; { Serveurs personnalis√©s }
+  UseSystemResolver: Boolean; { Utiliser le resolver systäme }
+  CustomServers: Array[0..7] of String[64]; { Serveurs personnalisÇs }
   ServerCount: Integer;       { Nombre de serveurs }
-  MaxResults: Integer;        { Nombre max de r√©sultats }
+  MaxResults: Integer;        { Nombre max de rÇsultats }
   OutputFormat: String[16];   { Format de sortie }
  End;
- 
+
  { Statistiques du resolver }
  TResolverStats = Record
-  TotalQueries: LongInt;      { Total des requ√™tes }
-  SuccessfulQueries: LongInt; { Requ√™tes r√©ussies }
-  FailedQueries: LongInt;     { Requ√™tes √©chou√©es }
-  TimeoutQueries: LongInt;    { Requ√™tes en timeout }
-  TotalTime: Int64;           { Temps total }
-  MinTime: LongInt;           { Temps minimum }
-  MaxTime: LongInt;           { Temps maximum }
-  AvgTime: LongInt;           { Temps moyen }
-  ServersUsed: Array[0..15] of String[64]; { Serveurs utilis√©s }
-  ServerCounts: Array[0..15] of LongInt; { Compteurs par serveur }
+  TotalQueries: LongInt;                        { Total des requàtes }
+  SuccessfulQueries: LongInt;                   { Requàtes rÇussies }
+  FailedQueries: LongInt;                       { Requàtes ÇchouÇes }
+  TimeoutQueries: LongInt;                      { Requàtes en dÇpassement de dÇlai }
+  TotalTime: Int64;                             { Temps total }
+  MinTime: LongInt;                             { Temps minimum }
+  MaxTime: LongInt;                             { Temps maximum }
+  AvgTime: LongInt;                             { Temps moyen }
+  ServersUsed: Array[0..15] of String[64];      { Serveurs utilisÇs }
+  ServerCounts: Array[0..15] of LongInt;        { Compteurs par serveur }
   ServerResponseTimes: Array[0..15] of LongInt; { Temps par serveur }
-  UniqueServers: Integer;     { Nombre de serveurs uniques }
+  UniqueServers: Integer;                       { Nombre de serveurs uniques }
  End;
 
 Var
- { Variables globales }
+  { Variables globales }
  ResolverConfig: TResolverConfig;
  ResolverStats: TResolverStats;
  WSAInitialized: Boolean;
- 
- { Cache de r√©solution }
+
+ { Cache de rÇsolution }
  DNSCache: Array[0..255] of TDNSResult;
  CacheCount: Integer;
- 
+
  { Serveurs DNS publics }
  PublicServers: Array[0..9] of String[64];
+{$ENDIF}
 
+Function LowerCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If S[I] in ['A'..'Z'] Then S[I] := Chr(Ord(S[I]) + 32);
+ LowerCase := S;
+End;
+
+Function UpperCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If S[I] in ['a'..'z'] Then S[I] := Chr(Ord(S[I]) - 32);
+ UpperCase := S;
+End;
+
+{$IFDEF FPC}
 { Initialisation Winsock }
 Function InitializeWinsock: Boolean;
 Var
@@ -105,8 +127,7 @@ Begin
 End;
 
 { Nettoyage Winsock }
-Procedure CleanupWinsock;
-Begin
+Procedure CleanupWinsock;Begin
  If WSAInitialized Then Begin
   WSACleanup;
   WSAInitialized := False;
@@ -114,8 +135,7 @@ Begin
 End;
 
 { Initialiser la configuration }
-Procedure InitializeResolverConfig;
-Begin
+Procedure InitializeResolverConfig;Begin
  With ResolverConfig Do Begin
   DefaultServer := '8.8.8.8';
   Timeout := 5000; { 5 secondes }
@@ -135,15 +155,12 @@ Begin
   MaxResults := 10;
   OutputFormat := 'standard';
  End;
- 
- { Initialiser les statistiques }
+  { Initialiser les statistiques }
  FillChar(ResolverStats, SizeOf(ResolverStats), 0);
  ResolverStats.MinTime := MaxLongInt;
- 
- { Initialiser le cache }
+  { Initialiser le cache }
  CacheCount := 0;
- 
- { Serveurs DNS publics }
+  { Serveurs DNS publics }
  PublicServers[0] := '8.8.8.8';         { Google Primary }
  PublicServers[1] := '8.8.4.4';         { Google Secondary }
  PublicServers[2] := '1.1.1.1';         { Cloudflare Primary }
@@ -156,9 +173,8 @@ Begin
  PublicServers[9] := '64.6.65.6';       { Verisign Secondary }
 End;
 
-{ Convertir type de r√©solution en cha√Æne }
-Function ResolverTypeToString(ResType: TResolverType): String;
-Begin
+ { Convertir type de r√©solution en cha√Æne }
+Function ResolverTypeToString(ResType: TResolverType):String;Begin
  Case ResType Of
   RES_FORWARD: ResolverTypeToString := 'A';
   RES_REVERSE: ResolverTypeToString := 'PTR';
@@ -172,7 +188,7 @@ Begin
  End;
 End;
 
-{ Convertir cha√Æne en type de r√©solution }
+{ Convertir chaåne en type de rÇsolution }
 Function StringToResolverType(TypeStr: String): TResolverType;
 Var
  UpperStr: String;
@@ -205,11 +221,9 @@ Var
 Begin
  IsValidIPAddress := False;
  If Length(IP) = 0 Then Exit;
- 
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -224,26 +238,23 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
  IsValidIPAddress := (Dots = 4);
 End;
 
-{ Valider un nom de domaine }
+ { Valider un nom de domaine }
 Function IsValidDomainName(Domain: String): Boolean;
 Var
  I: Integer;
 Begin
  IsValidDomainName := False;
  If (Length(Domain) = 0) or (Length(Domain) > 253) Then Exit;
- 
  For I := 1 To Length(Domain) Do Begin
   If not (Domain[I] in ['a'..'z', 'A'..'Z', '0'..'9', '-', '.', '_']) Then Exit;
  End;
- 
  IsValidDomainName := True;
 End;
 
-{ Convertir une adresse IP en format in-addr.arpa }
+ { Convertir une adresse IP en format in-addr.arpa }
 Function IPToInAddrArpa(IP: String): String;
 Var
  Parts: Array[1..4] of String;
@@ -252,8 +263,7 @@ Var
 Begin
  IPToInAddrArpa := '';
  If not IsValidIPAddress(IP) Then Exit;
- 
- { D√©couper l'adresse IP }
+  { DÇcouper l'adresse IP }
  S := IP + '.';
  P := 1;
  PartCount := 0;
@@ -265,47 +275,42 @@ Begin
    P := I + 1;
   End;
  End;
- 
- { Construire l'adresse invers√©e }
+  { Construire l'adresse inversÇe }
  If PartCount = 4 Then
   IPToInAddrArpa := Parts[4] + '.' + Parts[3] + '.' + Parts[2] + '.' + Parts[1] + '.in-addr.arpa';
 End;
 
-{ Obtenir le serveur DNS syst√®me par d√©faut }
-Function GetSystemDNSServer: String;
-Begin
- { Pour cette impl√©mentation, retourner Google DNS }
+ { Obtenir le serveur DNS systäme par dÇfaut }
+Function GetSystemDNSServer: String;Begin
+  { Pour cette implÇmentation, retourner Google DNS }
  GetSystemDNSServer := '8.8.8.8';
 End;
 
-{ Logger pour resolver }
-Procedure LogMessage(Level: Integer; Message: String);
-Begin
+ { Logger pour resolver }
+Procedure LogMessage(Level:Integer;Message:String);Begin
  If ResolverConfig.VerboseMode >= Level Then Begin
   WriteLn('[', FormatDateTime('hh:nn:ss', Now), '] ', Message);
  End;
 End;
 
-{ Ajouter un serveur aux statistiques }
+ { Ajouter un serveur aux statistiques }
 Procedure AddServerToStats(Server: String; ResponseTime: LongInt);
 Var
  I: Integer;
  Found: Boolean;
 Begin
  Found := False;
- 
- { Chercher si le serveur existe d√©j√† }
+  { Chercher si le serveur existe dÇjÖ }
  For I := 0 To ResolverStats.UniqueServers - 1 Do Begin
   If ResolverStats.ServersUsed[I] = Server Then Begin
    Inc(ResolverStats.ServerCounts[I]);
-   ResolverStats.ServerResponseTimes[I] := 
+   ResolverStats.ServerResponseTimes[I] :=
     (ResolverStats.ServerResponseTimes[I] + ResponseTime) div 2;
    Found := True;
    Break;
   End;
  End;
- 
- { Ajouter nouveau serveur }
+  { Ajouter nouveau serveur }
  If not Found and (ResolverStats.UniqueServers < 16) Then Begin
   ResolverStats.ServersUsed[ResolverStats.UniqueServers] := Server;
   ResolverStats.ServerCounts[ResolverStats.UniqueServers] := 1;
@@ -314,34 +319,30 @@ Begin
  End;
 End;
 
-{ Mettre √† jour les statistiques }
-Procedure UpdateStats(var DNSResult: TDNSResult; Success: Boolean);
-Begin
+{ Mettre Ö jour les statistiques }
+Procedure UpdateStats(var DNSResult: TDNSResult; Success: Boolean);Begin
  Inc(ResolverStats.TotalQueries);
- 
  If Success Then Begin
   Inc(ResolverStats.SuccessfulQueries);
   ResolverStats.TotalTime := ResolverStats.TotalTime + DNSResult.ResponseTime;
-  
   If DNSResult.ResponseTime < ResolverStats.MinTime Then
    ResolverStats.MinTime := DNSResult.ResponseTime;
-   
   If DNSResult.ResponseTime > ResolverStats.MaxTime Then
    ResolverStats.MaxTime := DNSResult.ResponseTime;
-   
   If ResolverStats.SuccessfulQueries > 0 Then
    ResolverStats.AvgTime := ResolverStats.TotalTime div ResolverStats.SuccessfulQueries;
-   
   AddServerToStats(DNSResult.ServerUsed, DNSResult.ResponseTime);
- End Else Begin
+ End
+  Else
+ Begin
   Inc(ResolverStats.FailedQueries);
   If DNSResult.ErrorCode = 10060 Then { WSAETIMEDOUT }
    Inc(ResolverStats.TimeoutQueries);
  End;
 End;
 
-{ R√©solution DNS r√©elle utilisant les fonctions syst√®me }
-Function PerformDNSResolution(QueryName: String; ResType: TResolverType; 
+{ RÇsolution DNS rÇelle utilisant les fonctions systäme }
+Function PerformDNSResolution(QueryName: String; ResType: TResolverType;
                               Server: String; var DNSResult: TDNSResult): Boolean;
 Var
  HostEnt: PHostEnt;
@@ -353,12 +354,10 @@ Var
 Begin
  PerformDNSResolution := False;
  FillChar(DNSResult, SizeOf(DNSResult), 0);
- 
  DNSResult.QueryName := QueryName;
  DNSResult.ResultType := ResType;
  DNSResult.ServerUsed := Server;
  DNSResult.Timestamp := Now;
- 
  If Not WSAInitialized Then Begin
   If Not InitializeWinsock Then Begin
    DNSResult.ErrorCode := -1;
@@ -366,42 +365,38 @@ Begin
    Exit;
   End;
  End;
- 
  StartTime := GetTickCount;
  QueryNameToUse := QueryName;
- 
- LogMessage(2, 'R√©solution DNS: ' + QueryName + ' (' + 
+ LogMessage(2, 'RÇsolution DNS: ' + QueryName + ' (' +
             ResolverTypeToString(ResType) + ') via ' + Server);
- 
  Try
   Case ResType Of
    RES_FORWARD: Begin
-    { R√©solution directe A }
+    { RÇsolution directe A }
     HostEnt := gethostbyname(PChar(AnsiString(QueryNameToUse)));
     DNSResult.ResponseTime := GetTickCount - StartTime;
-    
     If (HostEnt <> nil) and (HostEnt^.h_addr_list <> nil) Then Begin
-     { Prendre la premi√®re adresse IP }
+     { Prendre la premiäre adresse IP }
      AddrPtr := HostEnt^.h_addr_list^;
      If AddrPtr <> nil Then Begin
       Move(AddrPtr^, Addr, 4);
       DNSResult.ResultData := StrPas(inet_ntoa(Addr));
-      DNSResult.TTL := 3600; { Valeur par d√©faut }
+      DNSResult.TTL := 3600; { Valeur par dÇfaut }
       PerformDNSResolution := True;
      End;
-    End Else Begin
+    End
+     Else
+    Begin
      DNSResult.ErrorCode := WSAGetLastError;
      DNSResult.ErrorMessage := 'Host not found';
     End;
    End;
-   
    RES_REVERSE: Begin
-    { R√©solution inverse PTR }
+    { RÇsolution inverse PTR }
     If IsValidIPAddress(QueryNameToUse) Then Begin
      Addr.s_addr := inet_addr(PChar(AnsiString(QueryNameToUse)));
      HostEnt := gethostbyaddr(@Addr, 4, AF_INET);
      DNSResult.ResponseTime := GetTickCount - StartTime;
-     
      If HostEnt <> nil Then Begin
       DNSResult.ResultData := StrPas(HostEnt^.h_name);
       DNSResult.TTL := 3600;
@@ -410,23 +405,26 @@ Begin
       DNSResult.ErrorCode := WSAGetLastError;
       DNSResult.ErrorMessage := 'Reverse lookup failed';
      End;
-    End Else If Pos('.in-addr.arpa', LowerCase(QueryNameToUse)) > 0 Then Begin
-     { Extraire l'IP du format in-addr.arpa et r√©soudre }
-     { Impl√©mentation simplifi√©e }
+    End
+     Else
+    If Pos('.in-addr.arpa', LowerCase(QueryNameToUse)) > 0 Then Begin
+     { Extraire l'IP du format in-addr.arpa et rÇsoudre }
+     { ImplÇmentation simplifiÇe }
      DNSResult.ResponseTime := GetTickCount - StartTime + Random(50) + 10;
      DNSResult.ResultData := 'reverse-' + QueryNameToUse + '.example.com';
      DNSResult.TTL := 3600;
      PerformDNSResolution := True;
-    End Else Begin
+    End
+     Else
+    Begin
      DNSResult.ErrorCode := -2;
      DNSResult.ErrorMessage := 'Invalid IP address for reverse lookup';
     End;
    End;
-   
-  Else Begin
+   Else
+  Begin
    { Pour les autres types (MX, NS, etc.), utiliser une simulation enrichie }
    DNSResult.ResponseTime := GetTickCount - StartTime + Random(100) + 20;
-   
    Case ResType Of
     RES_MX: Begin
      If Pos('google.com', LowerCase(QueryNameToUse)) > 0 Then
@@ -440,7 +438,6 @@ Begin
      Else
       DNSResult.ResultData := '10 mail.' + QueryNameToUse + '.';
     End;
-    
     RES_NS: Begin
      If Pos('google.com', LowerCase(QueryNameToUse)) > 0 Then
       DNSResult.ResultData := 'ns1.google.com.'
@@ -449,11 +446,9 @@ Begin
      Else
       DNSResult.ResultData := 'ns1.' + QueryNameToUse + '.';
     End;
-    
     RES_CNAME: Begin
      DNSResult.ResultData := QueryNameToUse + '.cdn.example.com.';
     End;
-    
     RES_TXT: Begin
      If Pos('google.com', LowerCase(QueryNameToUse)) > 0 Then
       DNSResult.ResultData := '"v=spf1 include:_spf.google.com ~all"'
@@ -462,16 +457,13 @@ Begin
      Else
       DNSResult.ResultData := '"v=spf1 mx a ~all"';
     End;
-    
    Else
     DNSResult.ResultData := 'Unknown record type';
    End;
-   
    DNSResult.TTL := 300;
    PerformDNSResolution := True;
   End;
  End;
- 
  Except
   On E: Exception Do Begin
    DNSResult.ResponseTime := GetTickCount - StartTime;
@@ -481,40 +473,34 @@ Begin
  End;
 End;
 
-{ Afficher un r√©sultat DNS }
-Procedure DisplayDNSResult(var DNSResult: TDNSResult; Success: Boolean);
-Begin
+ { Afficher un rÇsultat DNS }
+Procedure DisplayDNSResult(var DNSResult: TDNSResult; Success: Boolean);Begin
  If ResolverConfig.QuietMode Then Begin
-  { Mode silencieux - donn√©es seulement }
-  If Success Then
-   WriteLn(DNSResult.ResultData)
-  Else
-   WriteLn('ERROR: ', DNSResult.ErrorMessage);
+  { Mode silencieux - donnÇes seulement }
+  If Success Then WriteLn(DNSResult.ResultData)
+             Else WriteLn('ERROR: ', DNSResult.ErrorMessage);
   Exit;
  End;
- 
- { Mode standard }
+  { Mode standard }
  WriteLn('Query: ', DNSResult.QueryName);
  WriteLn('Type:  ', ResolverTypeToString(DNSResult.ResultType));
  WriteLn('Server:', DNSResult.ServerUsed);
  WriteLn('Time:  ', DNSResult.ResponseTime, ' ms');
- 
  If Success Then Begin
   WriteLn('Result:', DNSResult.ResultData);
   WriteLn('TTL:   ', DNSResult.TTL, ' seconds');
   WriteLn('Status: SUCCESS');
- End Else Begin
+ End
+  Else
+ Begin
   WriteLn('Error: ', DNSResult.ErrorMessage, ' (', DNSResult.ErrorCode, ')');
   WriteLn('Status: FAILED');
  End;
- 
  WriteLn('Time:  ', FormatDateTime('yyyy-mm-dd hh:nn:ss', DNSResult.Timestamp));
- 
- If not ResolverConfig.BatchMode Then
-  WriteLn;
+ If not ResolverConfig.BatchMode Then WriteLn;
 End;
 
-{ R√©soudre un nom avec plusieurs serveurs }
+ { RÇsoudre un nom avec plusieurs serveurs }
 Function ResolveWithMultipleServers(QueryName: String; ResType: TResolverType): Boolean;
 Var
  I, ServerIndex: Integer;
@@ -525,35 +511,33 @@ Var
 Begin
  ResolveWithMultipleServers := False;
  ServerCount := 0;
- 
- { D√©terminer les serveurs √† utiliser }
+ { DÇterminer les serveurs Ö utiliser }
  If ResolverConfig.ServerCount > 0 Then Begin
-  { Serveurs personnalis√©s }
+  { Serveurs personnalisÇs }
   For I := 0 To ResolverConfig.ServerCount - 1 Do Begin
    ServersToTry[ServerCount] := ResolverConfig.CustomServers[I];
    Inc(ServerCount);
   End;
- End Else If ResolverConfig.UseSystemResolver Then Begin
-  { Serveur syst√®me }
+ End
+  Else
+ If ResolverConfig.UseSystemResolver Then Begin
+  { Serveur systäme }
   ServersToTry[0] := GetSystemDNSServer;
   ServerCount := 1;
- End Else Begin
+ End
+  Else
+ Begin
   { Serveurs publics }
   For I := 0 To 3 Do Begin { Utiliser les 4 premiers serveurs }
    ServersToTry[ServerCount] := PublicServers[I];
    Inc(ServerCount);
   End;
  End;
- 
- { Essayer chaque serveur }
+  { Essayer chaque serveur }
  For ServerIndex := 0 To ServerCount - 1 Do Begin
   Success := PerformDNSResolution(QueryName, ResType, ServersToTry[ServerIndex], DNSResult);
-  
-  If ResolverConfig.VerboseMode > 0 Then
-   DisplayDNSResult(DNSResult, Success);
-   
+  If ResolverConfig.VerboseMode > 0 Then DisplayDNSResult(DNSResult, Success);
   UpdateStats(DNSResult, Success);
-  
   If Success Then Begin
    If not ResolverConfig.VerboseMode > 0 Then
     DisplayDNSResult(DNSResult, Success);
@@ -567,7 +551,7 @@ Begin
  End;
 End;
 
-{ Test de performance DNS }
+ { Test de performance DNS }
 Function PerformDNSBenchmark(QueryName: String): Boolean;
 Var
  I, J: Integer;
@@ -579,53 +563,46 @@ Var
 Begin
  PerformDNSBenchmark := False;
  TestRounds := 5;
- 
  WriteLn('Benchmark DNS pour: ', QueryName);
  WriteLn('==================' + StringOfChar('=', Length(QueryName)));
  WriteLn;
- WriteLn('Serveur                 R√©ussi/Total  Min    Avg    Max    Taux');
+ WriteLn('Serveur                 RÇussi/Total  Min    Avg    Max    Taux');
  WriteLn('----------------------  ------------  -----  -----  -----  ----');
- 
  For I := 0 To 9 Do Begin { Tester tous les serveurs publics }
   TotalTime := 0;
   MinTime := MaxLongInt;
   MaxTime := 0;
   SuccessCount := 0;
-  
   For J := 1 To TestRounds Do Begin
    Success := PerformDNSResolution(QueryName, RES_FORWARD, PublicServers[I], DNSResult);
-   
    If Success Then Begin
     Inc(SuccessCount);
     TotalTime := TotalTime + DNSResult.ResponseTime;
     If DNSResult.ResponseTime < MinTime Then MinTime := DNSResult.ResponseTime;
     If DNSResult.ResponseTime > MaxTime Then MaxTime := DNSResult.ResponseTime;
    End;
-   
    Sleep(100); { Petite pause entre les tests }
   End;
-  
   Write(Copy(PublicServers[I] + '                      ', 1, 22));
   Write(' ', SuccessCount:2, '/', TestRounds:2);
   Write('        ');
-  
   If SuccessCount > 0 Then Begin
    Write(MinTime:5, '  ');
    Write((TotalTime div SuccessCount):5, '  ');
    Write(MaxTime:5, '  ');
    Write(((SuccessCount * 100) div TestRounds):3, '%');
-  End Else Begin
+  End
+   Else
+  Begin
    Write('  -      -      -    0%');
   End;
-  
   WriteLn;
  End;
- 
  WriteLn;
  PerformDNSBenchmark := True;
 End;
 
-{ Mode trace DNS }
+ { Mode trace DNS }
 Function TraceDNSResolution(QueryName: String): Boolean;
 Var
  I: Integer;
@@ -634,31 +611,28 @@ Var
  TraceServers: Array[0..3] of String[64];
 Begin
  TraceDNSResolution := False;
- 
- { Serveurs pour la trace }
- TraceServers[0] := '8.8.8.8';      { Google }
- TraceServers[1] := '1.1.1.1';      { Cloudflare }
+  { Serveurs pour la trace }
+ TraceServers[0] := '8.8.8.8';        { Google }
+ TraceServers[1] := '1.1.1.1';        { Cloudflare }
  TraceServers[2] := '208.67.222.222'; { OpenDNS }
- TraceServers[3] := '9.9.9.9';      { Quad9 }
- 
+ TraceServers[3] := '9.9.9.9';        { Quad9 }
  WriteLn('Trace DNS pour: ', QueryName);
  WriteLn('===============' + StringOfChar('=', Length(QueryName)));
  WriteLn;
- 
  For I := 0 To 3 Do Begin
-  WriteLn('√âtape ', I + 1, ': Requ√™te vers ', TraceServers[I]);
+  WriteLn('êtape ', I + 1, ': Requàte vers ', TraceServers[I]);
   Success := PerformDNSResolution(QueryName, RES_FORWARD, TraceServers[I], DNSResult);
-  
-  Write('  R√©sultat: ');
+  Write('  RÇsultat: ');
   If Success Then Begin
    WriteLn(DNSResult.ResultData, ' (', DNSResult.ResponseTime, ' ms)');
    UpdateStats(DNSResult, Success);
    TraceDNSResolution := True;
-  End Else Begin
-   WriteLn('√âCHEC - ', DNSResult.ErrorMessage);
+  End
+   Else
+  Begin
+   WriteLn('êCHEC - ', DNSResult.ErrorMessage);
    UpdateStats(DNSResult, Success);
   End;
-  
   WriteLn;
  End;
 End;
@@ -668,66 +642,62 @@ Procedure ShowResolverStats;
 Var
  I: Integer;
 Begin
- WriteLn('Statistiques de r√©solution DNS:');
+ WriteLn('Statistiques de rÇsolution DNS:');
  WriteLn('===============================');
- WriteLn('Total des requ√™tes     : ', ResolverStats.TotalQueries);
- WriteLn('Requ√™tes r√©ussies      : ', ResolverStats.SuccessfulQueries);
- WriteLn('Requ√™tes √©chou√©es      : ', ResolverStats.FailedQueries);
+ WriteLn('Total des requàtes     : ', ResolverStats.TotalQueries);
+ WriteLn('Requàtes rÇussies      : ', ResolverStats.SuccessfulQueries);
+ WriteLn('Requàtes ÇchouÇes      : ', ResolverStats.FailedQueries);
  WriteLn('Timeouts               : ', ResolverStats.TimeoutQueries);
- 
+
  If ResolverStats.SuccessfulQueries > 0 Then Begin
   WriteLn('Temps minimum          : ', ResolverStats.MinTime, ' ms');
   WriteLn('Temps moyen            : ', ResolverStats.AvgTime, ' ms');
   WriteLn('Temps maximum          : ', ResolverStats.MaxTime, ' ms');
-  WriteLn('Taux de r√©ussite       : ', 
+  WriteLn('Taux de rÇussite       : ',
           ((ResolverStats.SuccessfulQueries * 100) div ResolverStats.TotalQueries), '%');
  End;
- 
  If ResolverStats.UniqueServers > 0 Then Begin
   WriteLn;
-  WriteLn('Serveurs utilis√©s:');
+  WriteLn('Serveurs utilisÇs:');
   WriteLn('------------------');
   For I := 0 To ResolverStats.UniqueServers - 1 Do Begin
    WriteLn('  ', Copy(ResolverStats.ServersUsed[I] + '                ', 1, 16),
-           ' : ', ResolverStats.ServerCounts[I]:3, ' requ√™tes, ',
+           ' : ', ResolverStats.ServerCounts[I]:3, ' requàtes, ',
            ResolverStats.ServerResponseTimes[I]:3, ' ms moyen');
   End;
  End;
 End;
 
-{ Tester la configuration du resolver }
+ { Tester la configuration du resolver }
 Procedure TestResolverConfiguration;
 Var
  I: Integer;
 Begin
  WriteLn('Test de configuration du resolver:');
  WriteLn('==================================');
- WriteLn('Serveur par d√©faut     : ', ResolverConfig.DefaultServer);
+ WriteLn('Serveur par dÇfaut     : ', ResolverConfig.DefaultServer);
  WriteLn('Timeout                : ', ResolverConfig.Timeout, ' ms');
  WriteLn('Tentatives             : ', ResolverConfig.Retries);
  WriteLn('Port DNS               : ', ResolverConfig.Port);
- WriteLn('R√©cursion              : ', BoolToStr(ResolverConfig.UseRecursion, 'Oui', 'Non'));
+ WriteLn('RÇcursion              : ', BoolToStr(ResolverConfig.UseRecursion, 'Oui', 'Non'));
  WriteLn('Utiliser TCP           : ', BoolToStr(ResolverConfig.UseTCP, 'Oui', 'Non'));
- WriteLn('Resolver syst√®me       : ', BoolToStr(ResolverConfig.UseSystemResolver, 'Oui', 'Non'));
- WriteLn('Serveurs personnalis√©s : ', ResolverConfig.ServerCount);
- 
+ WriteLn('Resolver systäme       : ', BoolToStr(ResolverConfig.UseSystemResolver, 'Oui', 'Non'));
+ WriteLn('Serveurs personnalisÇs : ', ResolverConfig.ServerCount);
  If ResolverConfig.ServerCount > 0 Then Begin
   WriteLn('  Liste des serveurs:');
   For I := 0 To ResolverConfig.ServerCount - 1 Do
    WriteLn('    ', I + 1, '. ', ResolverConfig.CustomServers[I]);
  End;
- 
  WriteLn;
- WriteLn('Test de connectivit√©...');
- 
- { Tester la r√©solution basique }
+ WriteLn('Test de connectivitÇ...');
+  { Tester la rÇsolution basique }
  If ResolveWithMultipleServers('google.com', RES_FORWARD) Then
-  WriteLn('‚úì R√©solution DNS fonctionnelle')
+  WriteLn('˛ RÇsolution DNS fonctionnelle')
  Else
-  WriteLn('‚úó Probl√®me de r√©solution DNS');
+  WriteLn('˛ Probläme de rÇsolution DNS');
 End;
 
-{ Analyser la ligne de commande }
+ { Analyser la ligne de commande }
 Procedure ParseResolverCommandLine;
 Var
  I: Integer;
@@ -739,11 +709,9 @@ Begin
  Action := 'resolve';
  QueryName := '';
  ResType := RES_FORWARD;
- 
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-s') or (LowerCase(Param) = '--server') Then Begin
    If I < ParamCount Then Begin
     Inc(I);
@@ -827,49 +795,40 @@ Begin
   Else If Copy(Param, 1, 1) <> '-' Then Begin
    QueryName := Param;
   End;
-  
   Inc(I);
  End;
- 
- { Validation }
+  { Validation }
  If (Action = 'resolve') and (QueryName = '') Then Begin
   WriteLn('resolver: Nom de domaine ou adresse IP requis');
   WriteLn('Usage: resolver [options] nom_de_domaine');
   WriteLn('Utilisez resolver --help pour plus d''informations');
   Halt(1);
  End;
- 
- { D√©tection automatique du type pour r√©solution inverse }
+  { DÇtection automatique du type pour rÇsolution inverse }
  If IsValidIPAddress(QueryName) and (ResType = RES_FORWARD) Then Begin
   ResType := RES_REVERSE;
   If ResolverConfig.VerboseMode > 0 Then
-   LogMessage(1, 'D√©tection automatique: r√©solution inverse pour ' + QueryName);
+   LogMessage(1, 'DÇtection automatique: rÇsolution inverse pour ' + QueryName);
  End;
- 
- { Ex√©cuter l'action }
+  { ExÇcuter l'action }
  Case Action Of
   'resolve': Begin
    If ResolverConfig.VerboseMode > 0 Then
-    LogMessage(1, 'R√©solution de ' + QueryName + ' (' + ResolverTypeToString(ResType) + ')');
-   
+    LogMessage(1, 'RÇsolution de ' + QueryName + ' (' + ResolverTypeToString(ResType) + ')');
    ResolveWithMultipleServers(QueryName, ResType);
-   
    If ResolverConfig.ShowStats Then Begin
     WriteLn;
     ShowResolverStats;
    End;
   End;
-  
   'trace': Begin
    If QueryName = '' Then QueryName := 'example.com';
    TraceDNSResolution(QueryName);
   End;
-  
   'benchmark': Begin
    If QueryName = '' Then QueryName := 'google.com';
    PerformDNSBenchmark(QueryName);
   End;
-  
   'test-config': Begin
    TestResolverConfiguration;
   End;
@@ -879,22 +838,16 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedResolver(QueryName: String);
-Begin
+Procedure ShowSimulatedResolver(QueryName: String);Begin
  WriteLn('Resolver DNS (simulation):');
  WriteLn('=========================');
  WriteLn('Query: ', QueryName);
  WriteLn('Type:  A');
  WriteLn('Server: 8.8.8.8');
  WriteLn('Time:  45 ms');
- 
- If LowerCase(QueryName) = 'google.com' Then
-  WriteLn('Result: 142.250.185.46')
- Else If LowerCase(QueryName) = 'example.com' Then
-  WriteLn('Result: 93.184.216.34')
- Else
-  WriteLn('Result: 203.0.113.1');
-  
+ If LowerCase(QueryName) = 'google.com' Then WriteLn('Result: 142.250.185.46') Else
+ If LowerCase(QueryName) = 'example.com' Then WriteLn('Result: 93.184.216.34')
+                                         Else WriteLn('Result: 203.0.113.1');
  WriteLn('TTL:   300 seconds');
  WriteLn('Status: SUCCESS');
 End;
@@ -908,34 +861,34 @@ BEGIN
   Halt(3);
  End;
  {$ENDIF}
- 
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('RESOLVER : Outil de test et diagnostic DNS');
+  WriteLn('RESOLVER : Cette commande permet de lancer l''outil de ',
+          'test et diagnostic DNS.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  RESOLVER [options] nom_de_domaine');
   WriteLn('  RESOLVER [options] adresse_ip');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -s, --server SERVEUR  Serveur DNS √† utiliser');
-  WriteLn('  -t, --type TYPE       Type de requ√™te (A, PTR, MX, NS, CNAME, TXT)');
-  WriteLn('  -w, --timeout MS      Timeout en millisecondes (d√©faut: 5000)');
-  WriteLn('  -r, --retries N       Nombre de tentatives (d√©faut: 3)');
-  WriteLn('  -p, --port PORT       Port DNS (d√©faut: 53)');
-  WriteLn('  -v, --verbose         Mode verbeux (utiliser -vv pour plus de d√©tails)');
-  WriteLn('  -q, --quiet           Mode silencieux (r√©sultats seulement)');
+  WriteLn('  -s, --server SERVEUR  Serveur DNS Ö utiliser');
+  WriteLn('  -t, --type TYPE       Type de requàte (A, PTR, MX, NS, CNAME, TXT)');
+  WriteLn('  -w, --timeout MS      Timeout en millisecondes (dÇfaut: 5000)');
+  WriteLn('  -r, --retries N       Nombre de tentatives (dÇfaut: 3)');
+  WriteLn('  -p, --port PORT       Port DNS (dÇfaut: 53)');
+  WriteLn('  -v, --verbose         Mode verbeux (utiliser -vv pour plus de dÇtails)');
+  WriteLn('  -q, --quiet           Mode silencieux (rÇsultats seulement)');
   WriteLn('  -b, --batch           Mode batch (pas de pauses)');
-  WriteLn('  -c, --continue        Continuer apr√®s erreur');
+  WriteLn('  -c, --continue        Continuer apräs erreur');
   WriteLn('  --tcp                 Utiliser TCP au lieu d''UDP');
-  WriteLn('  --no-recursion        D√©sactiver la r√©cursion');
-  WriteLn('  --system              Utiliser le resolver syst√®me');
+  WriteLn('  --no-recursion        D√©sactiver la rÇcursion');
+  WriteLn('  --system              Utiliser le resolver systäme');
   WriteLn('  --stats               Afficher les statistiques');
   WriteLn('  --trace               Mode trace DNS');
   WriteLn('  --benchmark           Test de performance');
   WriteLn('  --test-config         Tester la configuration');
   WriteLn;
-  WriteLn('Types de requ√™tes support√©s :');
+  WriteLn('Types de requàtes supportÇs :');
   WriteLn('  A, FORWARD   R√©solution directe (nom -> IP)');
   WriteLn('  PTR, REVERSE R√©solution inverse (IP -> nom)');
   WriteLn('  MX           Serveurs de messagerie');
@@ -944,7 +897,7 @@ BEGIN
   WriteLn('  TXT          Enregistrements texte');
   WriteLn('  ANY          Tous les types disponibles');
   WriteLn;
-  WriteLn('Serveurs DNS pr√©d√©finis :');
+  WriteLn('Serveurs DNS prÇdÇfinis :');
   WriteLn('  8.8.8.8         Google Primary DNS');
   WriteLn('  8.8.4.4         Google Secondary DNS');
   WriteLn('  1.1.1.1         Cloudflare Primary DNS');
@@ -957,38 +910,39 @@ BEGIN
   WriteLn('  64.6.65.6       Verisign Secondary');
   WriteLn;
   WriteLn('Exemples :');
-  WriteLn('  RESOLVER google.com               # R√©solution basique');
-  WriteLn('  RESOLVER -s 1.1.1.1 example.com   # Serveur sp√©cifique');
+  WriteLn('  RESOLVER google.com               # RÇsolution basique');
+  WriteLn('  RESOLVER -s 1.1.1.1 example.com   # Serveur spÇcifique');
   WriteLn('  RESOLVER -t MX gmail.com          # Serveurs mail');
-  WriteLn('  RESOLVER -t PTR 8.8.8.8           # R√©solution inverse');
+  WriteLn('  RESOLVER -t PTR 8.8.8.8           # RÇsolution inverse');
   WriteLn('  RESOLVER --trace github.com       # Mode trace');
   WriteLn('  RESOLVER --benchmark stackoverflow.com # Performance');
   WriteLn('  RESOLVER -v -s 8.8.8.8 -s 1.1.1.1 test.com # Multi-serveurs');
   WriteLn('  RESOLVER --test-config            # Test configuration');
   WriteLn('  RESOLVER --stats example.com      # Avec statistiques');
   WriteLn;
-  WriteLn('Modes sp√©ciaux :');
-  WriteLn('  --trace      Trace la r√©solution DNS √©tape par √©tape');
+  WriteLn('Modes spÇciaux :');
+  WriteLn('  --trace      Trace la rÇsolution DNS Çtape par Çtape');
   WriteLn('  --benchmark  Compare les performances de tous les serveurs');
   WriteLn('  --test-config Teste la configuration du resolver');
-  WriteLn('  --system     Force l''utilisation du resolver syst√®me');
+  WriteLn('  --system     Force l''utilisation du resolver systäme');
   WriteLn;
   WriteLn('Formats de sortie :');
-  WriteLn('  Standard : Affichage d√©taill√© avec serveur, temps, TTL');
-  WriteLn('  --quiet  : R√©sultats seulement, un par ligne');
-  WriteLn('  --verbose: Informations d√©taill√©es et debug');
+  WriteLn('  Standard : Affichage dÇtaillÇ avec serveur, temps, TTL');
+  WriteLn('  --quiet  : RÇsultats seulement, un par ligne');
+  WriteLn('  --verbose: Informations dÇtaillÇes et debug');
   WriteLn('  --batch  : Mode non-interactif pour scripts');
   WriteLn;
-  WriteLn('Note: Effectue de vraies r√©solutions DNS avec mesure pr√©cise');
-  WriteLn('des temps de r√©ponse et support multi-serveurs.');
+  WriteLn('Note: Effectue de vraies rÇsolutions DNS avec mesure prÇcise');
+  WriteLn('des temps de rÇponse et support multi-serveurs.');
  End
  Else If ParamStr(1) = '--version' Then Begin
   WriteLn('RESOLVER 1.00 - DNS Resolution Testing Tool, NETWORKKIT-P');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
- Else Begin
+  Else
+ Begin
   {$IFDEF FPC}
   InitializeResolverConfig;
   ParseResolverCommandLine;
@@ -1000,7 +954,6 @@ BEGIN
    ShowSimulatedResolver('example.com');
   {$ENDIF}
  End;
- 
  {$IFDEF FPC}
  { Nettoyer Winsock }
  CleanupWinsock;
