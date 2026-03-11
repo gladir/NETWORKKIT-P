@@ -2,47 +2,41 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande rarp (Reverse ARP))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande rarp (Reverse ARP))
 }
 
 Program RARP;
 
 {$IFDEF FPC}
- {$mode objfpc}
- Uses SysUtils, Windows, WinSock;
-{$ELSE}
- { Turbo Pascal 7 }
-{$ENDIF}
-
-{$IFDEF FPC}
 Type
- { Structure pour une entr√©e RARP }
+  { Structure pour une entrÇe RARP }
  TRARPEntry = Record
   HWAddr: String[17];        { Adresse MAC (00:11:22:33:44:55) }
   IPAddr: String[15];        { Adresse IP correspondante }
-  HWType: Word;              { Type de mat√©riel (1=Ethernet) }
-  Flags: Word;               { Drapeaux (permanent, publi√©, etc.) }
+  HWType: Word;              { Type de matÇriel (1=Ethernet) }
+  Flags: Word;               { Drapeaux (permanent, publiÇ, etc.) }
   InterfaceName: String[10]; { Nom de l'interface }
-  Temp: Boolean;             { Entr√©e temporaire }
-  Pub: Boolean;              { Entr√©e publi√©e }
-  Complete: Boolean;         { Entr√©e compl√®te }
+  Temp: Boolean;             { EntrÇe temporaire }
+  Pub: Boolean;              { EntrÇe publiÇe }
+  Complete: Boolean;         { EntrÇe compläte }
  End;
 
 Const
  MAX_RARP_ENTRIES = 256;
  HW_ETHER = 1;              { Type Ethernet }
- 
- { Flags RARP }
- ATF_COM = $02;             { Entr√©e compl√®te }
- ATF_PERM = $04;            { Entr√©e permanente }
- ATF_PUBL = $08;            { Entr√©e publi√©e }
+
+ { Drapeaux RARP }
+ ATF_COM = $02;             { EntrÇe compläte }
+ ATF_PERM = $04;            { EntrÇe permanente }
+ ATF_PUBL = $08;            { EntrÇe publiÇe }
  ATF_USETRAILERS = $10;     { Utilise des trailers }
 
 Var
  RARPTable: Array[0..MAX_RARP_ENTRIES-1] of TRARPEntry;
  RARPCount: Integer;
 
-{ Proc√©dures Windows pour la gestion r√©seau }
+{ ProcÇdures Windows pour la gestion rÇseau }
 Function GetAdaptersInfo(pAdapterInfo: Pointer; pOutBufLen: PDWORD): DWORD; stdcall; external 'iphlpapi.dll';
 Function SendARP(DestIP, SrcIP: DWORD; pMacAddr: Pointer; PhyAddrLen: PDWORD): DWORD; stdcall; external 'iphlpapi.dll';
 
@@ -66,10 +60,9 @@ Begin
  End;
 End;
 
-{ Cr√©er des entr√©es RARP d'exemple }
-Procedure CreateSampleEntries;
-Begin
- { Entr√©e 1: Serveur local }
+ { CrÇer des entrÇes RARP d'exemple }
+Procedure CreateSampleEntries;Begin
+ { EntrÇe 1: Serveur local }
  With RARPTable[0] Do Begin
   HWAddr := '00:1B:21:3A:4C:5D';
   IPAddr := '192.168.1.1';
@@ -80,8 +73,7 @@ Begin
   Pub := True;
   Complete := True;
  End;
- 
- { Entr√©e 2: Poste de travail }
+  { EntrÇe 2: Poste de travail }
  With RARPTable[1] Do Begin
   HWAddr := '00:50:56:C0:00:01';
   IPAddr := '192.168.1.100';
@@ -92,8 +84,7 @@ Begin
   Pub := False;
   Complete := True;
  End;
- 
- { Entr√©e 3: Serveur DHCP }
+  { EntrÇe 3: Serveur DHCP }
  With RARPTable[2] Do Begin
   HWAddr := '00:0C:29:12:34:56';
   IPAddr := '192.168.1.254';
@@ -104,8 +95,7 @@ Begin
   Pub := True;
   Complete := True;
  End;
- 
- { Entr√©e 4: Entr√©e incompl√®te }
+  { EntrÇe 4: EntrÇe incompläte }
  With RARPTable[3] Do Begin
   HWAddr := '00:15:5D:01:02:03';
   IPAddr := '192.168.1.150';
@@ -116,14 +106,12 @@ Begin
   Pub := False;
   Complete := False;
  End;
- 
  RARPCount := 4;
 End;
 {$ENDIF}
 
-{$IFNDEF FPC}
-{ Fonctions utilitaires pour Turbo Pascal }
-Function IntToStr(Value: LongInt): String;
+ { Fonctions utilitaires pour Turbo Pascal }
+Function IntToStr(Value: LongInt):String;
 Var
  S: String;
 Begin
@@ -141,6 +129,7 @@ Begin
  StrToInt := Value;
 End;
 
+{$IFNDEF FPC}
 Function LowerCase(S: String): String;
 Var
  I: Integer;
@@ -201,11 +190,9 @@ Var
 Begin
  IsValidIP := False;
  If Length(IP) = 0 Then Exit;
- 
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -216,7 +203,6 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
  IsValidIP := (Dots = 4);
 End;
 
@@ -227,7 +213,6 @@ Var
 Begin
  IsValidMAC := False;
  If Length(MAC) <> 17 Then Exit;
- 
  Colons := 0;
  For I := 1 To Length(MAC) Do Begin
   If MAC[I] = ':' Then Begin
@@ -236,34 +221,30 @@ Begin
   End Else If not (MAC[I] in ['0'..'9', 'A'..'F', 'a'..'f']) Then
    Exit;
  End;
- 
  IsValidMAC := (Colons = 5);
 End;
 
-{ Normaliser une adresse MAC }
-Function NormalizeMAC(MAC: String): String;
+ { Normaliser une adresse MAC }
+Function NormalizeMAC(MAC:String): String;
 Var
  I: Integer;
  NormStr: String;
 Begin
  NormStr := '';
  For I := 1 To Length(MAC) Do Begin
-  If MAC[I] in ['a'..'f'] Then
-   NormStr := NormStr + Chr(Ord(MAC[I]) - 32)
-  Else
-   NormStr := NormStr + MAC[I];
+  If MAC[I] in ['a'..'f']Then NormStr := NormStr + Chr(Ord(MAC[I]) - 32)
+                         Else NormStr := NormStr + MAC[I];
  End;
  NormalizeMAC := NormStr;
 End;
 
-{ Trouver une entr√©e RARP par adresse MAC }
+ { Trouver une entrÇe RARP par adresse MAC }
 Function FindRARPByMAC(HWAddr: String): Integer;
 Var
  I: Integer;
 Begin
  FindRARPByMAC := -1;
  HWAddr := NormalizeMAC(HWAddr);
- 
  For I := 0 To RARPCount - 1 Do Begin
   If NormalizeMAC(RARPTable[I].HWAddr) = HWAddr Then Begin
    FindRARPByMAC := I;
@@ -272,13 +253,12 @@ Begin
  End;
 End;
 
-{ Trouver une entr√©e RARP par adresse IP }
+ { Trouver une entrÇe RARP par adresse IP }
 Function FindRARPByIP(IPAddr: String): Integer;
 Var
  I: Integer;
 Begin
  FindRARPByIP := -1;
- 
  For I := 0 To RARPCount - 1 Do Begin
   If RARPTable[I].IPAddr = IPAddr Then Begin
    FindRARPByIP := I;
@@ -287,48 +267,45 @@ Begin
  End;
 End;
 
-{ Ajouter une entr√©e RARP }
+ { Ajouter une entrÇe RARP }
 Function AddRARPEntry(HWAddr, IPAddr, IntfName: String; Temp, Pub: Boolean): Boolean;
 Var
  Index: Integer;
 Begin
  AddRARPEntry := False;
- 
- { V√©rifier les adresses }
+  { VÇrifier les adresses }
  If not IsValidMAC(HWAddr) Then Begin
   WriteLn('Erreur: Adresse MAC invalide: ', HWAddr);
   Exit;
  End;
- 
  If not IsValidIP(IPAddr) Then Begin
   WriteLn('Erreur: Adresse IP invalide: ', IPAddr);
   Exit;
  End;
- 
- { V√©rifier si l'entr√©e existe d√©j√† }
+  { VÇrifier si l'entrÇe existe dÇjÖ }
  Index := FindRARPByMAC(HWAddr);
  If Index >= 0 Then Begin
-  { Mettre √† jour l'entr√©e existante }
+  { Mettre Ö jour l'entrÇe existante }
   With RARPTable[Index] Do Begin
    RARPTable[Index].IPAddr := IPAddr;
    RARPTable[Index].InterfaceName := IntfName;
    RARPTable[Index].Temp := Temp;
    RARPTable[Index].Pub := Pub;
    RARPTable[Index].Complete := True;
-   
-   { Mettre √† jour les flags }
+    { Mettre Ö jour les drapeaux }
    Flags := ATF_COM;
    If not Temp Then Flags := Flags or ATF_PERM;
    If Pub Then Flags := Flags or ATF_PUBL;
   End;
-  WriteLn('Entr√©e RARP mise √† jour pour ', HWAddr);
- End Else Begin
-  { Ajouter nouvelle entr√©e }
+  WriteLn('EntrÇe RARP mise Ö jour pour ', HWAddr);
+ End
+  Else
+ Begin
+  { Ajouter nouvelle entrÇe }
   If RARPCount >= MAX_RARP_ENTRIES Then Begin
    WriteLn('Erreur: Table RARP pleine');
    Exit;
   End;
-  
   Index := RARPCount;
   With RARPTable[Index] Do Begin
    HWAddr := NormalizeMAC(HWAddr);
@@ -338,60 +315,52 @@ Begin
    RARPTable[Index].Temp := Temp;
    RARPTable[Index].Pub := Pub;
    Complete := True;
-   
-   { D√©finir les flags }
+    { DÇfinir les drapeaux }
    Flags := ATF_COM;
    If not Temp Then Flags := Flags or ATF_PERM;
    If Pub Then Flags := Flags or ATF_PUBL;
   End;
-  
   Inc(RARPCount);
-  WriteLn('Entr√©e RARP ajout√©e pour ', HWAddr);
+  WriteLn('EntrÇe RARP ajoutÇe pour ', HWAddr);
  End;
- 
  AddRARPEntry := True;
 End;
 
-{ Supprimer une entr√©e RARP }
+ { Supprimer une entrÇe RARP }
 Function DeleteRARPEntry(HWAddr: String): Boolean;
 Var
  Index, I: Integer;
 Begin
  DeleteRARPEntry := False;
  Index := FindRARPByMAC(HWAddr);
- 
  If Index < 0 Then Begin
-  WriteLn('Erreur: Entr√©e RARP introuvable pour ', HWAddr);
+  WriteLn('Erreur: EntrÇe RARP introuvable pour ', HWAddr);
   Exit;
  End;
- 
- { D√©caler les entr√©es suivantes }
- For I := Index To RARPCount - 2 Do
-  RARPTable[I] := RARPTable[I + 1];
-  
+  { DÇcaler les entrÇes suivantes }
+ For I := Index To RARPCount - 2 Do RARPTable[I] := RARPTable[I + 1];
  Dec(RARPCount);
- WriteLn('Entr√©e RARP supprim√©e pour ', HWAddr);
+ WriteLn('EntrÇe RARP supprimÇe pour ', HWAddr);
  DeleteRARPEntry := True;
 End;
 
-{ R√©soudre une adresse MAC en IP (simulation) }
+ { RÇsoudre une adresse MAC en IP (simulation) }
 Function ResolveMAC(HWAddr: String; var IPAddr: String): Boolean;
 Var
  Index: Integer;
 Begin
  ResolveMAC := False;
  Index := FindRARPByMAC(HWAddr);
- 
  If Index >= 0 Then Begin
   IPAddr := RARPTable[Index].IPAddr;
   ResolveMAC := True;
-  WriteLn(HWAddr, ' r√©solu en ', IPAddr);
+  WriteLn(HWAddr, ' rÇsolu en ', IPAddr);
  End Else Begin
-  WriteLn('Impossible de r√©soudre ', HWAddr);
+  WriteLn('Impossible de rÇsoudre ', HWAddr);
  End;
 End;
 
-{ Afficher les flags sous forme de cha√Æne }
+ { Afficher les drapeaux sous forme de chaåne }
 Function FlagsToString(Flags: Word): String;
 Var
  FlagStr: String;
@@ -405,7 +374,7 @@ Begin
  FlagsToString := FlagStr;
 End;
 
-{ Afficher la table RARP }
+ { Afficher la table RARP }
 Procedure ShowRARPTable(ShowHeaders: Boolean);
 Var
  I: Integer;
@@ -414,33 +383,28 @@ Begin
   WriteLn('Table RARP vide');
   Exit;
  End;
- 
  If ShowHeaders Then Begin
   WriteLn('Table RARP (Reverse Address Resolution Protocol):');
   WriteLn('Adresse IP      Adresse MAC       Type HW Flags Interface');
   WriteLn('--------------- ----------------- ------- ----- ---------');
  End;
- 
  For I := 0 To RARPCount - 1 Do Begin
   With RARPTable[I] Do Begin
    Write(Copy(IPAddr + '               ', 1, 15), ' ');
    Write(Copy(HWAddr + '                 ', 1, 17), ' ');
-   
    Case HWType Of
     HW_ETHER: Write('ether   ');
     Else Write(HWType:3, '     ');
    End;
-   
    Write(Copy(FlagsToString(Flags) + '     ', 1, 5), ' ');
    WriteLn(InterfaceName);
   End;
  End;
- 
  If ShowHeaders Then Begin
   WriteLn;
-  WriteLn('L√©gende des flags:');
-  WriteLn('  C = Compl√®te, M = Permanente, P = Publi√©e, T = Trailers');
-  WriteLn('Entr√©es: ', RARPCount);
+  WriteLn('LÇgende des drapeaux:');
+  WriteLn('  C = Compläte, M = Permanente, P = PubliÇe, T = Trailers');
+  WriteLn('EntrÇes: ', RARPCount);
  End;
 End;
 
@@ -448,10 +412,10 @@ End;
 Procedure FlushRARPTable;
 Begin
  RARPCount := 0;
- WriteLn('Table RARP vid√©e');
+ WriteLn('Table RARP vidÇe');
 End;
 
-{ Afficher les statistiques RARP }
+ { Afficher les statistiques RARP }
 Procedure ShowRARPStats;
 Var
  I, Complete, Permanent, Published, Incomplete: Integer;
@@ -460,7 +424,6 @@ Begin
  Permanent := 0;
  Published := 0;
  Incomplete := 0;
- 
  For I := 0 To RARPCount - 1 Do Begin
   With RARPTable[I] Do Begin
    If (Flags and ATF_COM) <> 0 Then Inc(Complete)
@@ -469,21 +432,19 @@ Begin
    If (Flags and ATF_PUBL) <> 0 Then Inc(Published);
   End;
  End;
- 
  WriteLn('Statistiques RARP:');
  WriteLn('==================');
- WriteLn('Total entr√©es      : ', RARPCount);
- WriteLn('Entr√©es compl√®tes  : ', Complete);
- WriteLn('Entr√©es permanentes: ', Permanent);
- WriteLn('Entr√©es publi√©es   : ', Published);
- WriteLn('Entr√©es incompl√®tes: ', Incomplete);
+ WriteLn('Total entrÇes      : ', RARPCount);
+ WriteLn('EntrÇes complätes  : ', Complete);
+ WriteLn('EntrÇes permanentes: ', Permanent);
+ WriteLn('EntrÇes publiÇes   : ', Published);
+ WriteLn('EntrÇes incomplätes: ', Incomplete);
 End;
 {$ENDIF}
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedRARP;
-Begin
+Procedure ShowSimulatedRARP;Begin
  WriteLn('Table RARP (Reverse Address Resolution Protocol):');
  WriteLn('Adresse IP      Adresse MAC       Type HW Flags Interface');
  WriteLn('--------------- ----------------- ------- ----- ---------');
@@ -492,30 +453,27 @@ Begin
  WriteLn('192.168.1.254   00:0C:29:12:34:56 ether   CMP   eth0');
  WriteLn('192.168.1.150   00:15:5D:01:02:03 ether   -     eth0');
  WriteLn;
- WriteLn('L√©gende des flags:');
- WriteLn('  C = Compl√®te, M = Permanente, P = Publi√©e, T = Trailers');
- WriteLn('Entr√©es: 4');
+ WriteLn('LÇgende des drapeaux:');
+ WriteLn('  C = Compläte, M = Permanente, P = PubliÇe, T = Trailers');
+ WriteLn('EntrÇes: 4');
 End;
 
-Procedure SimulateRARPAdd;
-Begin
- WriteLn('Entr√©e RARP ajout√©e pour 00:11:22:33:44:55 (simulation)');
+Procedure SimulateRARPAdd;Begin
+ WriteLn('EntrÇe RARP ajoutÇe pour 00:11:22:33:44:55 (simulation)');
 End;
 
-Procedure SimulateRARPDelete;
-Begin
- WriteLn('Entr√©e RARP supprim√©e pour 00:11:22:33:44:55 (simulation)');
+Procedure SimulateRARPDelete;Begin
+ WriteLn('Entr√©e RARP supprimÇe pour 00:11:22:33:44:55 (simulation)');
 End;
 
-Procedure ShowSimulatedStats;
-Begin
+Procedure ShowSimulatedStats;Begin
  WriteLn('Statistiques RARP:');
  WriteLn('==================');
- WriteLn('Total entr√©es      : 4');
- WriteLn('Entr√©es compl√®tes  : 3');
- WriteLn('Entr√©es permanentes: 2');
- WriteLn('Entr√©es publi√©es   : 2');
- WriteLn('Entr√©es incompl√®tes: 1');
+ WriteLn('Total entrÇes      : 4');
+ WriteLn('EntrÇes complätes  : 3');
+ WriteLn('EntrÇes permanentes: 2');
+ WriteLn('EntrÇes publiÇes   : 2');
+ WriteLn('EntrÇes incomplätes: 1');
 End;
 {$ENDIF}
 
@@ -536,11 +494,9 @@ Begin
  ShowNumeric := False;
  Temp := False;
  Pub := False;
- 
- { Analyser les param√®tres }
+  { Analyser les paramätres }
  For I := 1 To ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-a') or (LowerCase(Param) = '--all') Then
    Action := 'show'
   Else If (LowerCase(Param) = '-d') or (LowerCase(Param) = '--delete') Then
@@ -571,7 +527,6 @@ Begin
    IPAddr := Param;
   {$ENDIF}
  End;
- 
  {$IFDEF FPC}
  Case Action Of
   'show': Begin
@@ -582,13 +537,13 @@ Begin
    If (HWAddr <> '') and (IPAddr <> '') Then
     AddRARPEntry(HWAddr, IPAddr, InterfaceName, Temp, Pub)
    Else
-    WriteLn('Erreur: Adresse MAC et IP requises pour ajouter une entr√©e');
+    WriteLn('Erreur: Adresse MAC et IP requises pour ajouter une entrÇe');
   End;
   'delete': Begin
    If HWAddr <> '' Then
     DeleteRARPEntry(HWAddr)
    Else
-    WriteLn('Erreur: Adresse MAC requise pour supprimer une entr√©e');
+    WriteLn('Erreur: Adresse MAC requise pour supprimer une entrÇe');
   End;
   'flush': FlushRARPTable;
   'stats': Begin
@@ -601,66 +556,64 @@ Begin
  End;
  End;
  {$ELSE}
- Case Action Of
-  'show': ShowSimulatedRARP;
-  'add': SimulateRARPAdd;
-  'delete': SimulateRARPDelete;
-  'flush': WriteLn('Table RARP vid√©e (simulation)');
-  'stats': ShowSimulatedStats;
- Else
-  ShowSimulatedRARP;
- End;
+ If Action='show'Then ShowSimulatedRARP Else
+ If Action='add'Then SimulateRARPAdd Else
+ If Action='delete'Then SimulateRARPDelete Else
+ If Action='flush'Then WriteLn('Table RARP vidÇe (simulation)') Else
+ If Action='stats'Then ShowSimulatedStats
+                  Else ShowSimulatedRARP;
  {$ENDIF}
 End;
 
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
    (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('RARP : Gestion du protocole Reverse Address Resolution Protocol');
+  WriteLn('RARP : Cette commande permet d''effectuer la gestion du ',
+          'protocole Reverse Address Resolution Protocol');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  RARP [options] [adresse_mac] [adresse_ip]');
   WriteLn;
   WriteLn('Options :');
   WriteLn('  -a, --all             Afficher toute la table RARP');
-  WriteLn('  -d, --delete          Supprimer une entr√©e');
-  WriteLn('  -s, --set             Ajouter/modifier une entr√©e');
+  WriteLn('  -d, --delete          Supprimer une entrÇe');
+  WriteLn('  -s, --set             Ajouter/modifier une entrÇe');
   WriteLn('  -f, --flush           Vider la table RARP');
-  WriteLn('  -n, --numeric         Affichage num√©rique');
-  WriteLn('  -t, --temp            Entr√©e temporaire');
-  WriteLn('  -p, --pub             Entr√©e publi√©e');
+  WriteLn('  -n, --numeric         Affichage numÇrique');
+  WriteLn('  -t, --temp            EntrÇe temporaire');
+  WriteLn('  -p, --pub             EntrÇe publiÇe');
   WriteLn('  --stats               Afficher les statistiques');
-  WriteLn('  dev=INTERFACE         Sp√©cifier l''interface');
+  WriteLn('  dev=INTERFACE         SpÇcifier l''interface');
   WriteLn;
-  WriteLn('Param√®tres :');
+  WriteLn('Paramätres :');
   WriteLn('  adresse_mac           Adresse MAC (00:11:22:33:44:55)');
   WriteLn('  adresse_ip            Adresse IP correspondante');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  RARP                              # Afficher la table RARP');
-  WriteLn('  RARP -a                           # Afficher toutes les entr√©es');
+  WriteLn('  RARP -a                           # Afficher toutes les entrÇes');
   WriteLn('  RARP --stats                      # Statistiques RARP');
-  WriteLn('  RARP -s 00:11:22:33:44:55 192.168.1.10   # Ajouter entr√©e');
-  WriteLn('  RARP -s 00:11:22:33:44:55 192.168.1.10 -p # Entr√©e publi√©e');
-  WriteLn('  RARP -d 00:11:22:33:44:55         # Supprimer entr√©e');
+  WriteLn('  RARP -s 00:11:22:33:44:55 192.168.1.10   # Ajouter entrÇe');
+  WriteLn('  RARP -s 00:11:22:33:44:55 192.168.1.10 -p # EntrÇe publiÇe');
+  WriteLn('  RARP -d 00:11:22:33:44:55         # Supprimer entrÇe');
   WriteLn('  RARP -f                           # Vider la table');
   WriteLn;
-  WriteLn('Flags des entr√©es :');
-  WriteLn('  C = Compl√®te     M = Permanente');
-  WriteLn('  P = Publi√©e      T = Trailers');
+  WriteLn('Drapeaux des entrÇes :');
+  WriteLn('  C = Compläte     M = Permanente');
+  WriteLn('  P = PubliÇe      T = Trailers');
   WriteLn;
-  WriteLn('Note: RARP permet de r√©soudre une adresse MAC en adresse IP.');
-  WriteLn('Utilis√© principalement pour l''amor√ßage r√©seau des stations');
+  WriteLn('Note: RARP permet de rÇsoudre une adresse MAC en adresse IP.');
+  WriteLn('UtilisÇ principalement pour l''amoráage rÇseau des stations');
   WriteLn('sans disque dur.');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion r√©elle)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion rÇelle)');
  End
   Else
  If ParamStr(1) = '--version' Then Begin
   WriteLn('RARP 1.00 - Reverse Address Resolution Protocol, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
   Else
  Begin
