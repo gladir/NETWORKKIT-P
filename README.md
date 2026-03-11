@@ -135,6 +135,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer le programme de nouvelles Internet et courriel.</td>
 	</tr>
 	<tr>
+		<td><b>PING.PAS</b></td>
+		<td>Cette commande permet de tester la connectivité réseau.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
