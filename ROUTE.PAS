@@ -10,7 +10,7 @@ Program ROUTE;
 
 {$IFDEF FPC}
  {$mode objfpc}
- Uses SysUtils, Windows;
+ Uses DOS, Windows;
 {$ELSE}
  Uses DOS;
 {$ENDIF}
@@ -96,7 +96,6 @@ Function CreateIpForwardEntry(Var pRoute:MIB_IPFORWARDROW):DWORD;stdcall;externa
 Function DeleteIpForwardEntry(Var pRoute:MIB_IPFORWARDROW):DWORD;stdcall;external 'iphlpapi.dll';
 {$ENDIF}
 
-{$IFNDEF FPC}
  { Fonctions utilitaires pour Turbo Pascal }
 Function IntToStr(Value:LongInt):String;
 Var
@@ -125,6 +124,7 @@ Begin
  UpperCase:=S;
 End;
 
+{$IFNDEF FPC}
 Function Pos(SubStr,S:String):Integer;
 Var
  I,J:Integer;
@@ -300,7 +300,7 @@ Begin
  WriteLn('Erreur lors de la r‚cup‚ration de la table de routage');
 End;
 
-{ Proc‚dure pour ajouter une route }
+ { Proc‚dure pour ajouter une route }
 Procedure AddRoute(Dest,Gateway,Netmask:String;Metric:Integer);
 Var
  Route:MIB_IPFORWARDROW;
@@ -321,7 +321,7 @@ Begin
                       Else WriteLn('Erreur lors de l''ajout de la route : ',dwRetVal);
 End;
 
-{ Proc‚dure pour supprimer une route }
+ { Proc‚dure pour supprimer une route }
 Procedure DelRoute(Dest,Gateway,Netmask:String);
 Var
  Route:MIB_IPFORWARDROW;
@@ -390,7 +390,7 @@ Begin
    {$ENDIF}
   End
    Else
-  WriteLn('Usage : ROUTE ADD destination passerelle [masque] [mÃ©trique]');
+  WriteLn('Usage : ROUTE ADD destination passerelle [masque] [m‚trique]');
  End
   Else
  If(Cmd='DEL')or(Cmd='DELETE')or(Cmd='SUPPRIMER')Then Begin
