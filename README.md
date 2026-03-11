@@ -143,6 +143,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet d'effectuer la configuration des interfaces PLIP.</td>
 	</tr>
 	<tr>
+		<td><b>RARP.PAS</b></td>
+		<td>Cette commande permet d'effectuer la gestion du protocole Reverse Address Resolution Protocol.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
