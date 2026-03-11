@@ -2,14 +2,15 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande plipconfig (configuration PLIP))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande plipconfig (configuration PLIP))
 }
 
 Program PLIPCONF;
 
 {$IFDEF FPC}
  {$mode objfpc}
- Uses SysUtils, Windows;
+ Uses Windows;
 {$ELSE}
  { Turbo Pascal 7 }
 {$ENDIF}
@@ -20,29 +21,29 @@ Type
  TPLIPInterface = Record
   Name: String[10];          { Nom de l'interface (plip0, plip1, etc.) }
   Active: Boolean;           { Interface active }
-  IPAddr: String[15];        { Adresse IP assign√©e }
+  IPAddr: String[15];        { Adresse IP assignÇe }
   RemoteAddr: String[15];    { Adresse IP distante }
-  Netmask: String[15];       { Masque de sous-r√©seau }
+  Netmask: String[15];       { Masque de sous-rÇseau }
   MTU: Word;                 { Maximum Transmission Unit }
-  IRQ: Byte;                 { Num√©ro IRQ }
-  IOPort: Word;              { Port d'entr√©e/sortie }
-  Timeout: Word;             { D√©lai d'attente en ms }
+  IRQ: Byte;                 { NumÇro IRQ }
+  IOPort: Word;              { Port d'entrÇe/sortie }
+  Timeout: Word;             { DÇlai d'attente en ms }
   TxPackets: LongInt;        { Paquets transmis }
-  RxPackets: LongInt;        { Paquets re√ßus }
+  RxPackets: LongInt;        { Paquets reáus }
   TxErrors: LongInt;         { Erreurs de transmission }
-  RxErrors: LongInt;         { Erreurs de r√©ception }
+  RxErrors: LongInt;         { Erreurs de rÇception }
  End;
 
 Const
  MAX_PLIP_INTERFACES = 4;    { Maximum 4 interfaces PLIP }
  DEFAULT_MTU = 1500;
- DEFAULT_TIMEOUT = 500;      { 500ms par d√©faut }
+ DEFAULT_TIMEOUT = 500;      { 500ms par dÇfaut }
 
 Var
  PLIPInterfaces: Array[0..MAX_PLIP_INTERFACES-1] of TPLIPInterface;
  InterfaceCount: Integer;
 
-{ Proc√©dure d'initialisation des interfaces PLIP }
+ { ProcÇdure d'initialisation des interfaces PLIP }
 Procedure InitializePLIP;
 Var
  I: Integer;
@@ -67,9 +68,8 @@ Begin
  End;
 End;
 
-{ Cr√©er des interfaces PLIP d'exemple }
-Procedure CreateSampleInterfaces;
-Begin
+ { CrÇer des interfaces PLIP d'exemple }
+Procedure CreateSampleInterfaces;Begin
  { Interface PLIP0 }
  With PLIPInterfaces[0] Do Begin
   Name := 'plip0';
@@ -86,8 +86,7 @@ Begin
   TxErrors := 2;
   RxErrors := 1;
  End;
- 
- { Interface PLIP1 }
+  { Interface PLIP1 }
  With PLIPInterfaces[1] Do Begin
   Name := 'plip1';
   Active := False;
@@ -103,12 +102,10 @@ Begin
   TxErrors := 0;
   RxErrors := 0;
  End;
- 
  InterfaceCount := 2;
 End;
 {$ENDIF}
 
-{$IFNDEF FPC}
 { Fonctions utilitaires pour Turbo Pascal }
 Function IntToStr(Value: LongInt): String;
 Var
@@ -128,6 +125,22 @@ Begin
  StrToInt := Value;
 End;
 
+{ Conversion hexadÇcimale }
+Function IntToHex(Value: Word; Digits: Integer): String;
+Const
+ HexChars: String = '0123456789ABCDEF';
+Var
+ ResultStr: String;
+ I: Integer;
+Begin
+ ResultStr := '';
+ For I := 1 To Digits Do Begin
+  ResultStr := HexChars[(Value and $F) + 1] + ResultStr;
+  Value := Value shr 4;
+ End;
+ IntToHex := ResultStr;
+End;
+
 Function LowerCase(S: String): String;
 Var
  I: Integer;
@@ -137,6 +150,16 @@ Begin
  LowerCase := S;
 End;
 
+Function UpperCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If S[I] in ['a'..'z'] Then S[I] := Chr(Ord(S[I]) - 32);
+ UpperCase := S;
+End;
+
+{$IFNDEF FPC}
 Function Copy(S: String; Start, Len: Integer): String;
 Var
  ResultStr: String;
@@ -169,7 +192,6 @@ Begin
 End;
 {$ENDIF}
 
-{$IFDEF FPC}
 { Fonction pour valider une adresse IP }
 Function IsValidIP(IP: String): Boolean;
 Var
@@ -179,14 +201,12 @@ Var
 Begin
  IsValidIP := False;
  If Length(IP) = 0 Then Exit;
- 
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
-   If P = I Then Exit; { Deux points cons√©cutifs }
+   If P = I Then Exit; { Deux points consÇcutifs }
    Num := StrToInt(Copy(S, P, I - P));
    If (Num < 0) or (Num > 255) Then Exit;
    Inc(Dots);
@@ -194,10 +214,10 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
  IsValidIP := (Dots = 4);
 End;
 
+{$IFDEF FPC}
 { Trouver une interface PLIP par nom }
 Function FindPLIPInterface(Name: String): Integer;
 Var
@@ -220,9 +240,8 @@ Var
 Begin
  ConfigurePLIP := False;
  Index := FindPLIPInterface(Name);
- 
  If Index < 0 Then Begin
-  { Cr√©er une nouvelle interface si elle n'existe pas }
+  { CrÇer une nouvelle interface si elle n'existe pas }
   If InterfaceCount >= MAX_PLIP_INTERFACES Then Begin
    WriteLn('Erreur: Nombre maximum d''interfaces PLIP atteint');
    Exit;
@@ -231,117 +250,97 @@ Begin
   PLIPInterfaces[Index].Name := Name;
   Inc(InterfaceCount);
  End;
- 
- { Valider les adresses IP }
+  { Valider les adresses IP }
  If (IPAddr <> '') and not IsValidIP(IPAddr) Then Begin
   WriteLn('Erreur: Adresse IP locale invalide: ', IPAddr);
   Exit;
  End;
- 
  If (RemoteAddr <> '') and not IsValidIP(RemoteAddr) Then Begin
   WriteLn('Erreur: Adresse IP distante invalide: ', RemoteAddr);
   Exit;
  End;
- 
- { Configurer l'interface }
+  { Configurer l'interface }
  With PLIPInterfaces[Index] Do Begin
   If IPAddr <> '' Then Begin
    PLIPInterfaces[Index].IPAddr := IPAddr;
-   WriteLn('Interface ', Name, ': adresse IP d√©finie √† ', IPAddr);
+   WriteLn('Interface ', Name, ': adresse IP dÇfinie Ö ', IPAddr);
   End;
-  
   If RemoteAddr <> '' Then Begin
    PLIPInterfaces[Index].RemoteAddr := RemoteAddr;
-   WriteLn('Interface ', Name, ': adresse distante d√©finie √† ', RemoteAddr);
+   WriteLn('Interface ', Name, ': adresse distante dÇfinie Ö ', RemoteAddr);
   End;
-  
   If IRQ > 0 Then Begin
    PLIPInterfaces[Index].IRQ := IRQ;
-   WriteLn('Interface ', Name, ': IRQ d√©finie √† ', IRQ);
+   WriteLn('Interface ', Name, ': IRQ dÇfinie Ö ', IRQ);
   End;
-  
   If IOPort > 0 Then Begin
    PLIPInterfaces[Index].IOPort := IOPort;
-   WriteLn('Interface ', Name, ': port d''E/S d√©fini √† $', IntToHex(IOPort, 3));
+   WriteLn('Interface ', Name, ': port d''E/S dÇfini Ö $', IntToHex(IOPort, 3));
   End;
-  
   If not Active Then Begin
    Active := True;
-   WriteLn('Interface ', Name, ': activ√©e');
+   WriteLn('Interface ', Name, ': activÇe');
   End;
  End;
- 
  ConfigurePLIP := True;
 End;
 
-{ Activer/d√©sactiver une interface PLIP }
+ { Activer/dÇsactiver une interface PLIP }
 Function SetPLIPState(Name: String; Active: Boolean): Boolean;
 Var
  Index: Integer;
 Begin
  SetPLIPState := False;
  Index := FindPLIPInterface(Name);
- 
  If Index < 0 Then Begin
   WriteLn('Erreur: Interface PLIP "', Name, '" introuvable');
   Exit;
  End;
- 
  PLIPInterfaces[Index].Active := Active;
- If Active Then
-  WriteLn('Interface ', Name, ': activ√©e')
- Else
-  WriteLn('Interface ', Name, ': d√©sactiv√©e');
- 
+ If Active Then WriteLn('Interface ', Name, ': activÇe')
+           Else WriteLn('Interface ', Name, ': dÇsactivÇe');
  SetPLIPState := True;
 End;
 
-{ Afficher les statistiques d'une interface }
-Procedure ShowInterfaceStats(Index: Integer);
-Begin
+ { Afficher les statistiques d'une interface }
+Procedure ShowInterfaceStats(Index:Integer);Begin
  With PLIPInterfaces[Index] Do Begin
   WriteLn('Interface: ', Name);
-  Write('√âtat: ');
-  If Active Then WriteLn('UP') Else WriteLn('DOWN');
-  
-  If IPAddr <> '' Then
-   WriteLn('Adresse IP: ', IPAddr);
-  If RemoteAddr <> '' Then
-   WriteLn('Adresse distante: ', RemoteAddr);
-  If Netmask <> '' Then
-   WriteLn('Masque r√©seau: ', Netmask);
-   
+  Write('êtat: ');
+  If Active Then WriteLn('UP')
+            Else WriteLn('DOWN');
+  If IPAddr <> '' Then WriteLn('Adresse IP: ', IPAddr);
+  If RemoteAddr <> '' Then WriteLn('Adresse distante: ', RemoteAddr);
+  If Netmask <> '' Then WriteLn('Masque rÇseau: ', Netmask);
   WriteLn('MTU: ', MTU);
   If IRQ > 0 Then WriteLn('IRQ: ', IRQ);
   If IOPort > 0 Then WriteLn('Port E/S: $', IntToHex(IOPort, 3));
   WriteLn('D√©lai d''attente: ', Timeout, ' ms');
-  
   WriteLn;
   WriteLn('Statistiques:');
   WriteLn('  Paquets transmis: ', TxPackets);
-  WriteLn('  Paquets re√ßus: ', RxPackets);
+  WriteLn('  Paquets reáus: ', RxPackets);
   WriteLn('  Erreurs TX: ', TxErrors);
   WriteLn('  Erreurs RX: ', RxErrors);
  End;
 End;
 
-{ Afficher toutes les interfaces PLIP }
+ { Afficher toutes les interfaces PLIP }
 Procedure ShowAllInterfaces;
 Var
  I: Integer;
 Begin
  If InterfaceCount = 0 Then Begin
-  WriteLn('Aucune interface PLIP configur√©e');
+  WriteLn('Aucune interface PLIP configurÇe');
   Exit;
  End;
- 
  For I := 0 To InterfaceCount - 1 Do Begin
   ShowInterfaceStats(I);
   If I < InterfaceCount - 1 Then WriteLn;
  End;
 End;
 
-{ Afficher un r√©sum√© compact des interfaces }
+ { Afficher un rÇsumÇ compact des interfaces }
 Procedure ShowInterfacesSummary;
 Var
  I: Integer;
@@ -350,37 +349,26 @@ Begin
   WriteLn('Aucune interface PLIP configur√©e');
   Exit;
  End;
- 
- WriteLn('Interface   √âtat    IP Local        IP Distant      IRQ  Port    MTU');
+ WriteLn('Interface   êtat    IP Local        IP Distant      IRQ  Port    MTU');
  WriteLn('----------- ------- --------------- --------------- ---- ------- -----');
- 
  For I := 0 To InterfaceCount - 1 Do Begin
   With PLIPInterfaces[I] Do Begin
    Write(Copy(Name + '           ', 1, 11), ' ');
    If Active Then Write('UP     ') Else Write('DOWN   ');
-   
-   If IPAddr <> '' Then
-    Write(Copy(IPAddr + '               ', 1, 15))
-   Else
-    Write('               ');
+   If IPAddr <> '' Then Write(Copy(IPAddr + '               ', 1, 15))
+                   Else Write('               ');
    Write(' ');
-   
    If RemoteAddr <> '' Then
     Write(Copy(RemoteAddr + '               ', 1, 15))
    Else
     Write('               ');
    Write(' ');
-   
-   If IRQ > 0 Then
-    Write(IRQ:3, '  ')
-   Else
-    Write('     ');
-    
+   If IRQ > 0 Then Write(IRQ:3, '  ')
+              Else Write('     ');
    If IOPort > 0 Then
     Write('$', IntToHex(IOPort, 3), '   ')
    Else
     Write('        ');
-    
    WriteLn(MTU:5);
   End;
  End;
@@ -389,10 +377,9 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedPLIP;
-Begin
- WriteLn('Interfaces PLIP configur√©es (simulation):');
- WriteLn('Interface   √âtat    IP Local        IP Distant      IRQ  Port    MTU');
+Procedure ShowSimulatedPLIP;Begin
+ WriteLn('Interfaces PLIP configurÇes (simulation):');
+ WriteLn('Interface   êtat    IP Local        IP Distant      IRQ  Port    MTU');
  WriteLn('----------- ------- --------------- --------------- ---- ------- -----');
  WriteLn('plip0       UP      192.168.100.1   192.168.100.2   7    $378    1500');
  WriteLn('plip1       DOWN    192.168.101.1   192.168.101.2   5    $278    1200');
@@ -400,26 +387,25 @@ Begin
  WriteLn('Total: 2 interface(s) PLIP');
 End;
 
-Procedure ShowSimulatedDetailed;
-Begin
+Procedure ShowSimulatedDetailed;Begin
  WriteLn('Interface: plip0');
- WriteLn('√âtat: UP');
+ WriteLn('êtat: UP');
  WriteLn('Adresse IP: 192.168.100.1');
  WriteLn('Adresse distante: 192.168.100.2');
- WriteLn('Masque r√©seau: 255.255.255.252');
+ WriteLn('Masque rÇseau: 255.255.255.252');
  WriteLn('MTU: 1500');
  WriteLn('IRQ: 7');
  WriteLn('Port E/S: $378');
- WriteLn('D√©lai d''attente: 500 ms');
+ WriteLn('DÇlai d''attente: 500 ms');
  WriteLn;
  WriteLn('Statistiques:');
  WriteLn('  Paquets transmis: 1247');
- WriteLn('  Paquets re√ßus: 1156');
+ WriteLn('  Paquets reáus: 1156');
  WriteLn('  Erreurs TX: 2');
  WriteLn('  Erreurs RX: 1');
  WriteLn;
  WriteLn('Interface: plip1');
- WriteLn('√âtat: DOWN');
+ WriteLn('êtat: DOWN');
  WriteLn('Adresse IP: 192.168.101.1');
  WriteLn('Adresse distante: 192.168.101.2');
  WriteLn('MTU: 1200');
@@ -427,16 +413,14 @@ Begin
  WriteLn('Port E/S: $278');
 End;
 
-Procedure SimulatePLIPConfig;
-Begin
- WriteLn('Interface plip0: configuration simul√©e');
- WriteLn('Adresse IP d√©finie √† 192.168.100.1');
- WriteLn('Interface plip0: activ√©e');
+Procedure SimulatePLIPConfig;Begin
+ WriteLn('Interface plip0: configuration simulÇe');
+ WriteLn('Adresse IP dÇfinie Ö 192.168.100.1');
+ WriteLn('Interface plip0: activÇe');
 End;
 {$ENDIF}
 
-{ Conversion hexad√©cimale pour Free Pascal }
-{$IFDEF FPC}
+ { Conversion hexadÇcimale }
 Function HexToInt(HexStr: String): Word;
 Var
  I: Integer;
@@ -445,7 +429,6 @@ Var
 Begin
  Value := 0;
  HexStr := UpperCase(HexStr);
- 
  For I := 1 To Length(HexStr) Do Begin
   If HexStr[I] in ['0'..'9'] Then
    Digit := Ord(HexStr[I]) - Ord('0')
@@ -455,33 +438,12 @@ Begin
    HexToInt := 0;
    Exit;
   End;
-  
   Value := Value * 16 + Digit;
  End;
- 
  HexToInt := Value;
 End;
-{$ENDIF}
 
-{ Conversion hexad√©cimale pour Turbo Pascal }
-{$IFNDEF FPC}
-Function IntToHex(Value: Word; Digits: Integer): String;
-Const
- HexChars: String = '0123456789ABCDEF';
-Var
- ResultStr: String;
- I: Integer;
-Begin
- ResultStr := '';
- For I := 1 To Digits Do Begin
-  ResultStr := HexChars[(Value and $F) + 1] + ResultStr;
-  Value := Value shr 4;
- End;
- IntToHex := ResultStr;
-End;
-{$ENDIF}
-
-{ Analyse de la ligne de commande }
+ { Analyse de la ligne de commande }
 Procedure ParseCommandLine;
 Var
  I: Integer;
@@ -500,15 +462,11 @@ Begin
  IOPort := 0;
  ShowDetailed := False;
  ConfigMode := False;
- 
- { Analyser les param√®tres }
+  { Analyser les paramätres }
  For I := 1 To ParamCount Do Begin
   Param := ParamStr(I);
-  
-  If LowerCase(Param) = '-v' Then
-   ShowDetailed := True
-  Else If LowerCase(Param) = '-s' Then
-   ShowDetailed := False
+  If LowerCase(Param) = '-v' Then ShowDetailed := True
+  Else If LowerCase(Param) = '-s' Then ShowDetailed := False
   Else If Copy(LowerCase(Param), 1, 4) = 'plip' Then Begin
    InterfaceName := Param;
    ConfigMode := True;
@@ -532,7 +490,6 @@ Begin
    End;
   End;
  End;
- 
  {$IFDEF FPC}
  If ConfigMode and (InterfaceName <> '') Then Begin
   ConfigurePLIP(InterfaceName, IPAddr, RemoteAddr, IRQ, IOPort);
@@ -556,44 +513,45 @@ End;
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
    (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('PLIPCONF : Configuration des interfaces PLIP');
+  WriteLn('PLIPCONF : Cette commande permet d''effectuer la configuration ',
+           'des interfaces PLIP.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  PLIPCONF [interface] [adresse_ip] [adresse_distante] [options]');
   WriteLn('  PLIPCONF [-v|-s]');
   WriteLn;
-  WriteLn('Param√®tres :');
+  WriteLn('Paramätres :');
   WriteLn('  interface             Nom interface PLIP (plip0, plip1, etc.)');
   WriteLn('  adresse_ip            Adresse IP locale');
-  WriteLn('  adresse_distante      Adresse IP du syst√®me distant');
+  WriteLn('  adresse_distante      Adresse IP du systäme distant');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -v                    Affichage d√©taill√© (verbose)');
-  WriteLn('  -s                    Affichage r√©sum√© (summary)');
-  WriteLn('  irq=N                 D√©finir le num√©ro IRQ');
-  WriteLn('  port=ADDR             D√©finir le port d''E/S (hex: $378)');
+  WriteLn('  -v                    Affichage dÇtaillÇ (verbose)');
+  WriteLn('  -s                    Affichage rÇsumÇ (summary)');
+  WriteLn('  irq=N                 DÇfinir le numÇro IRQ');
+  WriteLn('  port=ADDR             DÇfinir le port d''E/S (hex: $378)');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  PLIPCONF                              # Lister toutes les interfaces');
-  WriteLn('  PLIPCONF -v                           # Affichage d√©taill√©');
+  WriteLn('  PLIPCONF -v                           # Affichage dÇtaillÇ');
   WriteLn('  PLIPCONF plip0 192.168.100.1 192.168.100.2');
   WriteLn('  PLIPCONF plip0 192.168.100.1 192.168.100.2 irq=7 port=$378');
   WriteLn;
-  WriteLn('Ports parall√®les courants :');
+  WriteLn('Ports paralläles courants :');
   WriteLn('  LPT1: $378 (IRQ 7)    LPT2: $278 (IRQ 5)');
-  WriteLn('  LPT3: $3BC (IRQ 7)    Custom: sp√©cifier manuellement');
+  WriteLn('  LPT3: $3BC (IRQ 7)    Custom: spÇcifier manuellement');
   WriteLn;
   WriteLn('Note: PLIP (Parallel Line Internet Protocol) permet la connexion');
-  WriteLn('r√©seau via le port parall√®le entre deux ordinateurs.');
+  WriteLn('rÇseau via le port parall√®le entre deux ordinateurs.');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion r√©elle)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion rÇelle)');
  End
   Else
  If ParamStr(1) = '--version' Then Begin
   WriteLn('PLIPCONF 1.00 - Configuration PLIP, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
   Else
  Begin
