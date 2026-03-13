@@ -155,6 +155,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet d'effectuer la manipulation de la table de routage IP.</td>
 	</tr>
 	<tr>
+		<td><b>SLATTACH.PAS</b></td>
+		<td>Cette commande permet de lancer le gestionnaire de connexions SLIP (Serial Line Internet Protocol).</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
