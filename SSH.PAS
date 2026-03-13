@@ -2,7 +2,8 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande ssh (Secure Shell))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande ssh (Secure Shell))
 }
 
 Program SSH;
@@ -14,59 +15,58 @@ Program SSH;
  { Turbo Pascal 7 }
 {$ENDIF}
 
-{$IFDEF FPC}
 Type
  { Structure pour une connexion SSH }
  TSSHConnection = Record
-  Hostname: String[64];      { Nom d'h√¥te ou IP }
-  Port: Word;                { Port SSH (d√©faut 22) }
+  Hostname: String[64];      { Nom d'hìte ou IP }
+  Port: Word;                { Port SSH (dÇfaut 22) }
   Username: String[64];      { Nom d'utilisateur }
-  Password: String[128];     { Mot de passe (non recommand√©) }
-  KeyFile: String[64];       { Fichier de cl√© priv√©e }
+  Password: String[128];     { Mot de passe (non recommandÇ) }
+  KeyFile: String[64];       { Fichier de clef privÇe }
   ForwardX11: Boolean;       { Redirection X11 }
   Compression: Boolean;      { Compression }
-  Verbose: Integer;          { Niveau de verbosit√© (0-3) }
+  Verbose: Integer;          { Niveau de verbositÇ (0-3) }
   BatchMode: Boolean;        { Mode batch (non-interactif) }
   ConfigFile: String[64];    { Fichier de configuration }
-  Command: String[128];      { Commande √† ex√©cuter }
+  Command: String[128];      { Commande Ö exÇcuter }
   LocalForward: String[64];  { Redirection de port locale }
   RemoteForward: String[64]; { Redirection de port distante }
   Cipher: String[32];        { Algorithme de chiffrement }
   Protocol: Integer;         { Version du protocole SSH (1 ou 2) }
-  Connected: Boolean;        { √âtat de la connexion }
+  Connected: Boolean;        { êtat de la connexion }
   LoginTime: String[19];     { Heure de connexion }
-  BytesSent: LongInt;        { Octets envoy√©s }
-  BytesReceived: LongInt;    { Octets re√ßus }
-  Authenticated: Boolean;    { Authentification r√©ussie }
+  BytesSent: LongInt;        { Octets envoyÇs }
+  BytesReceived: LongInt;    { Octets reáus }
+  Authenticated: Boolean;    { Authentification rÇussie }
   ChannelOpen: Boolean;      { Canal de session ouvert }
  End;
 
- { Canal SSH pour communications }
+  { Canal SSH pour communications }
  TSSHChannel = Record
   ChannelID: Word;           { ID du canal }
-  RemoteChannelID: Word;     { ID c√¥t√© serveur }
-  WindowSize: LongInt;       { Taille de fen√™tre }
+  RemoteChannelID: Word;     { ID cìtÇ serveur }
+  WindowSize: LongInt;       { Taille de fenàtre }
   MaxPacketSize: Word;       { Taille max des paquets }
   Active: Boolean;           { Canal actif }
  End;
 
- { Structure pour une session SSH active }
+  { Structure pour une session SSH active }
  TSSHSession = Record
-  SessionID: Integer;        { ID de session }
+  SessionID: Integer;         { ID de session }
   Connection: TSSHConnection; { Informations de connexion }
-  Channel: TSSHChannel;      { Canal de session }
-  Active: Boolean;           { Session active }
-  StartTime: String[19];     { Heure de d√©marrage }
-  LastActivity: String[19];  { Derni√®re activit√© }
-  Commands: Integer;         { Nombre de commandes ex√©cut√©es }
+  Channel: TSSHChannel;       { Canal de session }
+  Active: Boolean;            { Session active }
+  StartTime: String[19];      { Heure de dÇmarrage }
+  LastActivity: String[19];   { Derniäre activitÇ }
+  Commands: Integer;          { Nombre de commandes exÇcutÇes }
  End;
 
 Const
  MAX_SSH_SESSIONS = 32;
  DEFAULT_SSH_PORT = 22;
  SSH_VERSION = '2.0';
- 
- { Constantes SSH pour messages }
+
+  { Constantes SSH pour messages }
  SSH_MSG_DISCONNECT = 1;
  SSH_MSG_IGNORE = 2;
  SSH_MSG_UNIMPLEMENTED = 3;
@@ -89,13 +89,13 @@ Const
  SSH_MSG_CHANNEL_REQUEST = 98;
  SSH_MSG_CHANNEL_SUCCESS = 99;
  SSH_MSG_CHANNEL_FAILURE = 100;
- 
- { Constantes socket }
+
+  { Constantes socket }
  AF_INET = 2;
  SOCK_STREAM = 1;
  IPPROTO_TCP = 6;
- 
- { Constantes Winsock pour gestion d'erreurs }
+
+  { Constantes Winsock pour gestion d'erreurs }
  WSAECONNREFUSED = 10061;
  WSAENETUNREACH = 10051;
  WSAEHOSTUNREACH = 10065;
@@ -113,7 +113,8 @@ Var
  CurrentSession: Integer;
  WSAInitialized: Boolean;
 
-{ Fonctions pour authentification et canaux SSH compl√®te }
+{$IFDEF FPC}
+ { Fonctions pour authentification et canaux SSH compläte }
 Procedure InitializeSSH;
 Var
  I: Integer;
@@ -121,19 +122,17 @@ Begin
  SessionCount := 0;
  CurrentSession := -1;
  WSAInitialized := False;
- 
- { D√©sactivation temporaire de Winsock pour √©viter les plantages }
+  { DÇsactivation temporaire de Winsock pour Çviter les plantages }
  { Try
   WSAResult := WSAStartup($0202, WSData);
   If WSAResult = 0 Then Begin
    WSAInitialized := True;
    If ParamStr(1) <> '/?' Then
-    WriteLn('Winsock initialis√© pour connexions SSH r√©elles');
+    WriteLn('Winsock initialisÇ pour connexions SSH rÇelles');
   End;
  Except
   WSAInitialized := False;
  End; }
- 
  For I := 0 To MAX_SSH_SESSIONS-1 Do Begin
   With SSHSessions[I] Do Begin
    SessionID := I;
@@ -175,9 +174,8 @@ Begin
  End;
 End;
 
-{ Cr√©er des sessions SSH d'exemple }
-Procedure CreateSampleSessions;
-Begin
+ { CrÇer des sessions SSH d'exemple }
+Procedure CreateSampleSessions;Begin
  { Session locale }
  With SSHSessions[0] Do Begin
   SessionID := 0;
@@ -206,8 +204,7 @@ Begin
   LastActivity := '2026-02-21 14:35:22';
   Commands := 15;
  End;
- 
- { Session serveur de d√©veloppement }
+  { Session serveur de dÇveloppement }
  With SSHSessions[1] Do Begin
   SessionID := 1;
   With Connection Do Begin
@@ -235,8 +232,7 @@ Begin
   LastActivity := '2026-02-21 14:22:18';
   Commands := 43;
  End;
- 
- { Session de sauvegarde }
+  { Session de sauvegarde }
  With SSHSessions[2] Do Begin
   SessionID := 2;
   With Connection Do Begin
@@ -264,13 +260,11 @@ Begin
   LastActivity := '2026-02-21 12:15:30';
   Commands := 1;
  End;
- 
  SessionCount := 3;
 End;
 {$ENDIF}
 
-{$IFNDEF FPC}
-{ Fonctions utilitaires pour Turbo Pascal }
+ { Fonctions utilitaires pour Turbo Pascal }
 Function IntToStr(Value: LongInt): String;
 Var
  S: String;
@@ -307,6 +301,7 @@ Begin
  UpperCase := S;
 End;
 
+{$IFNDEF FPC}
 Function Copy(S: String; Start, Len: Integer): String;
 Var
  ResultStr: String;
@@ -349,11 +344,10 @@ Var
 Begin
  IsValidIP := False;
  If Length(IP) = 0 Then Exit;
- 
+
  Dots := 0;
  S := IP + '.';
  P := 1;
- 
  For I := 1 To Length(S) Do Begin
   If S[I] = '.' Then Begin
    If P = I Then Exit;
@@ -364,13 +358,11 @@ Begin
   End Else If not (S[I] in ['0'..'9']) Then
    Exit;
  End;
- 
  IsValidIP := (Dots = 4);
 End;
 
 { Obtenir le message d'erreur pour un code d'erreur Winsock }
-Function GetSocketErrorMessage(ErrorCode: Integer): String;
-Begin
+Function GetSocketErrorMessage(ErrorCode:Integer):String;Begin
  Case ErrorCode Of
   WSAECONNREFUSED: GetSocketErrorMessage := 'Connection refused';
   WSAENETUNREACH: GetSocketErrorMessage := 'Network unreachable';
@@ -386,24 +378,21 @@ Begin
   GetSocketErrorMessage := 'Error code ' + IntToStr(ErrorCode);
  End;
 End;
-{ R√©soudre un nom d'h√¥te en adresse IP (r√©el + fallback) }
-Function ResolveHostname(Hostname: String): String;
-Begin
+
+{ RÇsoudre un nom d'hìte en adresse IP (rÇel + fallback) }
+Function ResolveHostname(Hostname: String): String;Begin
  ResolveHostname := Hostname;
- 
- { V√©rifier si c'est d√©j√† une adresse IP valide }
+  { VÇrifier si c'est dÇjÖ une adresse IP valide }
  If IsValidIP(Hostname) Then Begin
   ResolveHostname := Hostname;
   Exit;
  End;
- 
- { Cas sp√©ciaux locaux }
+  { Cas spÇciaux locaux }
  If LowerCase(Hostname) = 'localhost' Then Begin
   ResolveHostname := '127.0.0.1';
   Exit;
  End;
- 
- { Base de donn√©es statique pour fallback }
+  { Base de donnÇes statique pour fallback }
  If LowerCase(Hostname) = 'example.com' Then
   ResolveHostname := '93.184.216.34'
  Else If LowerCase(Hostname) = 'github.com' Then
@@ -445,7 +434,7 @@ Begin
  Else If LowerCase(Hostname) = 'bitbucket.org' Then
   ResolveHostname := '104.192.143.3'
  Else If Copy(LowerCase(Hostname), 1, 4) = 'www.' Then
-  { Retirer www. et r√©soudre √† nouveau }
+  { Retirer www. et rÇsoudre Ö nouveau }
   ResolveHostname := ResolveHostname(Copy(Hostname, 5, Length(Hostname) - 4))
  Else If Pos('.local', LowerCase(Hostname)) > 0 Then
   ResolveHostname := '192.168.1.' + IntToStr(100 + (Length(Hostname) mod 50))
@@ -457,203 +446,178 @@ Begin
   { Nom simple sans domaine - adresse locale }
   ResolveHostname := '192.168.1.' + IntToStr(100 + (Length(Hostname) mod 50))
  Else
-  { Domaine inconnu - g√©n√©rer IP bas√©e sur le hash du nom }
+  { Domaine inconnu - gÇnÇrer IP basÇe sur le hash du nom }
   ResolveHostname := '203.0.113.' + IntToStr(1 + (Length(Hostname) mod 254));
 End;
 
-{ === √âTAPE 1: SESSION SSH AUTHENTIFI√âE ET CHIFFR√âE === }
-Function SSHConnect(var Session: TSSHSession): Boolean;
-Begin
+ { === êTAPE 1: SESSION SSH AUTHENTIFIêE ET CHIFFRêE === }
+Function SSHConnect(var Session: TSSHSession): Boolean;Begin
  SSHConnect := False;
- 
  With Session.Connection Do Begin
-  WriteLn('=== √âTAPE 1: √âTABLISSEMENT SESSION SSH AUTHENTIFI√âE ===');
+  WriteLn('=== êTAPE 1: êTABLISSEMENT SESSION SSH AUTHENTIFIêE ===');
   WriteLn;
   WriteLn('1. Connexion TCP vers ', Hostname, ':', Port);
-  WriteLn('   ‚úì Socket TCP ouvert');
-  WriteLn('   ‚úì Connexion √©tablie avec le serveur');
+  WriteLn('   ˛ Socket TCP ouvert');
+  WriteLn('   ˛ Connexion Çtablie avec le serveur');
   WriteLn;
-  WriteLn('2. N√©gociation de version SSH');
-  WriteLn('   ‚úì Client: SSH-2.0-NETWORKKIT_Pascal');
-  WriteLn('   ‚úì Serveur: SSH-2.0-OpenSSH_8.9p1');
+  WriteLn('2. NÇgociation de version SSH');
+  WriteLn('   ˛ Client: SSH-2.0-NETWORKKIT_Pascal');
+  WriteLn('   ˛ Serveur: SSH-2.0-OpenSSH_8.9p1');
   WriteLn;
-  WriteLn('3. √âchange de cl√©s Diffie-Hellman');
-  WriteLn('   ‚úì G√©n√©ration des cl√©s √©ph√©m√®res');
-  WriteLn('   ‚úì Calcul de la cl√© partag√©e');
-  WriteLn('   ‚úì V√©rification de l''empreinte du serveur');
+  WriteLn('3. êchange de clefs Diffie-Hellman');
+  WriteLn('   ˛ GÇnÇration des clefs ÇphÇmäres');
+  WriteLn('   ˛ Calcul de la clef partagÇe');
+  WriteLn('   ˛ VÇrification de l''empreinte du serveur');
   WriteLn;
   WriteLn('4. Configuration du chiffrement');
-  WriteLn('   ‚úì Algorithme: AES-256-CTR');
-  WriteLn('   ‚úì Int√©grit√©: HMAC-SHA256');
-  WriteLn('   ‚úì Cl√©s de session g√©n√©r√©es');
+  WriteLn('   ˛ Algorithme: AES-256-CTR');
+  WriteLn('   ˛ IntÇgritÇ: HMAC-SHA256');
+  WriteLn('   ˛ Clefs de session gÇnÇrÇes');
   WriteLn;
   WriteLn('5. Authentification utilisateur');
-  WriteLn('   ‚úì M√©thode: publickey');
-  WriteLn('   ‚úì Cl√© priv√©e: ~/.ssh/id_rsa');
-  WriteLn('   ‚úì Authentification r√©ussie');
+  WriteLn('   ˛ MÇthode: publickey');
+  WriteLn('   ˛ Clef privÇe: ~/.ssh/id_rsa');
+  WriteLn('   ˛ Authentification rÇussie');
   WriteLn;
-  
-  { Mettre √† jour l''√©tat }
+   { Mettre Ö jour l'Çtat }
   Connected := True;
   Authenticated := True;
   LoginTime := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
-  Inc(BytesSent, 1024); { Donn√©es d''handshake }
+  Inc(BytesSent, 1024); { DonnÇes d'handshake }
   Inc(BytesReceived, 512);
  End;
- 
  Session.Active := True;
- WriteLn('Session SSH authentifi√©e et chiffr√©e √©tablie !');
+ WriteLn('Session SSH authentifiÇe et chiffrÇe Çtablie !');
  WriteLn;
  SSHConnect := True;
 End;
 
-{ === √âTAPE 2: OUVERTURE CANAL DE SESSION === }
-Function SSHOpenChannel(var Session: TSSHSession): Boolean;
-Begin
+{ === êTAPE 2: OUVERTURE CANAL DE SESSION === }
+Function SSHOpenChannel(var Session: TSSHSession): Boolean;Begin
  SSHOpenChannel := False;
- 
- WriteLn('=== √âTAPE 2: OUVERTURE CANAL DE SESSION SSH ===');
+ WriteLn('=== êTAPE 2: OUVERTURE CANAL DE SESSION SSH ===');
  WriteLn;
- 
  With Session.Channel Do Begin
   WriteLn('1. Demande d''ouverture de canal');
-  WriteLn('   ‚úì Type: session');
-  WriteLn('   ‚úì ID canal local: 1');
+  WriteLn('   ˛ Type: session');
+  WriteLn('   ˛ ID canal local: 1');
   WriteLn;
-  WriteLn('2. R√©ponse du serveur');
-  WriteLn('   ‚úì Canal accept√©');
-  WriteLn('   ‚úì ID canal distant: 100');
+  WriteLn('2. RÇponse du serveur');
+  WriteLn('   ˛ Canal acceptÇ');
+  WriteLn('   ˛ ID canal distant: 100');
   WriteLn;
-  WriteLn('3. N√©gociation des param√®tres');
-  WriteLn('   ‚úì Taille de fen√™tre: 32768 octets');
-  WriteLn('   ‚úì Taille max paquet: 16384 octets');
+  WriteLn('3. NÇgociation des paramätres');
+  WriteLn('   ˛ Taille de fenàtre: 32768 octets');
+  WriteLn('   ˛ Taille max paquet: 16384 octets');
   WriteLn;
-  
-  { Configuration du canal }
+   { Configuration du canal }
   ChannelID := 1;
   RemoteChannelID := 100;
   WindowSize := 32768;
   MaxPacketSize := 16384;
   Active := True;
  End;
- 
  Session.Connection.ChannelOpen := True;
  Inc(Session.Connection.BytesSent, 64);
  Inc(Session.Connection.BytesReceived, 32);
- 
  WriteLn('Canal de session SSH ouvert !');
  WriteLn;
  SSHOpenChannel := True;
 End;
 
-{ === √âTAPE 3: ENVOI COMMANDE VIA PROTOCOLE SSH === }
-Function SSHSendCommand(var Session: TSSHSession; Command: String): Boolean;
-Begin
+ { === êTAPE 3: ENVOI COMMANDE VIA PROTOCOLE SSH === }
+Function SSHSendCommand(var Session:TSSHSession;Command:String):Boolean;Begin
  SSHSendCommand := False;
- 
- WriteLn('=== √âTAPE 3: ENVOI COMMANDE VIA PROTOCOLE SSH ===');
+ WriteLn('=== êTAPE 3: ENVOI COMMANDE VIA PROTOCOLE SSH ===');
  WriteLn;
- WriteLn('Commande √† ex√©cuter: "', Command, '"');
+ WriteLn('Commande Ö exÇcuter: "', Command, '"');
  WriteLn;
- WriteLn('1. Pr√©paration du paquet SSH');
- WriteLn('   ‚úì Type: SSH_MSG_CHANNEL_REQUEST');
- WriteLn('   ‚úì Canal: ', Session.Channel.RemoteChannelID);
- WriteLn('   ‚úì Type de requ√™te: exec');
+ WriteLn('1. PrÇparation du paquet SSH');
+ WriteLn('   ˛ Type: SSH_MSG_CHANNEL_REQUEST');
+ WriteLn('   ˛ Canal: ', Session.Channel.RemoteChannelID);
+ WriteLn('   ˛ Type de requàte: exec');
  WriteLn;
- WriteLn('2. Chiffrement des donn√©es');
- WriteLn('   ‚úì Algorithme: AES-256-CTR');
- WriteLn('   ‚úì Taille donn√©es: ', Length(Command), ' octets');
- WriteLn('   ‚úì Padding ajout√© pour alignement');
+ WriteLn('2. Chiffrement des donnÇes');
+ WriteLn('   ˛ Algorithme: AES-256-CTR');
+ WriteLn('   ˛ Taille donnÇes: ', Length(Command), ' octets');
+ WriteLn('   ˛ Padding ajoutÇ pour alignement');
  WriteLn;
- WriteLn('3. Ajout de l''int√©grit√©');
- WriteLn('   ‚úì HMAC-SHA256 calcul√©');
- WriteLn('   ‚úì S√©quence: ', Session.Commands + 1);
+ WriteLn('3. Ajout de l''intÇgritÇ');
+ WriteLn('   ˛ HMAC-SHA256 calculÇ');
+ WriteLn('   ˛ SÇquence: ', Session.Commands + 1);
  WriteLn;
- WriteLn('4. Transmission s√©curis√©e');
- WriteLn('   ‚úì Paquet envoy√© au serveur');
- WriteLn('   ‚úì Accus√© de r√©ception re√ßu');
+ WriteLn('4. Transmission sÇcurisÇe');
+ WriteLn('   ˛ Paquet envoyÇ au serveur');
+ WriteLn('   ˛ AccusÇ de rÇception reáu');
  WriteLn;
- 
  Inc(Session.Connection.BytesSent, Length(Command) + 32);
  Inc(Session.Commands);
- 
  WriteLn('Commande transmise via protocole SSH !');
  WriteLn;
  SSHSendCommand := True;
 End;
 
-{ === √âTAPE 4: R√âCEPTION ET D√âCODAGE R√âPONSE === }
-Function SSHReceiveResponse(var Session: TSSHSession; var Response: String): Boolean;
-Begin
+{ === êTAPE 4: RêCEPTION ET DêCODAGE RêPONSE === }
+Function SSHReceiveResponse(Var Session:TSSHSession;Var Response:String):Boolean;Begin
  SSHReceiveResponse := False;
- 
- WriteLn('=== √âTAPE 4: R√âCEPTION ET D√âCODAGE R√âPONSE ===');
+ WriteLn('=== êTAPE 4: RêCEPTION ET DêCODAGE RêPONSE ===');
  WriteLn;
- WriteLn('1. R√©ception des paquets');
- WriteLn('   ‚úì Type: SSH_MSG_CHANNEL_DATA');
- WriteLn('   ‚úì Canal source: ', Session.Channel.RemoteChannelID);
- WriteLn('   ‚úì Taille re√ßue: 256 octets');
+ WriteLn('1. RÇception des paquets');
+ WriteLn('   ˛ Type: SSH_MSG_CHANNEL_DATA');
+ WriteLn('   ˛ Canal source: ', Session.Channel.RemoteChannelID);
+ WriteLn('   ˛ Taille reáue: 256 octets');
  WriteLn;
- WriteLn('2. V√©rification int√©grit√©');
- WriteLn('   ‚úì HMAC-SHA256 v√©rifi√©');
- WriteLn('   ‚úì Paquet authentique');
- WriteLn('   ‚úì S√©quence correcte');
+ WriteLn('2. VÇrification intÇgritÇ');
+ WriteLn('   ˛ HMAC-SHA256 vÇrifiÇ');
+ WriteLn('   ˛ Paquet authentique');
+ WriteLn('   ˛ SÇquence correcte');
  WriteLn;
- WriteLn('3. D√©chiffrement AES-256-CTR');
- WriteLn('   ‚úì Donn√©es d√©chiffr√©es');
- WriteLn('   ‚úì Padding retir√©');
+ WriteLn('3. DÇchiffrement AES-256-CTR');
+ WriteLn('   ˛ DonnÇes dÇchiffrÇes');
+ WriteLn('   ˛ Padding retirÇ');
  WriteLn;
  WriteLn('4. Extraction du contenu');
- WriteLn('   ‚úì Payload extrait');
- WriteLn('   ‚úì Format UTF-8 valid√©');
+ WriteLn('   ˛ Payload extrait');
+ WriteLn('   ˛ Format UTF-8 validÇ');
  WriteLn;
- 
- { G√©n√©rer une r√©ponse simul√©e bas√©e sur les commandes courantes }
- Response := 'R√©ponse SSH s√©curis√©e pour commande ' + IntToStr(Session.Commands);
- 
+  { GÇnÇrer une rÇponse simulÇe basÇe sur les commandes courantes }
+ Response := 'RÇponse SSH sÇcurisÇe pour commande ' + IntToStr(Session.Commands);
  Inc(Session.Connection.BytesReceived, 256);
  Session.Connection.LoginTime := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
- 
- WriteLn('R√©ponse d√©cod√©e avec succ√®s !');
+ WriteLn('RÇponse dÇcodÇe avec succäs !');
  WriteLn;
  SSHReceiveResponse := True;
 End;
 
-{ Fonction principale d''ex√©cution compl√®te }
-Function ExecuteSSHCommand(var Session: TSSHSession; Command: String): String;
+ { Fonction principale d''exÇcution compläte }
+Function ExecuteSSHCommand(var Session:TSSHSession;Command:String):String;
 Var
  Response: String;
 Begin
  ExecuteSSHCommand := '';
- 
- { V√©rifier que la session est pr√™te }
- If not Session.Active or not Session.Connection.Connected or 
+ { VÇrifier que la session est pràte }
+ If not Session.Active or not Session.Connection.Connected or
     not Session.Connection.Authenticated then Begin
   WriteLn('ERREUR: Session SSH non √©tablie');
   Exit;
  End;
- 
- { V√©rifier le canal }
+  { VÇrifier le canal }
  If not Session.Connection.ChannelOpen or not Session.Channel.Active Then Begin
   WriteLn('ERREUR: Canal SSH non ouvert');
   Exit;
  End;
- 
- { Ex√©cution des 4 √©tapes }
- 
- { √âtape 3: Envoi de la commande }
+  { ExÇcution des 4 Çtapes }
+  { êtape 3: Envoi de la commande }
  If not SSHSendCommand(Session, Command) Then Begin
   WriteLn('ERREUR: Impossible d''envoyer la commande');
   Exit;
  End;
- 
- { √âtape 4: R√©ception de la r√©ponse }
+  { êtape 4: RÇception de la rÇponse }
  If not SSHReceiveResponse(Session, Response) Then Begin
-  WriteLn('ERREUR: Impossible de recevoir la r√©ponse');
+  WriteLn('ERREUR: Impossible de recevoir la rÇponse');
   Exit;
  End;
- 
- { Simuler le contenu de r√©ponse selon la commande }
+  { Simuler le contenu de rÇponse selon la commande }
  If LowerCase(Command) = 'pwd' Then Begin
   Response := '/home/' + Session.Connection.Username;
  End Else If LowerCase(Command) = 'whoami' Then Begin
@@ -664,45 +628,46 @@ Begin
   Response := FormatDateTime('ddd mmm dd hh:nn:ss yyyy', Now);
  End Else If Copy(LowerCase(Command), 1, 2) = 'ls' Then Begin
   Response := 'total 12' + #13#10 +
-              'drwxr-xr-x  2 ' + Session.Connection.Username + ' ' + Session.Connection.Username + ' 4096 Feb 21 14:30 Documents' + #13#10 +
-              'drwxr-xr-x  2 ' + Session.Connection.Username + ' ' + Session.Connection.Username + ' 4096 Feb 21 13:15 Downloads' + #13#10 +
-              '-rw-r--r--  1 ' + Session.Connection.Username + ' ' + Session.Connection.Username + '  220 Feb 21 12:00 .bashrc';
+              'drwxr-xr-x  2 ' + Session.Connection.Username + ' ' +
+              Session.Connection.Username + ' 4096 Feb 21 14:30 Documents' +
+              #13#10 +
+              'drwxr-xr-x  2 ' + Session.Connection.Username + ' ' +
+              Session.Connection.Username + ' 4096 Feb 21 13:15 Downloads' +
+              #13#10 +
+              '-rw-r--r--  1 ' + Session.Connection.Username + ' ' +
+              Session.Connection.Username + '  220 Feb 21 12:00 .bashrc';
  End Else Begin
-  Response := 'Sortie de la commande "' + Command + '" ex√©cut√©e avec succ√®s sur ' + Session.Connection.Hostname;
+  Response := 'Sortie de la commande "' + Command +
+              '" ex√©cut√©e avec succ√®s sur ' +
+              Session.Connection.Hostname;
  End;
- 
- WriteLn('--- R√âSULTAT DE LA COMMANDE ---');
+ WriteLn('--- RêSULTAT DE LA COMMANDE ---');
  WriteLn(Response);
- WriteLn('--- FIN R√âSULTAT ---');
+ WriteLn('--- FIN RêSULTAT ---');
  WriteLn;
- 
  ExecuteSSHCommand := Response;
 End;
 
-{ Fonctions simplifi√©es pour compatibilit√© }
-Function SendSSHData(Dummy: Integer; Data: String): Boolean;
-Begin
+ { Fonctions simplifiÇes pour compatibilitÇ }
+Function SendSSHData(Dummy:Integer;Data:String):Boolean;Begin
  SendSSHData := True;
 End;
 
-Function ReceiveSSHData(Dummy: Integer; var Data: String; MaxLen: Integer): Boolean;
-Begin
+Function ReceiveSSHData(Dummy:Integer;Var Data:String;MaxLen:Integer):Boolean;Begin
  Data := 'SSH Response Data';
  ReceiveSSHData := True;
 End;
 
-Function SSHKeyExchange(Dummy: Integer; var Session: TSSHSession): Boolean;
-Begin
+Function SSHKeyExchange(Dummy:Integer;Var Session:TSSHSession):Boolean;Begin
  SSHKeyExchange := True;
 End;
 
-Function SSHAuthenticate(Dummy: Integer; Username, Password: String): Boolean;
-Begin
+Function SSHAuthenticate(Dummy:Integer;Username,Password:String):Boolean;Begin
  SSHAuthenticate := True;
 End;
 
-{ Parser une sp√©cification d'h√¥te (utilisateur@h√¥te:port) }
-Procedure ParseHostSpec(HostSpec: String; var Username, Hostname: String; var Port: Word);
+ { Analyser une spÇcification d'hìte (utilisateur@hìte:port) }
+Procedure ParseHostSpec(HostSpec:String;Var Username,Hostname:String;Var Port:Word);
 Var
  AtPos, ColonPos: Integer;
  PortStr: String;
@@ -710,15 +675,13 @@ Begin
  Username := '';
  Hostname := HostSpec;
  Port := DEFAULT_SSH_PORT;
- 
- { Chercher le @ pour le nom d'utilisateur }
+  { Chercher le @ pour le nom d'utilisateur }
  AtPos := Pos('@', HostSpec);
  If AtPos > 0 Then Begin
   Username := Copy(HostSpec, 1, AtPos - 1);
   Hostname := Copy(HostSpec, AtPos + 1, Length(HostSpec) - AtPos);
  End;
- 
- { Chercher le : pour le port }
+  { Chercher le : pour le port }
  ColonPos := Pos(':', Hostname);
  If ColonPos > 0 Then Begin
   PortStr := Copy(Hostname, ColonPos + 1, Length(Hostname) - ColonPos);
@@ -728,35 +691,29 @@ Begin
  End;
 End;
 
-{ Cr√©er une nouvelle session SSH }
-Function CreateSSHSession(HostSpec, Command: String; Options: String): Integer;
+ { CrÇer une nouvelle session SSH }
+Function CreateSSHSession(HostSpec,Command:String;Options:String):Integer;
 Var
  Index: Integer;
  Username, Hostname: String;
  Port: Word;
 Begin
  CreateSSHSession := -1;
- 
  If SessionCount >= MAX_SSH_SESSIONS Then Begin
   WriteLn('ssh: Nombre maximum de sessions atteint');
   Exit;
  End;
- 
- { Parser la sp√©cification d'h√¥te }
+  { Parser la spÇcification d'hìte }
  ParseHostSpec(HostSpec, Username, Hostname, Port);
- 
  If Username = '' Then Begin
-  Username := 'user'; { Utilisateur par d√©faut }
+  Username := 'user'; { Utilisateur par dÇfaut }
  End;
- 
  Index := SessionCount;
- 
- { Assigner les valeurs de base en dehors du With }
+  { Assigner les valeurs de base en dehors du With }
  SSHSessions[Index].SessionID := Index;
  SSHSessions[Index].Connection.Hostname := Hostname;
  SSHSessions[Index].Connection.Port := Port;
  SSHSessions[Index].Connection.Username := Username;
- 
  With SSHSessions[Index].Connection Do Begin
    Password := '';
    KeyFile := '~/.ssh/id_rsa';
@@ -774,7 +731,7 @@ Begin
    BytesSent := 0;
    BytesReceived := 0;
   End;
- { Assigner la commande en dehors du With pour √©viter la confusion }
+  { Assigner la commande en dehors du With pour Çviter la confusion }
  SSHSessions[Index].Connection.Command := Command;
  With SSHSessions[Index] Do Begin
   Active := True;
@@ -785,85 +742,71 @@ Begin
  CreateSSHSession := Index;
 End;
 
-{ Se connecter √† un serveur SSH avec authentification compl√®te }
+ { Se connecter Ö un serveur SSH avec authentification compläte }
 Function ConnectSSH(var Session: TSSHSession): Boolean;
 Var
  ResolvedIP: String;
 Begin
  ConnectSSH := False;
- 
  With Session.Connection Do Begin
-  WriteLn('Tentative de connexion SSH √† ', Hostname, ':', Port, '...');
-  
-  { R√©solution DNS }
+  WriteLn('Tentative de connexion SSH Ö ', Hostname, ':', Port, '...');
+   { RÇsolution DNS }
   ResolvedIP := ResolveHostname(Hostname);
   If ResolvedIP <> Hostname Then
-   WriteLn('R√©solution DNS: ', Hostname, ' -> ', ResolvedIP);
+   WriteLn('RÇsolution DNS: ', Hostname, ' -> ', ResolvedIP);
   WriteLn;
  End;
- 
- { √âtape 1: √âtablir la session authentifi√©e }
+  { êtape 1: êtablir la session authentifiÇe }
  If not SSHConnect(Session) Then Begin
-  WriteLn('ERREUR: Impossible d''√©tablir la session SSH');
+  WriteLn('ERREUR: Impossible d''Çtablir la session SSH');
   Exit;
  End;
- 
- { √âtape 2: Ouvrir le canal de session }
+  { êtape 2: Ouvrir le canal de session }
  If not SSHOpenChannel(Session) Then Begin
   WriteLn('ERREUR: Impossible d''ouvrir le canal SSH');
   Exit;
  End;
- 
- WriteLn('‚úì CONNEXION SSH COMPL√àTE √âTABLIE');
- WriteLn('  - Session authentifi√©e et chiffr√©e: OUI');
+ WriteLn('˛ CONNEXION SSH COMPLETE êTABLIE');
+ WriteLn('  - Session authentifiÇe et chiffrÇe: OUI');
  WriteLn('  - Canal de session ouvert: OUI');
- WriteLn('  - Pr√™t pour l''ex√©cution de commandes');
+ WriteLn('  - Pràt pour l''exÇcution de commandes');
  WriteLn;
- 
  ConnectSSH := True;
 End;
 
-{ Ex√©cuter une commande SSH avec session authentifi√©e (wrapper) }
+ { ExÇcuter une commande SSH avec session authentifiÇe (wrapper) }
 Function ExecuteSSHCommandWrapper(var Session: TSSHSession; Command: String): Boolean;
 Var
  CommandResult: String;
 Begin
  ExecuteSSHCommandWrapper := False;
- 
  If not Session.Active Then Begin
   WriteLn('ssh: Session non active');
   Exit;
  End;
- 
  With Session.Connection Do Begin
-  WriteLn('Ex√©cution de "', Command, '" sur ', Hostname, '...');
+  WriteLn('ExÇcution de "', Command, '" sur ', Hostname, '...');
   WriteLn;
-  
-  { Utiliser la commande de la session si le param√®tre est vide }
+   { Utiliser la commande de la session si le paramätre est vide }
   If (Command = '') and (Session.Connection.Command <> '') Then
    Command := Session.Connection.Command;
-  
-  { Ex√©cuter la commande compl√®te avec les 4 √©tapes }
+   { ExÇcuter la commande compläte avec les 4 Çtapes }
   CommandResult := ExecuteSSHCommand(Session, Command);
-  
   If CommandResult <> '' Then Begin
-   { Mettre √† jour les statistiques }
+    { Mettre Ö jour les statistiques }
    Inc(BytesSent, Length(Command) + 20);
    Inc(BytesReceived, Length(CommandResult));
-   
-   { Mettre √† jour l'activit√© }
+    { Mettre Ö jour l'activitÇ }
    LoginTime := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
-   
    ExecuteSSHCommandWrapper := True;
   End Else Begin
-   WriteLn('ssh: Erreur lors de l''ex√©cution de la commande');
+   WriteLn('ssh: Erreur lors de l''exÇcution de la commande');
   End;
  End;
 End;
 
-{ Fermer une session SSH }
-Procedure CloseSSHSession(var Session: TSSHSession);
-Begin
+ { Fermer une session SSH }
+Procedure CloseSSHSession(var Session: TSSHSession);Begin
  If Session.Active Then Begin
   WriteLn('Fermeture de la connexion avec ', Session.Connection.Hostname);
   Session.Active := False;
@@ -871,7 +814,7 @@ Begin
  End;
 End;
 
-{ Lister les sessions SSH actives }
+ { Lister les sessions SSH actives }
 Procedure ListSSHSessions;
 Var
  I: Integer;
@@ -880,65 +823,54 @@ Begin
   WriteLn('Aucune session SSH active');
   Exit;
  End;
- 
  WriteLn('Sessions SSH actives:');
  WriteLn('====================');
- WriteLn('ID  Utilisateur@H√¥te              Port  √âtat     D√©marrage        Commandes');
+ WriteLn('ID  Utilisateur@Hìte              Port  êtat     DÇmarrage        Commandes');
  WriteLn('--- ----------------------------- ----- -------- ---------------- ---------');
- 
  For I := 0 To SessionCount - 1 Do Begin
   With SSHSessions[I] Do Begin
    Write(SessionID:2, '  ');
-   Write(Copy(Connection.Username + '@' + Connection.Hostname + 
+   Write(Copy(Connection.Username + '@' + Connection.Hostname +
               '                             ', 1, 29), ' ');
    Write(Connection.Port:5, ' ');
-   If Active Then Write('Actif   ') Else Write('Ferm√©   ');
+   If Active Then Write('Actif   ') Else Write('FermÇ   ');
    Write(Copy(StartTime + '                ', 1, 16), ' ');
    WriteLn(Commands:4);
   End;
  End;
- 
  WriteLn;
  WriteLn('Total: ', SessionCount, ' session(s)');
 End;
 
-{ Afficher les d√©tails d'une session }
-Procedure ShowSessionDetails(SessionID: Integer);
-Begin
+ { Afficher les dÇtails d'une session }
+Procedure ShowSessionDetails(SessionID:Integer);Begin
  If (SessionID < 0) or (SessionID >= SessionCount) Then Begin
   WriteLn('ssh: Session ', SessionID, ' introuvable');
   Exit;
  End;
- 
  With SSHSessions[SessionID] Do Begin
-  WriteLn('D√©tails de la session SSH ', SessionID, ':');
+  WriteLn('DÇtails de la session SSH ', SessionID, ':');
   WriteLn('================================');
   With Connection Do Begin
-   WriteLn('H√¥te             : ', Hostname, ':', Port);
+   WriteLn('Hìte             : ', Hostname, ':', Port);
    WriteLn('Utilisateur      : ', Username);
    WriteLn('Protocole        : SSH-', Protocol, '.0');
    WriteLn('Chiffrement      : ', Cipher);
-   WriteLn('Cl√© priv√©e       : ', KeyFile);
-   If ForwardX11 Then 
-    WriteLn('Redirection X11  : Oui')
-   Else
-    WriteLn('Redirection X11  : Non');
-   If Compression Then 
-    WriteLn('Compression      : Oui')
-   Else
-    WriteLn('Compression      : Non');
+   WriteLn('Clef privÇe      : ', KeyFile);
+   If ForwardX11 Then WriteLn('Redirection X11  : Oui')
+                 Else WriteLn('Redirection X11  : Non');
+   If Compression Then WriteLn('Compression      : Oui')
+                  Else WriteLn('Compression      : Non');
    If LocalForward <> '' Then
     WriteLn('Forward local    : ', LocalForward);
    If RemoteForward <> '' Then
     WriteLn('Forward distant  : ', RemoteForward);
-   If Connected Then 
-    WriteLn('√âtat             : Connect√©')
-   Else
-    WriteLn('√âtat             : D√©connect√©');
+   If Connected Then WriteLn('êtat             : ConnectÇ')
+                Else WriteLn('êtat             : DÇconnectÇ');
    WriteLn('Heure connexion  : ', LoginTime);
-   WriteLn('Derni√®re activit√©: ', LastActivity);
-   WriteLn('Octets envoy√©s   : ', BytesSent);
-   WriteLn('Octets re√ßus     : ', BytesReceived);
+   WriteLn('Derniäre activitÇ: ', LastActivity);
+   WriteLn('Octets envoyÇs   : ', BytesSent);
+   WriteLn('Octets reáus     : ', BytesReceived);
    WriteLn('Commandes        : ', Commands);
   End;
  End;
@@ -954,7 +886,6 @@ Begin
  TotalCommands := 0;
  TotalSent := 0;
  TotalReceived := 0;
- 
  For I := 0 To SessionCount - 1 Do Begin
   With SSHSessions[I] Do Begin
    If Active Then Inc(ActiveSessions);
@@ -963,47 +894,43 @@ Begin
    Inc(TotalReceived, Connection.BytesReceived);
   End;
  End;
- 
  WriteLn('Statistiques SSH:');
  WriteLn('=================');
  WriteLn('Sessions totales   : ', SessionCount);
  WriteLn('Sessions actives   : ', ActiveSessions);
- WriteLn('Commandes ex√©cut√©es: ', TotalCommands);
- WriteLn('Octets envoy√©s     : ', TotalSent);
- WriteLn('Octets re√ßus       : ', TotalReceived);
+ WriteLn('Commandes exÇcutÇes: ', TotalCommands);
+ WriteLn('Octets envoyÇs     : ', TotalSent);
+ WriteLn('Octets reáus       : ', TotalReceived);
  WriteLn('Version SSH        : ', SSH_VERSION);
 End;
 {$ENDIF}
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedSSH;
-Begin
+Procedure ShowSimulatedSSH;Begin
  WriteLn('Sessions SSH actives (simulation):');
  WriteLn('====================');
- WriteLn('ID  Utilisateur@H√¥te              Port  √âtat     D√©marrage        Commandes');
+ WriteLn('ID  Utilisateur@Hìte              Port  êtat     DÇmarrage        Commandes');
  WriteLn('--- ----------------------------- ----- -------- ---------------- ---------');
  WriteLn(' 0  user@localhost                   22 Actif    2026-02-21 14:30    15');
  WriteLn(' 1  developer@dev.example.com      2222 Actif    2026-02-21 13:15    43');
- WriteLn(' 2  backup@backup.internal           22 Ferm√©    2026-02-21 12:00     1');
+ WriteLn(' 2  backup@backup.internal           22 FermÇ    2026-02-21 12:00     1');
  WriteLn;
  WriteLn('Total: 3 session(s)');
 End;
 
-Procedure SimulateSSHConnect;
-Begin
- WriteLn('Tentative de connexion √† example.com:22...');
+Procedure SimulateSSHConnect;Begin
+ WriteLn('Tentative de connexion Ö example.com:22...');
  WriteLn('SSH-2.0-NETWORKKIT_user@example.com');
- WriteLn('√âchange de cl√©s...');
+ WriteLn('êchange de clefs...');
  WriteLn('Algorithme: aes128-ctr');
- WriteLn('Authentification par cl√© publique...');
- WriteLn('Connexion √©tablie avec example.com');
+ WriteLn('Authentification par clef© publique...');
+ WriteLn('Connexion Çtablie avec example.com');
  WriteLn('Bienvenue sur example.com!');
 End;
 
-Procedure SimulateSSHCommand;
-Begin
- WriteLn('Ex√©cution de "ls -la" sur example.com...');
+Procedure SimulateSSHCommand;Begin
+ WriteLn('ExÇcution de "ls -la" sur example.com...');
  WriteLn;
  WriteLn('total 12');
  WriteLn('drwxr-xr-x  2 user user 4096 Feb 21 14:30 Documents');
@@ -1011,20 +938,19 @@ Begin
  WriteLn('-rw-r--r--  1 user user  220 Feb 21 12:00 .bash_logout');
 End;
 
-Procedure ShowSimulatedStats;
-Begin
+Procedure ShowSimulatedStats;Begin
  WriteLn('Statistiques SSH:');
  WriteLn('=================');
  WriteLn('Sessions totales   : 3');
  WriteLn('Sessions actives   : 2');
- WriteLn('Commandes ex√©cut√©es: 59');
- WriteLn('Octets envoy√©s     : 1066944');
- WriteLn('Octets re√ßus       : 37376');
+ WriteLn('Commandes exÇcutÇes: 59');
+ WriteLn('Octets envoyÇs     : 1066944');
+ WriteLn('Octets reáus       : 37376');
  WriteLn('Version SSH        : 2.0');
 End;
 {$ENDIF}
 
-{ Analyse de la ligne de commande }
+ { Analyse de la ligne de commande }
 Procedure ParseCommandLine;
 Var
  I: Integer;
@@ -1047,86 +973,77 @@ Begin
  ForwardX11 := False;
  Compression := False;
  BatchMode := False;
- 
- { Analyser les param√®tres }
+  { Analyser les paramätres }
  I := 1;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
-  If (LowerCase(Param) = '-v') Then
-   Inc(Verbose)
-  Else If (LowerCase(Param) = '-x') Then
-   ForwardX11 := True
-  Else If (LowerCase(Param) = '-c') Then
-   Compression := True
-  Else If (LowerCase(Param) = '-n') Then
-   BatchMode := True
-  Else If (LowerCase(Param) = '-l') Then Begin
+  If (LowerCase(Param) = '-v') Then Inc(Verbose) Else
+  If (LowerCase(Param) = '-x') Then ForwardX11 := True
+  Else If (LowerCase(Param) = '-c') Then Compression := True Else
+  If (LowerCase(Param) = '-n') Then BatchMode := True Else
+  If (LowerCase(Param) = '-l') Then Begin
    Action := 'list';
-  End Else If (LowerCase(Param) = '-p') and (I < ParamCount) Then Begin
+  End
+   Else
+  If (LowerCase(Param) = '-p') and (I < ParamCount) Then Begin
    Inc(I);
-   Try
-    Port := StrToInt(ParamStr(I));
-    If Port = 0 Then Port := DEFAULT_SSH_PORT;
-   Except
+   Port := StrToInt(ParamStr(I));
+   If Port = 0 Then Begin
     WriteLn('ssh: Port invalide "', ParamStr(I), '"');
     WriteLn('Usage: ssh -p PORT hostname [commande]');
     WriteLn('Exemple: ssh -p 2222 example.com');
     Exit;
    End;
-  End Else If (LowerCase(Param) = '-i') and (I < ParamCount) Then Begin
+  End
+   Else
+  If (LowerCase(Param) = '-i') and (I < ParamCount) Then Begin
    Inc(I);
    KeyFile := ParamStr(I);
-  End Else If Copy(LowerCase(Param), 1, 2) = '-l' Then Begin
-   Username := Copy(Param, 3, Length(Param) - 2);
-  End Else If LowerCase(Param) = '--stats' Then
-   Action := 'stats'
-  Else If Copy(Param, 1, 1) <> '-' Then Begin
-   If HostSpec = '' Then
-    HostSpec := Param
+  End
    Else
-    Command := Command + Param + ' ';
+  If Copy(LowerCase(Param), 1, 2) = '-l' Then Begin
+   Username := Copy(Param, 3, Length(Param) - 2);
+  End
+   Else
+  If LowerCase(Param) = '--stats' Then Action := 'stats' Else
+  If Copy(Param, 1, 1) <> '-' Then Begin
+   If HostSpec = '' Then HostSpec := Param
+                    Else Command := Command + Param + ' ';
   End;
-  
   Inc(I);
  End;
- 
- { Nettoyer la commande }
- If Length(Command) > 0 Then
-  Command := Copy(Command, 1, Length(Command) - 1);
- 
+  { Nettoyer la commande }
+ If Length(Command) > 0 Then Command := Copy(Command, 1, Length(Command) - 1);
  {$IFDEF FPC}
  Case Action Of
   'connect': Begin
    If HostSpec = '' Then Begin
-    WriteLn('ssh: Nom d''h√¥te requis');
+    WriteLn('ssh: Nom d''hìte requis');
     WriteLn('Usage: ssh [options] hostname [commande]');
     Exit;
    End;
-   
    If SessionCount = 0 Then CreateSampleSessions;
-   
    SessionIndex := CreateSSHSession(HostSpec, Command, '');
    If SessionIndex >= 0 Then Begin
     If ConnectSSH(SSHSessions[SessionIndex]) Then Begin
      If Command <> '' Then Begin
       ExecuteSSHCommandWrapper(SSHSessions[SessionIndex], Command);
-      
-      { Affichage du r√©sum√© complet }
+      { Affichage du rÇsumÇ complet }
       WriteLn('=====================================================');
-      WriteLn('‚úì D√âMONSTRATION COMPL√àTE DES 4 √âTAPES SSH');
+      WriteLn('˛ DêMONSTRATION COMPLETE DES 4 êTAPES SSH');
       WriteLn('=====================================================');
       WriteLn('Session vers: ', SSHSessions[SessionIndex].Connection.Hostname);
       WriteLn('Utilisateur: ', SSHSessions[SessionIndex].Connection.Username);
       WriteLn('Canal ID: ', SSHSessions[SessionIndex].Channel.ChannelID);
-      WriteLn('Commandes ex√©cut√©es: ', SSHSessions[SessionIndex].Commands);
-      WriteLn('Octets envoy√©s: ', SSHSessions[SessionIndex].Connection.BytesSent);
-      WriteLn('Octets re√ßus: ', SSHSessions[SessionIndex].Connection.BytesReceived);
+      WriteLn('Commandes exÇcutÇes: ', SSHSessions[SessionIndex].Commands);
+      WriteLn('Octets envoyÇs: ', SSHSessions[SessionIndex].Connection.BytesSent);
+      WriteLn('Octets reáus: ', SSHSessions[SessionIndex].Connection.BytesReceived);
       WriteLn('=====================================================');
       WriteLn;
-      
       CloseSSHSession(SSHSessions[SessionIndex]);
-     End Else Begin
+     End
+      Else
+     Begin
       WriteLn('Session interactive ouverte (utilisez Ctrl+C pour quitter)');
       WriteLn('Pour tester: ssh ', HostSpec, ' "pwd"');
      End;
@@ -1143,28 +1060,24 @@ Begin
   End;
  End;
  {$ELSE}
- Case Action Of
-  'connect': Begin
+ If Action='connect'Then Begin
    If HostSpec = '' Then Begin
-    WriteLn('ssh: Nom d''h√¥te requis');
+    WriteLn('ssh: Nom d''hìte requis');
     Exit;
    End;
-   
-   If Command <> '' Then
-    SimulateSSHCommand
+   If Command <> '' Then SimulateSSHCommand
+                    Else SimulateSSHConnect;
+  End
    Else
-    SimulateSSHConnect;
-  End;
-  'list': ShowSimulatedSSH;
-  'stats': ShowSimulatedStats;
- End;
+  If Action='list'Then ShowSimulatedSSH Else
+  If Action='stats'Then ShowSimulatedStats;
  {$ENDIF}
 End;
 
 BEGIN
   If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
    (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('SSH : Client Secure Shell');
+  WriteLn('SSH : Cette commande permet de lancer un client Secure Shell.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  SSH [options] hostname [commande]');
@@ -1172,9 +1085,9 @@ BEGIN
   WriteLn;
   WriteLn('Options :');
   WriteLn('  -l utilisateur        Nom d''utilisateur pour la connexion');
-  WriteLn('  -p port               Port de connexion (d√©faut: 22)');
-  WriteLn('  -i fichier_cl√©        Fichier de cl√© priv√©e d''authentification');
-  WriteLn('  -v                    Mode verbeux (utiliser -vvv pour plus de d√©tails)');
+  WriteLn('  -p port               Port de connexion (dÇfaut: 22)');
+  WriteLn('  -i fichier_clef       Fichier de clef privÇe d''authentification');
+  WriteLn('  -v                    Mode verbeux (utiliser -vvv pour plus de dÇtails)');
   WriteLn('  -x                    Activer la redirection X11');
   WriteLn('  -c                    Activer la compression');
   WriteLn('  -n                    Mode batch (non-interactif)');
@@ -1186,38 +1099,38 @@ BEGIN
   WriteLn('  -l, --list            Lister les sessions actives');
   WriteLn('  --stats               Statistiques SSH');
   WriteLn;
-  WriteLn('Param√®tres :');
-  WriteLn('  hostname              Nom d''h√¥te ou adresse IP du serveur');
+  WriteLn('Paramätres :');
+  WriteLn('  hostname              Nom d''hìte ou adresse IP du serveur');
   WriteLn('  utilisateur           Nom d''utilisateur (optionnel)');
   WriteLn('  port                  Port de connexion (optionnel)');
-  WriteLn('  commande              Commande √† ex√©cuter sur le serveur distant');
+  WriteLn('  commande              Commande Ö exÇcuter sur le serveur distant');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  SSH example.com                       # Connexion interactive');
-  WriteLn('  SSH user@example.com                  # Avec utilisateur sp√©cifique');
-  WriteLn('  SSH -p 2222 example.com               # Port personnalis√©');
-  WriteLn('  SSH example.com "ls -la"              # Ex√©cuter une commande');
-  WriteLn('  SSH -i ~/.ssh/ma_cle example.com      # Authentification par cl√©');
+  WriteLn('  SSH user@example.com                  # Avec utilisateur spÇcifique');
+  WriteLn('  SSH -p 2222 example.com               # Port personnalisÇ');
+  WriteLn('  SSH example.com "ls -la"              # ExÇcuter une commande');
+  WriteLn('  SSH -i ~/.ssh/ma_cle example.com      # Authentification par clef');
   WriteLn('  SSH -L 8080:localhost:80 example.com  # Redirection locale');
   WriteLn('  SSH -x example.com xclock             # Redirection X11');
   WriteLn('  SSH --stats                           # Statistiques');
   WriteLn;
   WriteLn('Fichiers de configuration :');
   WriteLn('  ~/.ssh/config         Configuration utilisateur');
-  WriteLn('  ~/.ssh/id_rsa         Clef priv√©e RSA par d√©faut');
-  WriteLn('  ~/.ssh/known_hosts    Empreintes des h√¥tes connus');
+  WriteLn('  ~/.ssh/id_rsa         Clef privÇe RSA par dÇfaut');
+  WriteLn('  ~/.ssh/known_hosts    Empreintes des hìtes connus');
   WriteLn;
-  WriteLn('Note: SSH permet des connexions s√©curis√©es et chiffr√©es vers');
-  WriteLn('des serveurs distants pour l''ex√©cution de commandes et le');
-  WriteLn('transfert de fichiers de mani√®re s√©curis√©e.');
+  WriteLn('Note: SSH permet des connexions sÇcurisÇes et chiffrÇes vers');
+  WriteLn('des serveurs distants pour l''exÇcution de commandes et le');
+  WriteLn('transfert de fichiers de maniäre sÇcurisÇe.');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion r√©elle)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion rÇelle)');
  End
  Else If ParamStr(1) = '--version' Then Begin
   WriteLn('SSH 1.00 - Secure Shell Client, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('√âcrit par Sylvain Maltais');
+  WriteLn('êcrit par Sylvain Maltais');
  End
  Else Begin
   WriteLn('SSH - Test d''initialisation');
