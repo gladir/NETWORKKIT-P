@@ -163,6 +163,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer un client SMB/CIFS pour accéder aux partages SMB.</td>
 	</tr>
 	<tr>
+		<td><b>SSH.PAS</b></td>
+		<td>Cette commande permet de lancer un client Secure Shell.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
@@ -170,6 +174,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td><b>WHOIS.PAS</b></td>
 		<td>Cette commande permet de rechercher l'organisme associé avec un IP en se basant sur un dictionnaire locale hors ligne.</td>
 	</tr>	
+	<tr>
+		<td><b>YMODEM.PAS</b></td>
+		<td>Cette commande permet d'envoyer ou de recevoir un fichier en utilisant un protocole YModem.</td>
+	</tr>
 </table>
 
 <h2>Compilation</h2>
