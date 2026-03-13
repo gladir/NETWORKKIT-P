@@ -159,6 +159,10 @@ Voici la liste des différents fichiers proposés dans NETWORKKIT-P :
 		<td>Cette commande permet de lancer le gestionnaire de connexions SLIP (Serial Line Internet Protocol).</td>
 	</tr>
 	<tr>
+		<td><b>SMBCLIEN.PAS</b></td>
+		<td>Cette commande permet de lancer un client SMB/CIFS pour accéder aux partages SMB.</td>
+	</tr>
+	<tr>
 		<td><b>WHOAMI.PAS</b></td>
 		<td>Cette commande permet de retourner l'utilisateur connecté.</td>
 	</tr>
