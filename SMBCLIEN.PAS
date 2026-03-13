@@ -2,7 +2,9 @@
   @created: 2026
   @version: 1.00
   @website(https://www.gladir.com/networkkitp)
-  @abstract(Target: Turbo Pascal 7, Free Pascal - Commande smbclient (SMB/CIFS client))
+  @abstract(Target: Turbo Pascal 7, Free Pascal 3.2
+  @description: Commande smbclient (SMB/CIFS client))
+  @license: MIT
 }
 
 Program SMBCLIEN;
@@ -26,13 +28,13 @@ Type
   FullPath: String[255];      { Chemin complet }
   Size: Int64;                { Taille en octets }
   Attributes: LongWord;       { Attributs de fichier }
-  CreationTime: TDateTime;    { Date de cr√©ation }
-  LastWriteTime: TDateTime;   { Derni√®re modification }
-  LastAccessTime: TDateTime;  { Dernier acc√®s }
+  CreationTime: TDateTime;    { Date de crÇation }
+  LastWriteTime: TDateTime;   { Derniäre modification }
+  LastAccessTime: TDateTime;  { Dernier accäs }
   IsDirectory: Boolean;       { Est un dossier }
-  IsHidden: Boolean;          { Fichier cach√© }
+  IsHidden: Boolean;          { Fichier cachÇ }
   IsReadOnly: Boolean;        { Lecture seule }
-  IsSystem: Boolean;          { Fichier syst√®me }
+  IsSystem: Boolean;          { Fichier systäme }
   IsArchive: Boolean;         { Attribut archive }
  End;
 
@@ -50,11 +52,11 @@ Type
   ProtocolVersion: Integer;   { Version protocole SMB }
   Timeout: Integer;           { Timeout en secondes }
   MaxBufferSize: Integer;     { Taille buffer max }
-  CaseSensitive: Boolean;     { Noms de fichiers sensibles √† la casse }
+  CaseSensitive: Boolean;     { Noms de fichiers sensibles Ö la casse }
   Verbose: Boolean;           { Mode verbeux }
   Debug: Boolean;             { Mode debug }
-  Recursive: Boolean;         { R√©cursif pour commandes }
-  Preserve: Boolean;          { Pr√©server attributs }
+  Recursive: Boolean;         { RÇcursif pour commandes }
+  Preserve: Boolean;          { PrÇserver attributs }
   Archive: Boolean;           { Mode archive }
   Quiet: Boolean;             { Mode silencieux }
  End;
@@ -62,32 +64,32 @@ Type
  { Session SMB active }
  TSMBSession = Record
   Socket: TSocket;            { Socket de connexion }
-  IsConnected: Boolean;       { Connexion √©tablie }
-  IsAuthenticated: Boolean;   { Authentifi√© }
-  CurrentPath: String[255];   { R√©pertoire courant }
+  IsConnected: Boolean;       { Connexion Çtablie }
+  IsAuthenticated: Boolean;   { AuthentifiÇ }
+  CurrentPath: String[255];   { RÇpertoire courant }
   TreeID: Word;               { ID de l'arborescence }
   UserID: Word;               { ID utilisateur }
   ProcessID: Word;            { ID processus }
   MultiplexID: Word;          { ID multiplex }
-  SessionKey: Array[0..15] of Byte; { Cl√© de session }
+  SessionKey: Array[0..15] of Byte; { Clef de session }
   Challenge: Array[0..7] of Byte;   { Challenge d'auth }
-  Capabilities: LongWord;     { Capacit√©s du serveur }
+  Capabilities: LongWord;     { CapacitÇs du serveur }
   MaxTransmitSize: Word;      { Taille transmission max }
-  MaxMultiplexCount: Word;    { Nombre max requ√™tes simultan√©es }
+  MaxMultiplexCount: Word;    { Nombre max requàtes simultanÇes }
   LastError: String[255];     { Derni√®re erreur }
-  BytesTransferred: Int64;    { Octets transf√©r√©s }
-  FilesTransferred: Integer;  { Fichiers transf√©r√©s }
+  BytesTransferred: Int64;    { Octets transfÇrÇs }
+  FilesTransferred: Integer;  { Fichiers transfÇrÇs }
  End;
 
  { Commande client SMB }
  TSMBCommand = Record
   Command: String[32];        { Nom de la commande }
-  Parameters: String[255];    { Param√®tres }
+  Parameters: String[255];    { Paramätres }
   LocalPath: String[255];     { Chemin local }
   RemotePath: String[255];    { Chemin distant }
-  Recursive: Boolean;         { Mode r√©cursif }
+  Recursive: Boolean;         { Mode rÇcursif }
   Force: Boolean;             { Forcer l'action }
-  Preserve: Boolean;          { Pr√©server attributs }
+  Preserve: Boolean;          { PrÇserver attributs }
  End;
 
 Var
@@ -119,7 +121,7 @@ Begin
  {$ENDIF}
 End;
 
-{ === FONCTIONS SMB R√âELLES === }
+{ === FONCTIONS SMB RêELLES === }
 
 { Initialiser WinSock (Windows uniquement) }
 Function InitializeNetwork: Boolean;
@@ -137,7 +139,7 @@ Begin
  {$ENDIF}
 End;
 
-{ Nettoyer r√©seau }
+{ Nettoyer rÇseau }
 Procedure CleanupNetwork;
 Begin
  {$IFDEF WINDOWS}
@@ -154,177 +156,152 @@ Var
  {$ENDIF}
 Begin
  ConnectToSMBServer := False;
- 
  If SMBConfig.Verbose Then
   WriteLn('Connecting to ', Server, ':', Port, '...');
- 
- { Cr√©er socket }
+ { CrÇer socket }
  SMBSession.Socket := WinSock.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
  If SMBSession.Socket = INVALID_SOCKET Then Begin
   SMBSession.LastError := 'Cannot create socket';
   Exit;
  End;
- 
  Try
-  { Configurer timeout }
+  { Configurer le dÇpassement de dÇlai }
   setsockopt(SMBSession.Socket, SOL_SOCKET, SO_RCVTIMEO, @SMBConfig.Timeout, SizeOf(SMBConfig.Timeout));
   setsockopt(SMBSession.Socket, SOL_SOCKET, SO_SNDTIMEO, @SMBConfig.Timeout, SizeOf(SMBConfig.Timeout));
-  
-  { R√©soudre adresse serveur }
+  { RÇsoudre adresse serveur }
   {$IFDEF WINDOWS}
   HostEnt := gethostbyname(@Server[1]);
   If HostEnt = nil Then Begin
    ServerAddr.sin_addr.S_addr := inet_addr(@Server[1]);
    If ServerAddr.sin_addr.S_addr = INADDR_NONE Then Begin
-    SMBSession.LastError := 'Cannot resolve server: ' + Server;
+    SMBSession.LastError := 'Impossible de rÇsoudre le serveur: ' + Server;
     Exit;
    End;
   End Else Begin
    ServerAddr.sin_addr.S_addr := PInAddr(HostEnt^.h_addr_list^)^.S_addr;
   End;
   {$ENDIF}
-  
-  { Configurer adresse }
+   { Configurer adresse }
   ServerAddr.sin_family := AF_INET;
   ServerAddr.sin_port := htons(Port);
-  
-  { Se connecter }
+   { Se connecter }
   If connect(SMBSession.Socket, @ServerAddr, SizeOf(ServerAddr)) <> 0 Then Begin
-   SMBSession.LastError := 'Connection failed to ' + Server + ':' + IntToStr(Port);
+   SMBSession.LastError := 'Echec de connexion au ' + Server + ':' + IntToStr(Port);
    Exit;
   End;
-  
   SMBSession.IsConnected := True;
   SMBSession.CurrentPath := '\';
-  
-  If SMBConfig.Verbose Then
-   WriteLn('Connected to ', Server, ':', Port);
-  
+  If SMBConfig.Verbose Then WriteLn('Connexion Ö ', Server, ':', Port);
   ConnectToSMBServer := True;
-  
  Except
   SMBSession.LastError := 'Connection error';
  End;
 End;
 
-{ Envoyer des donn√©es brutes }
+{ Envoyer des donnÇes brutes }
 Function SendRawData(Data: Pointer; Size: Integer): Boolean;
 Var
  BytesSent: Integer;
 Begin
  SendRawData := False;
- 
  If not SMBSession.IsConnected Then Begin
   SMBSession.LastError := 'Not connected';
   Exit;
  End;
- 
  BytesSent := send(SMBSession.Socket, Data^, Size, 0);
  If BytesSent = Size Then Begin
   Inc(SMBSession.BytesTransferred, BytesSent);
   SendRawData := True;
- End Else Begin
+ End
+  Else
+ Begin
   SMBSession.LastError := 'Send failed';
  End;
 End;
 
 { Recevoir des donn√©es brutes }
-Function ReceiveRawData(Data: Pointer; MaxSize: Integer): Integer;
-Begin
+Function ReceiveRawData(Data: Pointer; MaxSize: Integer): Integer;Begin
  Result := 0;
- 
  If not SMBSession.IsConnected Then Begin
   SMBSession.LastError := 'Not connected';
   Exit;
  End;
- 
  Result := recv(SMBSession.Socket, Data^, MaxSize, 0);
- If Result > 0 Then
-  Inc(SMBSession.BytesTransferred, Result)
- Else
-  SMBSession.LastError := 'Receive failed';
+ If Result > 0 Then Inc(SMBSession.BytesTransferred, Result)
+               Else SMBSession.LastError := 'Receive failed';
 End;
 
-{ N√©gociation SMB simplifi√©e }
-Function NegotiateSMBProtocol: Boolean;
+ { NÇgociation SMB simplifiÇe }
+Function NegotiateSMBProtocol:Boolean;
 Var
- NegotiatePacket: Array[0..255] of Byte;
- Response: Array[0..511] of Byte;
- PacketSize: Integer;
- ResponseSize: Integer;
+ NegotiatePacket:Array[0..255] of Byte;
+ Response:Array[0..511] of Byte;
+ PacketSize:Integer;
+ ResponseSize:Integer;
 Begin
  NegotiateSMBProtocol := False;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Negotiating SMB protocol...');
- 
- { Construire paquet de n√©gociation SMB (simplifi√©) }
+ If SMBConfig.Verbose Then WriteLn('Negotiating SMB protocol...');
+  { Construire paquet de nÇgociation SMB (simplifiÇ) }
  FillChar(NegotiatePacket, SizeOf(NegotiatePacket), 0);
- 
- { NetBIOS Session Request Header (si port 139) }
+  { NetBIOS Session Request Header (si port 139) }
  If SMBConfig.Port = 139 Then Begin
   NegotiatePacket[0] := $81; { Session Request }
   NegotiatePacket[1] := $00;
   NegotiatePacket[2] := $00;
   NegotiatePacket[3] := $44; { Length }
   PacketSize := 72;
- End Else Begin
-  { SMB over TCP (port 445) - Header NBT simplifi√© }
+ End
+  Else
+ Begin
+   { SMB over TCP (port 445) - Header NBT simplifiÇ }
   NegotiatePacket[0] := $00;
   NegotiatePacket[1] := $00;
   NegotiatePacket[2] := $00;
   NegotiatePacket[3] := $40; { Length }
   PacketSize := 68;
  End;
- 
- { En-t√™te SMB }
+  { En-tàte SMB }
  NegotiatePacket[4] := $FF; { Protocol }
  NegotiatePacket[5] := $53; { 'S' }
  NegotiatePacket[6] := $4D; { 'M' }
  NegotiatePacket[7] := $42; { 'B' }
  NegotiatePacket[8] := $72; { SMB_COM_NEGOTIATE }
- 
- { Flags et autres champs }
- NegotiatePacket[9] := $00;  { Error code }
+  { Drapeaux et autres champs }
+ NegotiatePacket[9] := $00;  { Code d'erreur }
  NegotiatePacket[10] := $00;
  NegotiatePacket[11] := $00;
  NegotiatePacket[12] := $00;
- NegotiatePacket[13] := $18; { Flags }
- NegotiatePacket[14] := $43; { Flags2 }
+ NegotiatePacket[13] := $18; { Premier drapeaux }
+ NegotiatePacket[14] := $43; { Deuxiäme drapeaux }
  NegotiatePacket[15] := $C8;
- 
- { Process ID }
+  { Identificateur de processus }
  NegotiatePacket[30] := Lo(SMBSession.ProcessID);
  NegotiatePacket[31] := Hi(SMBSession.ProcessID);
- 
- { Envoyer paquet }
+  { Envoyer paquet }
  If not SendRawData(@NegotiatePacket, PacketSize) Then Begin
   SMBSession.LastError := 'Failed to send negotiate packet';
   Exit;
  End;
- 
- { Recevoir r√©ponse }
+  { Recevoir rÇponse }
  ResponseSize := ReceiveRawData(@Response, SizeOf(Response));
  If ResponseSize <= 0 Then Begin
   SMBSession.LastError := 'No negotiate response';
   Exit;
  End;
- 
- { Analyser r√©ponse basique }
- If (ResponseSize >= 8) and 
-    (Response[4] = $FF) and (Response[5] = $53) and 
+  { Analyser rÇponse basique }
+ If (ResponseSize >= 8) and
+    (Response[4] = $FF) and (Response[5] = $53) and
     (Response[6] = $4D) and (Response[7] = $42) Then Begin
-  
-  If SMBConfig.Verbose Then
-   WriteLn('SMB protocol negotiated successfully');
-  
+  If SMBConfig.Verbose Then WriteLn('NÇgociation de protocole SMB rÇussi');
   NegotiateSMBProtocol := True;
- End Else Begin
+ End
+  Else
+ Begin
   SMBSession.LastError := 'Invalid negotiate response';
  End;
 End;
 
-{ Authentification SMB simplifi√©e }
+ { Authentification SMB simplifiÇe }
 Function AuthenticateSMB: Boolean;
 Var
  AuthPacket: Array[0..255] of Byte;
@@ -333,52 +310,41 @@ Var
  ResponseSize: Integer;
 Begin
  AuthenticateSMB := False;
- 
  If SMBConfig.Verbose Then
-  WriteLn('Authenticating as ', SMBConfig.Username, '...');
- 
- { Construire paquet d'authentification (tr√®s simplifi√©) }
+  WriteLn('Authentication de l''utilisateur ', SMBConfig.Username, '...');
+  { Construire paquet d'authentification (tr√®s simplifi√©) }
  FillChar(AuthPacket, SizeOf(AuthPacket), 0);
- 
- { Header NBT }
+  { Entàte NBT }
  AuthPacket[0] := $00;
  AuthPacket[1] := $00;
  AuthPacket[2] := $00;
- AuthPacket[3] := $60; { Length }
- 
- { SMB Header }
- AuthPacket[4] := $FF; { Protocol }
+ AuthPacket[3] := $60; { Longueur }
+  { Entàte SMB }
+ AuthPacket[4] := $FF; { Protocole }
  AuthPacket[5] := $53; { 'S' }
  AuthPacket[6] := $4D; { 'M' }
  AuthPacket[7] := $42; { 'B' }
  AuthPacket[8] := $73; { SMB_COM_SESSION_SETUP_ANDX }
- 
  PacketSize := 100;
- 
- { Envoyer paquet }
+  { Envoyer paquet }
  If not SendRawData(@AuthPacket, PacketSize) Then Begin
   SMBSession.LastError := 'Failed to send auth packet';
   Exit;
  End;
- 
- { Recevoir r√©ponse }
+  { Recevoir rÇponse }
  ResponseSize := ReceiveRawData(@Response, SizeOf(Response));
  If ResponseSize <= 0 Then Begin
   SMBSession.LastError := 'No auth response';
   Exit;
  End;
- 
- { Pour cette d√©monstration, consid√©rer l'auth comme r√©ussie }
+  { Pour cette dÇmonstration, considÇrer l'auth comme rÇussie }
  SMBSession.IsAuthenticated := True;
  SMBSession.UserID := $1234; { ID fictif }
- 
- If SMBConfig.Verbose Then
-  WriteLn('Authentication successful');
- 
+ If SMBConfig.Verbose Then WriteLn('Authentication successful');
  AuthenticateSMB := True;
 End;
 
-{ Se connecter au partage }
+ { Se connecter au partage }
 Function ConnectToShare(ShareName: String): Boolean;
 Var
  ConnectPacket: Array[0..255] of Byte;
@@ -387,60 +353,44 @@ Var
  ResponseSize: Integer;
 Begin
  ConnectToShare := False;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Connecting to share: ', ShareName, '...');
- 
- { Construire paquet de connexion au partage }
+ If SMBConfig.Verbose Then WriteLn('Connection vers le partage: ', ShareName, '...');
+  { Construire paquet de connexion au partage }
  FillChar(ConnectPacket, SizeOf(ConnectPacket), 0);
- 
- { Header simplifi√© }
+  { Entàte simplifiÇ }
  ConnectPacket[0] := $00;
  ConnectPacket[1] := $00;
  ConnectPacket[2] := $00;
- ConnectPacket[3] := $70; { Length }
- 
- { SMB Header }
+ ConnectPacket[3] := $70; { Longueur }
+  { Entàte SMB }
  ConnectPacket[4] := $FF;
  ConnectPacket[5] := $53;
  ConnectPacket[6] := $4D;
  ConnectPacket[7] := $42;
  ConnectPacket[8] := $75; { SMB_COM_TREE_CONNECT_ANDX }
- 
  PacketSize := 120;
- 
- { Envoyer paquet }
+  { Envoyer paquet }
  If not SendRawData(@ConnectPacket, PacketSize) Then Begin
   SMBSession.LastError := 'Failed to send tree connect packet';
   Exit;
  End;
- 
- { Recevoir r√©ponse }
+  { Recevoir rÇponse }
  ResponseSize := ReceiveRawData(@Response, SizeOf(Response));
  If ResponseSize <= 0 Then Begin
   SMBSession.LastError := 'No tree connect response';
   Exit;
  End;
- 
- { Pour la d√©monstration, consid√©rer la connexion comme r√©ussie }
+  { Pour la dÇmonstration, considÇrer la connexion comme rÇussie }
  SMBSession.TreeID := $5678; { ID fictif }
- 
- If SMBConfig.Verbose Then
-  WriteLn('Connected to share: ', ShareName);
- 
+ If SMBConfig.Verbose Then WriteLn('Connexion au partage: ', ShareName);
  ConnectToShare := True;
 End;
 
-{ Lister les fichiers d'un r√©pertoire (simulation) }
-Function ListDirectory(Path: String): Integer;
-Begin
+ { Lister les fichiers d'un rÇpertoire (simulation) }
+Function ListDirectory(Path: String): Integer;Begin
  Result := 0;
  FileCount := 0;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Listing directory: ', Path);
- 
- { Simuler quelques fichiers pour la d√©monstration }
+ If SMBConfig.Verbose Then WriteLn('Affiche le rÇpertoire: ', Path);
+  { Simuler quelques fichiers pour la dÇmonstration }
  With SMBFiles[FileCount] Do Begin
   Name := '.';
   FullPath := Path;
@@ -451,7 +401,6 @@ Begin
   LastWriteTime := Now;
  End;
  Inc(FileCount);
- 
  With SMBFiles[FileCount] Do Begin
   Name := '..';
   FullPath := Path + '\..';
@@ -462,7 +411,6 @@ Begin
   LastWriteTime := Now;
  End;
  Inc(FileCount);
- 
  With SMBFiles[FileCount] Do Begin
   Name := 'documents';
   FullPath := Path + '\documents';
@@ -473,7 +421,6 @@ Begin
   LastWriteTime := Now - 1;
  End;
  Inc(FileCount);
- 
  With SMBFiles[FileCount] Do Begin
   Name := 'readme.txt';
   FullPath := Path + '\readme.txt';
@@ -484,7 +431,6 @@ Begin
   LastWriteTime := Now - 2;
  End;
  Inc(FileCount);
- 
  With SMBFiles[FileCount] Do Begin
   Name := 'config.ini';
   FullPath := Path + '\config.ini';
@@ -495,36 +441,28 @@ Begin
   LastWriteTime := Now - 0.5;
  End;
  Inc(FileCount);
- 
  Result := FileCount;
 End;
 
-{ T√©l√©charger un fichier }
-Function DownloadFile(RemotePath, LocalPath: String): Boolean;
-Begin
+ { TÇlÇcharger un fichier }
+Function DownloadFile(RemotePath,LocalPath:String):Boolean;Begin
  DownloadFile := False;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Downloading ', RemotePath, ' -> ', LocalPath);
- 
- { Pour cette d√©monstration, simuler le t√©l√©chargement }
+ If SMBConfig.Verbose Then WriteLn('TÇlÇchargement ', RemotePath, ' -> ', LocalPath);
+ { Pour cette dÇmonstration, simuler le tÇlÇchargement }
  Try
-  { Cr√©er un fichier local de test }
+  { CrÇer un fichier local de test }
   With TStringList.Create Do Begin
    Try
-    Add('This is a downloaded file from SMB server');
-    Add('Remote path: ' + RemotePath);
-    Add('Downloaded at: ' + DateTimeToStr(Now));
+    Add('C''est un tÇlÇchargement de fichier d''un serveur SMB');
+    Add('Chemin Ö distance: ' + RemotePath);
+    Add('TÇlÇchargement Ö: ' + DateTimeToStr(Now));
     Add('');
     Add('SMB Client Test Data');
     SaveToFile(LocalPath);
-    
     Inc(SMBSession.FilesTransferred);
     Inc(SMBSession.BytesTransferred, 1024);
-    
     If not SMBConfig.Quiet Then
-     WriteLn('Downloaded: ', RemotePath, ' (', 1024, ' bytes)');
-    
+     WriteLn('TÇlÇchargement: ', RemotePath, ' (', 1024, ' octets)');
     DownloadFile := True;
    Finally
     Free;
@@ -535,18 +473,15 @@ Begin
  End;
 End;
 
-{ T√©l√©verser un fichier }
+ { TÇlÇverser un fichier }
 Function UploadFile(LocalPath, RemotePath: String): Boolean;
 Var
  FileSize: Int64;
  FileInfo: TSearchRec;
 Begin
  UploadFile := False;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Uploading ', LocalPath, ' -> ', RemotePath);
- 
- { V√©rifier si le fichier local existe et obtenir sa taille }
+ If SMBConfig.Verbose Then WriteLn('TÇlÇversement ', LocalPath, ' -> ', RemotePath);
+  { VÇrifier si le fichier local existe et obtenir sa taille }
  If FindFirst(LocalPath, faAnyFile, FileInfo) = 0 Then Begin
   FileSize := FileInfo.Size;
   SysUtils.FindClose(FileInfo);
@@ -554,63 +489,45 @@ Begin
   SMBSession.LastError := 'Local file not found: ' + LocalPath;
   Exit;
  End;
- 
- { Pour cette d√©monstration, simuler l'upload }
+  { Pour cette dÇmonstration, simuler le tÇlÇversement }
  Inc(SMBSession.FilesTransferred);
  Inc(SMBSession.BytesTransferred, FileSize);
- 
  If not SMBConfig.Quiet Then
-  WriteLn('Uploaded: ', LocalPath, ' (', FileSize, ' bytes)');
- 
+  WriteLn('TÇlÇversement: ', LocalPath, ' (', FileSize, ' octets)');
  UploadFile := True;
 End;
 
-{ Cr√©er un r√©pertoire }
-Function CreateDirectory(Path: String): Boolean;
-Begin
+ { CrÇer un rÇpertoire }
+Function CreateDirectory(Path: String): Boolean;Begin
  CreateDirectory := False;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Creating directory: ', Path);
- 
- { Pour cette d√©monstration, simuler la cr√©ation }
- If not SMBConfig.Quiet Then
-  WriteLn('Directory created: ', Path);
- 
+ If SMBConfig.Verbose Then WriteLn('CrÇation de rÇpertoire: ', Path);
+  { Pour cette dÇmonstration, simuler la crÇation }
+ If not SMBConfig.Quiet Then WriteLn('RÇpertoire crÇer: ', Path);
  CreateDirectory := True;
 End;
 
-{ Supprimer un fichier }
-Function DeleteFile(Path: String): Boolean;
-Begin
+ { Supprimer un fichier }
+Function DeleteFile(Path:String):Boolean;Begin
  DeleteFile := False;
- 
- If SMBConfig.Verbose Then
-  WriteLn('Deleting file: ', Path);
- 
- { Pour cette d√©monstration, simuler la suppression }
- If not SMBConfig.Quiet Then
-  WriteLn('File deleted: ', Path);
- 
+ If SMBConfig.Verbose Then WriteLn('Supprimer un fichier: ', Path);
+  { Pour cette dÇmonstration, simuler la suppression }
+ If not SMBConfig.Quiet Then WriteLn('Fichier supprimer: ', Path);
  DeleteFile := True;
 End;
 
-{ Fermer la session SMB }
-Procedure CloseSMBSession;
-Begin
+ { Fermer la session SMB }
+Procedure CloseSMBSession;Begin
  If SMBSession.IsConnected Then Begin
   If SMBConfig.Verbose Then
-   WriteLn('Closing SMB session...');
-  
+   WriteLn('Fermeture de session SMB...');
   closesocket(SMBSession.Socket);
   SMBSession.IsConnected := False;
   SMBSession.IsAuthenticated := False;
  End;
 End;
 
-{ Initialiser configuration par d√©faut }
-Procedure InitializeSMBConfig;
-Begin
+ { Initialiser configuration par dÇfaut }
+Procedure InitializeSMBConfig;Begin
  With SMBConfig Do Begin
   Server := '';
   Share := '';
@@ -634,19 +551,17 @@ Begin
   Archive := False;
   Quiet := False;
  End;
- 
  { Initialiser session }
  FillChar(SMBSession, SizeOf(SMBSession), 0);
  SMBSession.ProcessID := GetCurrentProcessId;
  SMBSession.MultiplexID := 1;
  SMBSession.CurrentPath := '\';
- 
  FileCount := 0;
  InteractiveMode := False;
  ExitRequested := False;
 End;
 
-{ Afficher les fichiers list√©s }
+ { Afficher les fichiers listÇs }
 Procedure DisplayFileList;
 Var
  I: Integer;
@@ -655,13 +570,11 @@ Var
  AttrStr: String;
 Begin
  If FileCount = 0 Then Begin
-  WriteLn('No files found');
+  WriteLn('Pas de fichier trouvÇ');
   Exit;
  End;
- 
- WriteLn('Directory listing:');
+ WriteLn('Affiche le rÇpertoire:');
  WriteLn;
- 
  For I := 0 To FileCount - 1 Do Begin
   With SMBFiles[I] Do Begin
    { Formatage de la taille }
@@ -669,10 +582,8 @@ Begin
     SizeStr := '<DIR>     '
    Else
     SizeStr := Format('%9d', [Size]);
-   
    { Formatage de la date }
    DateStr := FormatDateTime('mm/dd/yyyy hh:nn', LastWriteTime);
-   
    { Attributs }
    AttrStr := '';
    If IsDirectory Then AttrStr := AttrStr + 'D'
@@ -685,16 +596,14 @@ Begin
    Else AttrStr := AttrStr + '-';
    If IsArchive Then AttrStr := AttrStr + 'A'
    Else AttrStr := AttrStr + '-';
-   
    WriteLn(AttrStr, ' ', SizeStr, ' ', DateStr, ' ', Name);
   End;
  End;
- 
  WriteLn;
- WriteLn(FileCount, ' files listed');
+ WriteLn(FileCount, ' fichiers trouvÇs');
 End;
 
-{ Traiter une commande client }
+ { Traiter une commande client }
 Function ProcessClientCommand(CommandLine: String): Boolean;
 Var
  Cmd: String;
@@ -703,53 +612,51 @@ Var
  Param1, Param2: String;
 Begin
  ProcessClientCommand := True;
- 
  CommandLine := Trim(CommandLine);
  If CommandLine = '' Then Exit;
- 
- { S√©parer commande et arguments }
+ { SÇparer commande et arguments }
  SpacePos := Pos(' ', CommandLine);
  If SpacePos > 0 Then Begin
   Cmd := Copy(CommandLine, 1, SpacePos - 1);
   Args := Trim(Copy(CommandLine, SpacePos + 1, Length(CommandLine)));
- End Else Begin
+ End
+  Else
+ Begin
   Cmd := CommandLine;
   Args := '';
  End;
- 
  Cmd := LowerCase(Cmd);
- 
- { Parser les param√®tres }
+  { Analyser les paramätres }
  SpacePos := Pos(' ', Args);
  If SpacePos > 0 Then Begin
   Param1 := Copy(Args, 1, SpacePos - 1);
   Param2 := Trim(Copy(Args, SpacePos + 1, Length(Args)));
- End Else Begin
+ End
+  Else
+ Begin
   Param1 := Args;
   Param2 := '';
  End;
- 
  Case Cmd Of
   'help', '?': Begin
-   WriteLn('SMB Client Commands:');
-   WriteLn('  ls, dir              List directory contents');
-   WriteLn('  cd <dir>             Change directory');
-   WriteLn('  pwd                  Show current directory');
-   WriteLn('  get <remote> [local] Download file');
-   WriteLn('  put <local> [remote] Upload file');
-   WriteLn('  mget <pattern>       Download multiple files');
-   WriteLn('  mput <pattern>       Upload multiple files');
-   WriteLn('  mkdir <dir>          Create directory');
-   WriteLn('  rmdir <dir>          Remove directory');
-   WriteLn('  rm, del <file>       Delete file');
-   WriteLn('  rename <old> <new>   Rename file');
-   WriteLn('  stat <file>          Show file information');
-   WriteLn('  verbose              Toggle verbose mode');
-   WriteLn('  quiet                Toggle quiet mode');
-   WriteLn('  exit, quit           Exit client');
+   WriteLn('Commandes client SMB:');
+   WriteLn('  ls, dir              Affiche le contenu du rÇpertoire');
+   WriteLn('  cd <dir>             Change de rÇpertoire');
+   WriteLn('  pwd                  Affiche le rÇpertoire courant');
+   WriteLn('  get <remote> [local] TÇlÇchargement de fichier');
+   WriteLn('  put <local> [remote] TÇlÇversement de fichier');
+   WriteLn('  mget <pattern>       TÇlÇchargement de multiples fichiers');
+   WriteLn('  mput <pattern>       TÇlÇversement de multiples fichiers');
+   WriteLn('  mkdir <dir>          CrÇer un rÇpertoire');
+   WriteLn('  rmdir <dir>          Enläve le rÇpertoire');
+   WriteLn('  rm, del <file>       Efface le fichier');
+   WriteLn('  rename <old> <new>   Renomme le fichier');
+   WriteLn('  stat <file>          Affiche les informations de fichier');
+   WriteLn('  verbose              Activer le mode dÇtaillÇ');
+   WriteLn('  quiet                Activer le mode silencieux');
+   WriteLn('  exit, quit           Quitte le client');
    WriteLn;
   End;
-  
   'ls', 'dir': Begin
    If Param1 <> '' Then
     ListDirectory(SMBSession.CurrentPath + '\' + Param1)
@@ -757,34 +664,34 @@ Begin
     ListDirectory(SMBSession.CurrentPath);
    DisplayFileList;
   End;
-  
   'cd': Begin
    If Param1 <> '' Then Begin
     If Param1 = '..' Then Begin
      { Remonter d'un niveau }
      If SMBSession.CurrentPath <> '\' Then Begin
-      { Simplification - retirer le dernier √©l√©ment }
+      { Simplification - retirer le dernier ÇlÇment }
       SMBSession.CurrentPath := '\';
      End;
-    End Else Begin
-     { Descendre dans le r√©pertoire }
+    End
+     Else
+    Begin
+     { Descendre dans le rÇpertoire }
      If SMBSession.CurrentPath = '\' Then
       SMBSession.CurrentPath := '\' + Param1
      Else
       SMBSession.CurrentPath := SMBSession.CurrentPath + '\' + Param1;
     End;
-    
     If not SMBConfig.Quiet Then
-     WriteLn('Changed to: ', SMBSession.CurrentPath);
-   End Else Begin
-    WriteLn('Current directory: ', SMBSession.CurrentPath);
+     WriteLn('Change le rÇpertoire vers: ', SMBSession.CurrentPath);
+   End
+    Else
+   Begin
+    WriteLn('RÇpertoire courant: ', SMBSession.CurrentPath);
    End;
   End;
-  
   'pwd': Begin
    WriteLn(SMBSession.CurrentPath);
   End;
-  
   'get': Begin
    If Param1 <> '' Then Begin
     If Param2 <> '' Then
@@ -792,65 +699,57 @@ Begin
     Else
      DownloadFile(Param1, ExtractFileName(Param1));
    End Else Begin
-    WriteLn('Usage: get <remote_file> [local_file]');
+    WriteLn('Syntaxe: get <remote_file> [local_file]');
    End;
   End;
-  
   'put': Begin
    If Param1 <> '' Then Begin
     If Param2 <> '' Then
      UploadFile(Param1, Param2)
     Else
      UploadFile(Param1, ExtractFileName(Param1));
-   End Else Begin
-    WriteLn('Usage: put <local_file> [remote_file]');
+   End
+    Else
+   Begin
+    WriteLn('Syntaxe: put <local_file> [remote_file]');
    End;
   End;
-  
   'mkdir': Begin
    If Param1 <> '' Then
     CreateDirectory(SMBSession.CurrentPath + '\' + Param1)
    Else
-    WriteLn('Usage: mkdir <directory>');
+    WriteLn('Syntaxe: mkdir <directory>');
   End;
-  
   'rm', 'del': Begin
-   If Param1 <> '' Then
-    DeleteFile(SMBSession.CurrentPath + '\' + Param1)
-   Else
-    WriteLn('Usage: rm <file>');
+   If Param1 <> '' Then DeleteFile(SMBSession.CurrentPath + '\' + Param1)
+                   Else WriteLn('Syntaxe: rm <file>');
   End;
-  
   'verbose': Begin
    SMBConfig.Verbose := not SMBConfig.Verbose;
-   WriteLn('Verbose mode: ', BoolToStr(SMBConfig.Verbose, True));
+   WriteLn('Mode dÇtaillÇ: ', BoolToStr(SMBConfig.Verbose, True));
   End;
-  
   'quiet': Begin
    SMBConfig.Quiet := not SMBConfig.Quiet;
-   WriteLn('Quiet mode: ', BoolToStr(SMBConfig.Quiet, True));
+   WriteLn('Mode silencieux: ', BoolToStr(SMBConfig.Quiet, True));
   End;
-  
   'stat': Begin
-   WriteLn('Connection status:');
-   WriteLn('  Server: ', SMBConfig.Server, ':', SMBConfig.Port);
-   WriteLn('  Share: ', SMBConfig.Share);
-   WriteLn('  User: ', SMBConfig.Username);
-   WriteLn('  Connected: ', BoolToStr(SMBSession.IsConnected, True));
-   WriteLn('  Authenticated: ', BoolToStr(SMBSession.IsAuthenticated, True));
-   WriteLn('  Current path: ', SMBSession.CurrentPath);
-   WriteLn('  Files transferred: ', SMBSession.FilesTransferred);
-   WriteLn('  Bytes transferred: ', SMBSession.BytesTransferred);
+   WriteLn('êtat de connexion:');
+   WriteLn('  Serveur: ', SMBConfig.Server, ':', SMBConfig.Port);
+   WriteLn('  Partage: ', SMBConfig.Share);
+   WriteLn('  Utilisateur: ', SMBConfig.Username);
+   WriteLn('  Connexion: ', BoolToStr(SMBSession.IsConnected, True));
+   WriteLn('  Authentication: ', BoolToStr(SMBSession.IsAuthenticated, True));
+   WriteLn('  Chemin courant: ', SMBSession.CurrentPath);
+   WriteLn('  Fichier transfÇrÇ: ', SMBSession.FilesTransferred);
+   WriteLn('  Octets transfÇrÇ: ', SMBSession.BytesTransferred);
   End;
-  
   'exit', 'quit': Begin
    ExitRequested := True;
    ProcessClientCommand := False;
   End;
-  
   Else Begin
-   WriteLn('Unknown command: ', Cmd);
-   WriteLn('Type "help" for list of commands');
+   WriteLn('Commande inconnu: ', Cmd);
+   WriteLn('Tapez "help" pour la liste des commandes');
   End;
  End;
 End;
@@ -862,36 +761,29 @@ Var
  Prompt: String;
 Begin
  WriteLn('SMB Client Interactive Mode');
- WriteLn('Type "help" for available commands');
- WriteLn('Type "exit" to quit');
+ WriteLn('Tapez "help" pour les commandes disponibles');
+ WriteLn('Tapez "exit" pour quitter');
  WriteLn;
- 
  ExitRequested := False;
  While not ExitRequested Do Begin
   { Construire le prompt }
   Prompt := 'smb: ' + SMBSession.CurrentPath + '> ';
   Write(Prompt);
   ReadLn(Command);
-  
-  If not ProcessClientCommand(Command) Then
-   Break;
+  If not ProcessClientCommand(Command) Then Break;
  End;
- 
- WriteLn('Session closed');
+ WriteLn('Session fermÇ');
 End;
 
-{ Ex√©cuter une commande unique }
-Function ExecuteSingleCommand(Command, Param1, Param2: String): Boolean;
-Begin
+ { ExÇcuter une commande unique }
+Function ExecuteSingleCommand(Command,Param1,Param2:String):Boolean;Begin
  Result := False;
- 
  Case LowerCase(Command) Of
   'ls', 'dir': Begin
    ListDirectory(SMBSession.CurrentPath);
    DisplayFileList;
    Result := True;
   End;
-  
   'get': Begin
    If Param1 <> '' Then Begin
     If Param2 <> '' Then
@@ -900,7 +792,6 @@ Begin
      Result := DownloadFile(Param1, ExtractFileName(Param1));
    End;
   End;
-  
   'put': Begin
    If Param1 <> '' Then Begin
     If Param2 <> '' Then
@@ -909,7 +800,6 @@ Begin
      Result := UploadFile(Param1, ExtractFileName(Param1));
    End;
   End;
-  
   Else Begin
    WriteLn('Command not supported in non-interactive mode: ', Command);
   End;
@@ -927,35 +817,29 @@ Var
  Param1, Param2: String;
 Begin
  ParseCommandLine := False;
- 
  If ParamCount < 1 Then Begin
   WriteLn('Usage: smbclient //server/share [options]');
   Exit;
  End;
- 
- { Premier param√®tre doit √™tre //server/share }
+  { Premier paramätre doit àtre //server/share }
  ServerShare := ParamStr(1);
  If Copy(ServerShare, 1, 2) <> '//' Then Begin
   WriteLn('Invalid server/share format. Use: //server/share');
   Exit;
  End;
- 
- { Parser server/share }
+  { Analyse serveur/partage }
  ServerShare := Copy(ServerShare, 3, Length(ServerShare)); { Retirer // }
  SlashPos := Pos('/', ServerShare);
  If SlashPos = 0 Then Begin
   WriteLn('Invalid server/share format. Use: //server/share');
   Exit;
  End;
- 
  SMBConfig.Server := Copy(ServerShare, 1, SlashPos - 1);
  SMBConfig.Share := Copy(ServerShare, SlashPos + 1, Length(ServerShare));
- 
- { Analyser les autres param√®tres }
+  { Analyser les autres paramätres }
  I := 2;
  While I <= ParamCount Do Begin
   Param := ParamStr(I);
-  
   If (LowerCase(Param) = '-u') or (LowerCase(Param) = '--user') Then Begin
    Inc(I);
    If I <= ParamCount Then
@@ -970,8 +854,8 @@ Begin
    If I <= ParamCount Then
     SMBConfig.Password := ParamStr(I)
    Else Begin
-    { Demander le mot de passe }
-    Write('Password: ');
+     { Demander le mot de passe }
+    Write('Mot de passe: ');
     ReadLn(SMBConfig.Password);
    End;
   End
@@ -996,13 +880,13 @@ Begin
    Inc(I);
    If I <= ParamCount Then Begin
     Command := ParamStr(I);
-    
+
     { Parser la commande }
     Inc(I);
     If I <= ParamCount Then Param1 := ParamStr(I) Else Param1 := '';
     Inc(I);
     If I <= ParamCount Then Param2 := ParamStr(I) Else Param2 := '';
-    
+
     { Ex√©cuter apr√®s connexion }
     ParseCommandLine := True;
     Exit; { Sortir pour traiter la commande }
@@ -1012,66 +896,55 @@ Begin
    { Param√®tre sans option - possiblement une commande }
    Command := Param;
   End;
-  
   Inc(I);
  End;
- 
- { Mode interactif par d√©faut }
+  { Mode interactif par dÇfaut }
  InteractiveMode := True;
  ParseCommandLine := True;
 End;
 
 { Fonction principale }
-Procedure RunSMBClient;
-Begin
+Procedure RunSMBClient;Begin
  If not SMBConfig.Quiet Then Begin
   WriteLn('SMBClient - SMB/CIFS Client');
-  WriteLn('Connecting to //', SMBConfig.Server, '/', SMBConfig.Share);
+  WriteLn('Connexion vers //', SMBConfig.Server, '/', SMBConfig.Share);
   WriteLn;
  End;
- 
- { Initialiser r√©seau }
+  { Initialiser rÇseau }
  If not InitializeNetwork Then Begin
-  WriteLn('Failed to initialize network');
+  WriteLn('êchec d''initialisation rÇseau');
   Halt(1);
  End;
- 
  Try
   { Se connecter au serveur }
-  If not ConnectToSMBServer(SMBConfig.Server, SMBConfig.Port) Then Begin
+  If not ConnectToSMBServer(SMBConfig.Server, SMBConfig.Port)Then Begin
    WriteLn('Connection failed: ', SMBSession.LastError);
    Halt(1);
   End;
-  
-  { N√©gocier le protocole SMB }
+  { NÇgocier le protocole SMB }
   If not NegotiateSMBProtocol Then Begin
-   WriteLn('Protocol negotiation failed: ', SMBSession.LastError);
+   WriteLn('êchec de nÇgociation de protocole: ', SMBSession.LastError);
    Halt(1);
   End;
-  
   { S'authentifier }
   If not AuthenticateSMB Then Begin
-   WriteLn('Authentication failed: ', SMBSession.LastError);
+   WriteLn('êchec d''authentication: ', SMBSession.LastError);
    Halt(1);
   End;
-  
-  { Se connecter au partage }
+   { Se connecter au partage }
   If not ConnectToShare(SMBConfig.Share) Then Begin
-   WriteLn('Share connection failed: ', SMBSession.LastError);
+   WriteLn('êchec de partage de connexion: ', SMBSession.LastError);
    Halt(1);
   End;
-  
   If not SMBConfig.Quiet Then
-   WriteLn('Successfully connected to //', SMBConfig.Server, '/', SMBConfig.Share);
-  
-  { Mode interactif ou ex√©cution de commande }
-  If InteractiveMode Then
-   RunInteractiveMode
-  Else Begin
-   { Ex√©cuter commande unique et sortir }
+   WriteLn('Connexion rÇussis Ö //', SMBConfig.Server, '/', SMBConfig.Share);
+   { Mode interactif ou exÇcution de commande }
+  If InteractiveMode Then RunInteractiveMode
+   Else
+  Begin
+   { ExÇcuter commande unique et sortir }
    { ... }
   End;
-  
  Finally
   CloseSMBSession;
   CleanupNetwork;
@@ -1081,18 +954,17 @@ End;
 
 {$IFNDEF FPC}
 { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedSMBClient;
-Begin
+Procedure ShowSimulatedSMBClient;Begin
  WriteLn('SMBCLIEN [NETWORKKIT-P] SMB/CIFS Client (simulation)');
  WriteLn('====================================================');
  WriteLn;
  WriteLn('SMBClient - SMB/CIFS Client');
- WriteLn('Connecting to //server/share');
+ WriteLn('Connection vers //server/share');
  WriteLn;
- WriteLn('Successfully connected to //fileserver/documents');
+ WriteLn('Connexion rÇussis Ö //fileserver/documents');
  WriteLn;
  WriteLn('smb: \> ls');
- WriteLn('Directory listing:');
+ WriteLn('Affiche du rÇpertoire:');
  WriteLn;
  WriteLn('D----      <DIR>     02/21/2026 10:15 .');
  WriteLn('D----      <DIR>     02/21/2026 10:15 ..');
@@ -1102,20 +974,21 @@ Begin
  WriteLn('-----      2048     02/20/2026 16:45 budget.xls');
  WriteLn('-R---       512     02/18/2026 11:30 policy.doc');
  WriteLn;
- WriteLn('7 files listed');
+ WriteLn('7 fichiers trouvÇs');
  WriteLn;
  WriteLn('smb: \> get readme.txt');
- WriteLn('Downloaded: readme.txt (1024 bytes)');
+ WriteLn('TÇlÇchargement: readme.txt (1024 bytes)');
  WriteLn;
  WriteLn('smb: \> exit');
- WriteLn('Session closed');
+ WriteLn('Session fermÇ');
 End;
 {$ENDIF}
 
 BEGIN
  If (ParamStr(1) = '/?') or (ParamStr(1) = '--help') or (ParamStr(1) = '-h') or
     (ParamStr(1) = '/h') or (ParamStr(1) = '/H') Then Begin
-  WriteLn('SMBCLIEN : SMB/CIFS client for accessing SMB shares');
+  WriteLn('SMBCLIEN : Cette commande permet de lancer un client SMB/CIFS ',
+          'pour accÇder aux partages SMB.');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  SMBCLIEN //server/share [options]');
@@ -1128,40 +1001,40 @@ BEGIN
   WriteLn('  -p, --password PASS   Mot de passe');
   WriteLn('  -w WORKGROUP          Groupe de travail');
   WriteLn('  -d DOMAIN             Domaine');
-  WriteLn('  -port PORT            Port TCP (d√©faut: 445)');
-  WriteLn('  -c COMMAND            Commande √† ex√©cuter');
-  WriteLn('  -D DIRECTORY          R√©pertoire initial');
+  WriteLn('  -port PORT            Port TCP (dÇfaut: 445)');
+  WriteLn('  -c COMMAND            Commande Ö exÇcuter');
+  WriteLn('  -D DIRECTORY          RÇpertoire initial');
   WriteLn('  -v                    Mode verbeux');
   WriteLn('  -q                    Mode silencieux');
   WriteLn('  -L                    Lister les partages du serveur');
   WriteLn('  -N                    Pas d''authentification');
   WriteLn('  -k                    Utiliser Kerberos');
   WriteLn('  -A AUTHFILE           Fichier d''authentification');
-  WriteLn('  -S server             Serveur √† utiliser');
-  WriteLn('  -T TARFILE            Cr√©er archive tar');
+  WriteLn('  -S server             Serveur Ö utiliser');
+  WriteLn('  -T TARFILE            CrÇer archive tar');
   WriteLn('  -x TARFILE            Extraire archive tar');
   WriteLn('  -r                    Reprendre transfert interrompu');
-  WriteLn('  -R                    Mode r√©cursif');
+  WriteLn('  -R                    Mode rÇcursif');
   WriteLn;
   WriteLn('Commandes interactives :');
   WriteLn('  Navigation :');
-  WriteLn('    ls, dir             Lister r√©pertoire');
-  WriteLn('    cd <dir>            Changer r√©pertoire');
-  WriteLn('    pwd                 Afficher r√©pertoire courant');
-  WriteLn('    lcd <dir>           Changer r√©pertoire local');
-  WriteLn('    lpwd                Afficher r√©pertoire local');
+  WriteLn('    ls, dir             Lister rÇpertoire');
+  WriteLn('    cd <dir>            Changer rÇpertoire');
+  WriteLn('    pwd                 Afficher rÇpertoire courant');
+  WriteLn('    lcd <dir>           Changer rÇpertoire local');
+  WriteLn('    lpwd                Afficher rÇpertoire local');
   WriteLn;
   WriteLn('  Transfert de fichiers :');
-  WriteLn('    get <remote> [local]        T√©l√©charger fichier');
-  WriteLn('    put <local> [remote]        T√©l√©verser fichier');
-  WriteLn('    mget <pattern>              T√©l√©charger multiples fichiers');
-  WriteLn('    mput <pattern>              T√©l√©verser multiples fichiers');
-  WriteLn('    reget <remote> [local]      Reprendre t√©l√©chargement');
-  WriteLn('    reput <local> [remote]      Reprendre t√©l√©versement');
+  WriteLn('    get <remote> [local]        TÇlÇcharger fichier');
+  WriteLn('    put <local> [remote]        TÇlÇverser fichier');
+  WriteLn('    mget <pattern>              TÇlÇcharger multiples fichiers');
+  WriteLn('    mput <pattern>              TÇlÇverser multiples fichiers');
+  WriteLn('    reget <remote> [local]      Reprendre tÇlÇchargement');
+  WriteLn('    reput <local> [remote]      Reprendre tÇlÇversement');
   WriteLn;
   WriteLn('  Gestion de fichiers :');
-  WriteLn('    mkdir <dir>         Cr√©er r√©pertoire');
-  WriteLn('    rmdir <dir>         Supprimer r√©pertoire');
+  WriteLn('    mkdir <dir>         CrÇer rÇpertoire');
+  WriteLn('    rmdir <dir>         Supprimer rÇpertoire');
   WriteLn('    rm, del <file>      Supprimer fichier');
   WriteLn('    rename <old> <new>  Renommer fichier');
   WriteLn('    chmod <mode> <file> Changer permissions');
@@ -1176,13 +1049,13 @@ BEGIN
   WriteLn('    verbose             Basculer mode verbeux');
   WriteLn('    quiet               Basculer mode silencieux');
   WriteLn('    prompt              Basculer confirmations');
-  WriteLn('    recurse             Basculer mode r√©cursif');
+  WriteLn('    recurse             Basculer mode rÇcursif');
   WriteLn('    translate           Basculer traduction noms');
   WriteLn;
   WriteLn('  Session :');
   WriteLn('    help, ?             Afficher aide');
   WriteLn('    history             Historique commandes');
-  WriteLn('    !<command>          Ex√©cuter commande shell');
+  WriteLn('    !<command>          ExÇcuter commande shell');
   WriteLn('    exit, quit          Quitter client');
   WriteLn;
   WriteLn('Exemples :');
@@ -1201,21 +1074,21 @@ BEGIN
   WriteLn('  //server.domain.com/docs Nom complet');
   WriteLn;
   WriteLn('Authentification :');
-  WriteLn('  ‚Ä¢ Authentification NTLM');
-  WriteLn('  ‚Ä¢ Support Kerberos');
-  WriteLn('  ‚Ä¢ Authentification anonyme');
-  WriteLn('  ‚Ä¢ Domaines Active Directory');
+  WriteLn('  ˛ Authentification NTLM');
+  WriteLn('  ˛ Support Kerberos');
+  WriteLn('  ˛ Authentification anonyme');
+  WriteLn('  ˛ Domaines Active Directory');
   WriteLn;
-  WriteLn('Protocoles support√©s :');
-  WriteLn('  ‚Ä¢ SMB 1.0 (CIFS)');
-  WriteLn('  ‚Ä¢ SMB 2.0');
-  WriteLn('  ‚Ä¢ SMB 2.1');
-  WriteLn('  ‚Ä¢ SMB 3.0');
+  WriteLn('Protocoles supportÇs :');
+  WriteLn('  ˛ SMB 1.0 (CIFS)');
+  WriteLn('  ˛ SMB 2.0');
+  WriteLn('  ˛ SMB 2.1');
+  WriteLn('  ˛ SMB 3.0');
   WriteLn;
   WriteLn('Variables d''environnement :');
-  WriteLn('  USER                 Nom d''utilisateur par d√©faut');
-  WriteLn('  PASSWD               Mot de passe par d√©faut');
-  WriteLn('  WORKGROUP            Groupe de travail par d√©faut');
+  WriteLn('  USER                 Nom d''utilisateur par dÇfaut');
+  WriteLn('  PASSWD               Mot de passe par dÇfaut');
+  WriteLn('  WORKGROUP            Groupe de travail par dÇfaut');
   WriteLn('  SMBCLIENT_DEBUG      Niveau de debug');
   WriteLn;
   WriteLn('Codes de retour :');
@@ -1225,25 +1098,27 @@ BEGIN
   WriteLn('  3                    Partage non accessible');
   WriteLn('  4                    Erreur de transfert');
   WriteLn;
-  WriteLn('Note: Client SMB/CIFS pour acc√©der aux partages r√©seau.');
+  WriteLn('Note: Client SMB/CIFS pour accÇder aux partages rÇseau.');
   WriteLn('Compatible avec smbclient de Samba. Supporte les protocoles');
-  WriteLn('SMB modernes avec authentification s√©curis√©e.');
+  WriteLn('SMB modernes avec authentification sÇcurisÇe.');
  End
- Else If ParamStr(1) = '--version' Then Begin
-  WriteLn('smbclient (NETWORKKIT-P) 1.0');
-  WriteLn('SMB/CIFS client for network file sharing');
-  WriteLn('Compatible with Samba smbclient');
+  Else
+ If ParamStr(1) = '--version' Then Begin
+  WriteLn('smbclient 1.0 - Clone Pascal - NETWORKKIT-P');
+  WriteLn('SMB/CIFS client pour le rÇseau de fichier partagÇ');
+  WriteLn('Compatible avec Samba smbclient');
   WriteLn;
-  WriteLn('Written by Sylvain Maltais for NETWORKKIT-P');
+  WriteLn('Ecrit par Sylvain Maltais');
  End
- Else Begin
+  Else
+ Begin
   {$IFDEF FPC}
   InitializeSMBConfig;
   If ParseCommandLine Then
    RunSMBClient
   Else Begin
-   WriteLn('Usage: smbclient //server/share [options]');
-   WriteLn('Try "smbclient --help" for more information.');
+   WriteLn('Syntaxe: smbclient //server/share [options]');
+   WriteLn('Essayer "smbclient --help" pour plus d''information.');
   End;
   {$ELSE}
   ShowSimulatedSMBClient;
