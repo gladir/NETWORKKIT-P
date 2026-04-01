@@ -21,7 +21,7 @@
       - Gestion des événements: clic gauche, clic droit, double-clic,
         glisser-déposer, molette de défilement
 
-  3.  [ ] Système de menus déroulants graphiques
+  3.  [x] Système de menus déroulants graphiques
       - Menu Fichier: Nouveau, Ouvrir, Enregistrer, Imprimer, Quitter
       - Menu Édition: Couper, Copier, Coller, Sélectionner tout
       - Menu Affichage: Volet de lecture, Trier par, Colonnes
@@ -307,6 +307,61 @@ Type
                 meLeftDoubleClick, meRightDoubleClick,
                 meWheelUp, meWheelDown);
 
+ { Structure pour un élément de menu }
+ TMenuItem = Record
+  Caption: String[30];    { Texte de l'élément }
+  Shortcut: String[15];   { Raccourci clavier (ex: Ctrl+N) }
+  Separator: Boolean;     { True si c'est un séparateur }
+  Enabled: Boolean;       { True si l'élément est actif }
+  ItemID: Integer;        { Identifiant unique de l'élément }
+ End;
+
+ { Structure pour un menu déroulant }
+ TDropdownMenu = Record
+  Title: String[20];       { Titre du menu dans la barre }
+  X, Width: Integer;       { Position et largeur dans la barre de menu }
+  Items: Array[0..14] of TMenuItem; { Éléments du menu (max 15) }
+  ItemCount: Integer;      { Nombre d'éléments }
+  DropX, DropY: Integer;   { Position du menu déroulant }
+  DropWidth, DropHeight: Integer; { Dimensions du menu déroulant }
+ End;
+
+Const
+ { Identifiants des commandes de menu }
+ CMD_FILE_NEW      = 101;
+ CMD_FILE_OPEN     = 102;
+ CMD_FILE_SAVE     = 103;
+ CMD_FILE_SAVEAS   = 104;
+ CMD_FILE_PRINT    = 105;
+ CMD_FILE_EXIT     = 106;
+
+ CMD_EDIT_UNDO     = 201;
+ CMD_EDIT_CUT      = 202;
+ CMD_EDIT_COPY     = 203;
+ CMD_EDIT_PASTE    = 204;
+ CMD_EDIT_SELECTALL= 205;
+
+ CMD_VIEW_PREVIEW  = 301;
+ CMD_VIEW_SORTBY   = 302;
+ CMD_VIEW_COLUMNS  = 303;
+ CMD_VIEW_REFRESH  = 304;
+
+ CMD_TOOLS_ACCOUNTS= 401;
+ CMD_TOOLS_OPTIONS = 402;
+ CMD_TOOLS_RULES   = 403;
+
+ CMD_MSG_NEW       = 501;
+ CMD_MSG_REPLY     = 502;
+ CMD_MSG_REPLYALL  = 503;
+ CMD_MSG_FORWARD   = 504;
+ CMD_MSG_DELETE    = 505;
+
+ CMD_HELP_ABOUT    = 601;
+ CMD_HELP_HELP     = 602;
+
+ { Nombre maximum de menus dans la barre }
+ MAX_MENUS = 6;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -327,6 +382,13 @@ Var
  { Variables pour la molette de défilement }
  MouseWheelDelta: Integer;
  ScrollOffset: Integer;
+
+ { Variables pour le système de menus }
+ Menus: Array[0..MAX_MENUS-1] of TDropdownMenu;
+ MenuCount: Integer;
+ ActiveMenu: Integer;        { Index du menu actif (-1 = aucun) }
+ ActiveMenuItem: Integer;    { Index de l'élément survolé (-1 = aucun) }
+ MenuBarActive: Boolean;     { True si la barre de menu est active }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -605,6 +667,331 @@ Begin
  TX := X1 + ((X2 - X1 - TextW) Div 2);
  TY := Y1 + ((Y2 - Y1 - TextH) Div 2);
  OutTextXY(TX, TY, Text);
+End;
+
+{ ============================================================================
+  PROCÉDURES D'INITIALISATION ET GESTION DES MENUS
+  ============================================================================ }
+
+{ Déclaration avancée de DrawInterface pour utilisation dans les menus }
+Procedure DrawInterface; Forward;
+
+{ Ajoute un élément à un menu }
+Procedure AddMenuItem(Var Menu: TDropdownMenu; Caption, Shortcut: String;
+                      IsSeparator: Boolean; ItemID: Integer);
+Begin
+ If Menu.ItemCount < 15 Then Begin
+  Menu.Items[Menu.ItemCount].Caption := Caption;
+  Menu.Items[Menu.ItemCount].Shortcut := Shortcut;
+  Menu.Items[Menu.ItemCount].Separator := IsSeparator;
+  Menu.Items[Menu.ItemCount].Enabled := True;
+  Menu.Items[Menu.ItemCount].ItemID := ItemID;
+  Inc(Menu.ItemCount);
+ End;
+End;
+
+{ Initialise tous les menus de la barre }
+Procedure InitializeMenus;
+Var
+ I: Integer;
+ MenuX: Integer;
+Begin
+ MenuCount := 6;
+ ActiveMenu := -1;
+ ActiveMenuItem := -1;
+ MenuBarActive := False;
+
+ { Initialiser les positions des menus }
+ MenuX := 8;
+
+ { Menu Fichier }
+ Menus[0].Title := 'Fichier';
+ Menus[0].X := MenuX;
+ Menus[0].Width := TextWidth('Fichier') + 16;
+ Menus[0].ItemCount := 0;
+ AddMenuItem(Menus[0], 'Nouveau message', 'Ctrl+N', False, CMD_FILE_NEW);
+ AddMenuItem(Menus[0], 'Ouvrir', 'Ctrl+O', False, CMD_FILE_OPEN);
+ AddMenuItem(Menus[0], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[0], 'Enregistrer sous...', 'Ctrl+S', False, CMD_FILE_SAVEAS);
+ AddMenuItem(Menus[0], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[0], 'Imprimer...', 'Ctrl+P', False, CMD_FILE_PRINT);
+ AddMenuItem(Menus[0], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[0], 'Quitter', 'Alt+F4', False, CMD_FILE_EXIT);
+
+ MenuX := MenuX + Menus[0].Width;
+
+ { Menu Édition }
+ Menus[1].Title := 'Edition';
+ Menus[1].X := MenuX;
+ Menus[1].Width := TextWidth('Edition') + 16;
+ Menus[1].ItemCount := 0;
+ AddMenuItem(Menus[1], 'Annuler', 'Ctrl+Z', False, CMD_EDIT_UNDO);
+ AddMenuItem(Menus[1], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[1], 'Couper', 'Ctrl+X', False, CMD_EDIT_CUT);
+ AddMenuItem(Menus[1], 'Copier', 'Ctrl+C', False, CMD_EDIT_COPY);
+ AddMenuItem(Menus[1], 'Coller', 'Ctrl+V', False, CMD_EDIT_PASTE);
+ AddMenuItem(Menus[1], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[1], 'Selectionner tout', 'Ctrl+A', False, CMD_EDIT_SELECTALL);
+
+ MenuX := MenuX + Menus[1].Width;
+
+ { Menu Affichage }
+ Menus[2].Title := 'Affichage';
+ Menus[2].X := MenuX;
+ Menus[2].Width := TextWidth('Affichage') + 16;
+ Menus[2].ItemCount := 0;
+ AddMenuItem(Menus[2], 'Volet de lecture', '', False, CMD_VIEW_PREVIEW);
+ AddMenuItem(Menus[2], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[2], 'Trier par...', '', False, CMD_VIEW_SORTBY);
+ AddMenuItem(Menus[2], 'Colonnes...', '', False, CMD_VIEW_COLUMNS);
+ AddMenuItem(Menus[2], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[2], 'Actualiser', 'F5', False, CMD_VIEW_REFRESH);
+
+ MenuX := MenuX + Menus[2].Width;
+
+ { Menu Outils }
+ Menus[3].Title := 'Outils';
+ Menus[3].X := MenuX;
+ Menus[3].Width := TextWidth('Outils') + 16;
+ Menus[3].ItemCount := 0;
+ AddMenuItem(Menus[3], 'Comptes...', '', False, CMD_TOOLS_ACCOUNTS);
+ AddMenuItem(Menus[3], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[3], 'Regles de messages...', '', False, CMD_TOOLS_RULES);
+ AddMenuItem(Menus[3], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[3], 'Options...', '', False, CMD_TOOLS_OPTIONS);
+
+ MenuX := MenuX + Menus[3].Width;
+
+ { Menu Message }
+ Menus[4].Title := 'Message';
+ Menus[4].X := MenuX;
+ Menus[4].Width := TextWidth('Message') + 16;
+ Menus[4].ItemCount := 0;
+ AddMenuItem(Menus[4], 'Nouveau message', 'Ctrl+N', False, CMD_MSG_NEW);
+ AddMenuItem(Menus[4], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[4], 'Repondre', 'Ctrl+R', False, CMD_MSG_REPLY);
+ AddMenuItem(Menus[4], 'Repondre a tous', 'Ctrl+Maj+R', False, CMD_MSG_REPLYALL);
+ AddMenuItem(Menus[4], 'Transferer', 'Ctrl+F', False, CMD_MSG_FORWARD);
+ AddMenuItem(Menus[4], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[4], 'Supprimer', 'Suppr', False, CMD_MSG_DELETE);
+
+ MenuX := MenuX + Menus[4].Width;
+
+ { Menu Aide (?) }
+ Menus[5].Title := '?';
+ Menus[5].X := MenuX;
+ Menus[5].Width := TextWidth('?') + 16;
+ Menus[5].ItemCount := 0;
+ AddMenuItem(Menus[5], 'Aide en ligne', 'F1', False, CMD_HELP_HELP);
+ AddMenuItem(Menus[5], '', '', True, 0); { Séparateur }
+ AddMenuItem(Menus[5], 'A propos...', '', False, CMD_HELP_ABOUT);
+
+ { Calculer les dimensions des menus déroulants }
+ For I := 0 To MenuCount - 1 Do Begin
+  Menus[I].DropX := Menus[I].X;
+  Menus[I].DropY := Layout.MenuBarRect.Y2 + 1;
+  Menus[I].DropWidth := 180;
+  Menus[I].DropHeight := Menus[I].ItemCount * 18 + 4;
+ End;
+End;
+
+{ Dessine un menu déroulant }
+Procedure DrawDropdownMenu(MenuIndex: Integer);
+Var
+ I: Integer;
+ ItemY: Integer;
+ ItemX1, ItemY1, ItemX2, ItemY2: Integer;
+Begin
+ If (MenuIndex < 0) Or (MenuIndex >= MenuCount) Then Exit;
+
+ HideMouse;
+
+ { Fond du menu déroulant }
+ FillRect(Menus[MenuIndex].DropX, Menus[MenuIndex].DropY,
+          Menus[MenuIndex].DropX + Menus[MenuIndex].DropWidth,
+          Menus[MenuIndex].DropY + Menus[MenuIndex].DropHeight,
+          COLOR_MENU_BG);
+ Draw3DRect(Menus[MenuIndex].DropX, Menus[MenuIndex].DropY,
+            Menus[MenuIndex].DropX + Menus[MenuIndex].DropWidth,
+            Menus[MenuIndex].DropY + Menus[MenuIndex].DropHeight, True);
+
+ { Dessiner chaque élément }
+ ItemY := Menus[MenuIndex].DropY + 2;
+
+ For I := 0 To Menus[MenuIndex].ItemCount - 1 Do Begin
+  ItemX1 := Menus[MenuIndex].DropX + 2;
+  ItemY1 := ItemY;
+  ItemX2 := Menus[MenuIndex].DropX + Menus[MenuIndex].DropWidth - 2;
+  ItemY2 := ItemY + 16;
+
+  If Menus[MenuIndex].Items[I].Separator Then Begin
+   { Dessiner un séparateur }
+   SetColor(COLOR_BUTTON_DARK);
+   Line(ItemX1, ItemY1 + 8, ItemX2, ItemY1 + 8);
+   SetColor(COLOR_BUTTON_LIGHT);
+   Line(ItemX1, ItemY1 + 9, ItemX2, ItemY1 + 9);
+  End Else Begin
+   { Élément survolé? }
+   If I = ActiveMenuItem Then Begin
+    FillRect(ItemX1, ItemY1, ItemX2, ItemY2, COLOR_LIST_SELECTED);
+    SetColor(COLOR_LIST_SELECTED_TEXT);
+   End Else Begin
+    If Menus[MenuIndex].Items[I].Enabled Then
+     SetColor(COLOR_MENU_TEXT)
+    Else
+     SetColor(COLOR_BUTTON_DARK);
+   End;
+
+   { Texte de l'élément }
+   OutTextXY(ItemX1 + 4, ItemY1 + 3, Menus[MenuIndex].Items[I].Caption);
+
+   { Raccourci clavier }
+   If Menus[MenuIndex].Items[I].Shortcut <> '' Then Begin
+    If I = ActiveMenuItem Then
+     SetColor(COLOR_LIST_SELECTED_TEXT)
+    Else
+     SetColor(COLOR_BUTTON_DARK);
+    OutTextXY(ItemX2 - TextWidth(Menus[MenuIndex].Items[I].Shortcut) - 4,
+              ItemY1 + 3, Menus[MenuIndex].Items[I].Shortcut);
+   End;
+  End;
+
+  ItemY := ItemY + 18;
+ End;
+
+ ShowMouse;
+End;
+
+{ Ferme le menu déroulant actif et redessine l'interface }
+Procedure CloseDropdownMenu;
+Begin
+ If ActiveMenu >= 0 Then Begin
+  ActiveMenu := -1;
+  ActiveMenuItem := -1;
+  MenuBarActive := False;
+  DrawInterface;
+ End;
+End;
+
+{ Vérifie si un point est dans la zone d'un menu de la barre }
+Function GetMenuAtPoint(X, Y: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ GetMenuAtPoint := -1;
+ If (Y >= Layout.MenuBarRect.Y1) And (Y <= Layout.MenuBarRect.Y2) Then Begin
+  For I := 0 To MenuCount - 1 Do Begin
+   If (X >= Menus[I].X) And (X < Menus[I].X + Menus[I].Width) Then Begin
+    GetMenuAtPoint := I;
+    Exit;
+   End;
+  End;
+ End;
+End;
+
+{ Vérifie si un point est dans le menu déroulant actif }
+Function GetMenuItemAtPoint(X, Y: Integer): Integer;
+Var
+ I: Integer;
+ ItemY: Integer;
+Begin
+ GetMenuItemAtPoint := -1;
+ If ActiveMenu < 0 Then Exit;
+
+ { Vérifier si le point est dans le menu déroulant }
+ If (X >= Menus[ActiveMenu].DropX) And
+    (X <= Menus[ActiveMenu].DropX + Menus[ActiveMenu].DropWidth) And
+    (Y >= Menus[ActiveMenu].DropY) And
+    (Y <= Menus[ActiveMenu].DropY + Menus[ActiveMenu].DropHeight) Then Begin
+
+  ItemY := Menus[ActiveMenu].DropY + 2;
+  For I := 0 To Menus[ActiveMenu].ItemCount - 1 Do Begin
+   If (Y >= ItemY) And (Y < ItemY + 18) Then Begin
+    If Not Menus[ActiveMenu].Items[I].Separator Then
+     GetMenuItemAtPoint := I;
+    Exit;
+   End;
+   ItemY := ItemY + 18;
+  End;
+ End;
+End;
+
+{ Exécute une commande de menu }
+Procedure ExecuteMenuCommand(CmdID: Integer);
+Begin
+ CloseDropdownMenu;
+
+ Case CmdID Of
+  CMD_FILE_NEW: Begin
+   { TODO: Nouveau message }
+   HideMouse;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Commande: Nouveau message          ');
+   ShowMouse;
+  End;
+
+  CMD_FILE_EXIT: Begin
+   Running := False;
+  End;
+
+  CMD_EDIT_COPY: Begin
+   HideMouse;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Commande: Copier                   ');
+   ShowMouse;
+  End;
+
+  CMD_EDIT_PASTE: Begin
+   HideMouse;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Commande: Coller                   ');
+   ShowMouse;
+  End;
+
+  CMD_VIEW_REFRESH: Begin
+   DrawInterface;
+  End;
+
+  CMD_TOOLS_OPTIONS: Begin
+   HideMouse;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Commande: Options                  ');
+   ShowMouse;
+  End;
+
+  CMD_HELP_ABOUT: Begin
+   HideMouse;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Outlook Express Clone - NETWORKKIT-P');
+   ShowMouse;
+  End;
+
+  Else Begin
+   { Commande non implementée }
+   HideMouse;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Commande non implementee           ');
+   ShowMouse;
+  End;
+ End;
 End;
 
 { ============================================================================
@@ -1087,7 +1474,45 @@ End;
 
 { Gère les clics de souris }
 Procedure HandleMouseClick;
+Var
+ ClickedMenu: Integer;
+ ClickedItem: Integer;
 Begin
+ { Si un menu est ouvert, vérifier le clic }
+ If ActiveMenu >= 0 Then Begin
+  { Clic sur un élément du menu déroulant? }
+  ClickedItem := GetMenuItemAtPoint(MouseX, MouseY);
+  If ClickedItem >= 0 Then Begin
+   If Menus[ActiveMenu].Items[ClickedItem].Enabled Then
+    ExecuteMenuCommand(Menus[ActiveMenu].Items[ClickedItem].ItemID);
+   Exit;
+  End;
+
+  { Clic sur un autre menu de la barre? }
+  ClickedMenu := GetMenuAtPoint(MouseX, MouseY);
+  If (ClickedMenu >= 0) And (ClickedMenu <> ActiveMenu) Then Begin
+   ActiveMenu := ClickedMenu;
+   ActiveMenuItem := -1;
+   DrawInterface;
+   DrawDropdownMenu(ActiveMenu);
+   Exit;
+  End;
+
+  { Clic ailleurs = fermer le menu }
+  CloseDropdownMenu;
+  Exit;
+ End;
+
+ { Vérifier le clic sur la barre de menu }
+ ClickedMenu := GetMenuAtPoint(MouseX, MouseY);
+ If ClickedMenu >= 0 Then Begin
+  ActiveMenu := ClickedMenu;
+  ActiveMenuItem := -1;
+  MenuBarActive := True;
+  DrawDropdownMenu(ActiveMenu);
+  Exit;
+ End;
+
  { Vérifie si le clic est sur le séparateur vertical }
  If PointInRect(MouseX, MouseY,
     Layout.VSplitterRect.X1, Layout.VSplitterRect.Y1,
@@ -1224,6 +1649,20 @@ Begin
  DragState := dsNone;
 End;
 
+{ Met à jour le survol des éléments de menu }
+Procedure UpdateMenuHover;
+Var
+ NewItem: Integer;
+Begin
+ If ActiveMenu >= 0 Then Begin
+  NewItem := GetMenuItemAtPoint(MouseX, MouseY);
+  If NewItem <> ActiveMenuItem Then Begin
+   ActiveMenuItem := NewItem;
+   DrawDropdownMenu(ActiveMenu);
+  End;
+ End;
+End;
+
 { Boucle principale de gestion des événements }
 Procedure MainEventLoop;
 Var
@@ -1235,6 +1674,9 @@ Begin
  LastBtn := 0;
  DragState := dsNone;
  InitMouseState;
+ ActiveMenu := -1;
+ ActiveMenuItem := -1;
+ MenuBarActive := False;
 
  While Running Do Begin
   { Lecture de l'état de la souris }
@@ -1245,6 +1687,10 @@ Begin
    GetMouseState(MouseX, MouseY, MouseBtn);
   {$ENDIF}
 
+  { Mise à jour du survol des menus }
+  If ActiveMenu >= 0 Then
+   UpdateMenuHover;
+
   { Détection des événements souris avancés }
   MouseEvent := DetectMouseEvent(LastBtn, MouseBtn, MouseX, MouseY);
 
@@ -1253,7 +1699,11 @@ Begin
     { Clic simple traité lors de l'appui du bouton }
    End;
    meRightClick: Begin
-    HandleRightClick;
+    { Fermer le menu si ouvert, sinon gérer clic droit }
+    If ActiveMenu >= 0 Then
+     CloseDropdownMenu
+    Else
+     HandleRightClick;
    End;
    meLeftDoubleClick: Begin
     HandleDoubleClick;
@@ -1289,8 +1739,14 @@ Begin
   { Vérification des touches du clavier }
   If KeyPressed Then Begin
    Key := ReadKey;
-   If Key = #27 Then Running := False; { Échap pour quitter }
+   If Key = #27 Then Begin
+    If ActiveMenu >= 0 Then
+     CloseDropdownMenu
+    Else
+     Running := False; { Échap pour quitter }
+   End;
    If Key = #0 Then ReadKey; { Touches étendues }
+  End;
   End;
 
   { Petite pause pour ne pas saturer le CPU }
@@ -1317,6 +1773,9 @@ BEGIN
  { Initialisation de la disposition par défaut }
  Layout.FolderPaneWidth := 160;
  Layout.PreviewPaneHeight := 150;
+
+ { Initialisation des menus déroulants }
+ InitializeMenus;
 
  { Affichage de l'interface }
  ShowMouse;
