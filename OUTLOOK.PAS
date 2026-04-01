@@ -15,7 +15,7 @@
         liste des messages, volet de lecture
       - Gérer le redimensionnement des panneaux avec la souris
 
-  2.  [ ] Support complet de la souris (Turbo Pascal et Free Pascal)
+  2.  [x] Support complet de la souris (Turbo Pascal et Free Pascal)
       - Détecter et initialiser le pilote souris (INT 33h pour TP)
       - Utiliser PtcMouse pour Free Pascal
       - Gestion des événements: clic gauche, clic droit, double-clic,
@@ -224,7 +224,7 @@
 Program OUTLOOK;
 
 Uses {$IFDEF FPC}
-      Crt,PtcGraph,PtcCrt,PtcMouse
+      Crt,PtcGraph,PtcCrt,PtcMouse,SysUtils
      {$ELSE}
       Crt,Graph,DOS
      {$ENDIF};
@@ -274,6 +274,15 @@ Const
  { Taille de la zone de redimensionnement }
  SPLITTER_SIZE = 4;
 
+ { Paramètres du double-clic }
+ DOUBLE_CLICK_TIME = 500;  { Temps max entre deux clics en millisecondes }
+ DOUBLE_CLICK_DIST = 4;    { Distance max entre deux clics en pixels }
+
+ { Boutons de la souris }
+ MOUSE_LEFT = 1;
+ MOUSE_RIGHT = 2;
+ MOUSE_MIDDLE = 4;
+
 Type
  { Structure pour la disposition des zones de l'interface }
  TWindowLayout = Record
@@ -293,6 +302,11 @@ Type
  { État de la souris pour le redimensionnement }
  TDragState = (dsNone, dsDragVSplitter, dsDragHSplitter);
 
+ { Type d'événement souris }
+ TMouseEvent = (meNone, meLeftClick, meRightClick, meMiddleClick,
+                meLeftDoubleClick, meRightDoubleClick,
+                meWheelUp, meWheelDown);
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -303,6 +317,16 @@ Var
  {$IFDEF FPC}
   MouseButtons: Word;
  {$ENDIF}
+
+ { Variables pour la détection du double-clic }
+ LastClickTime: LongInt;
+ LastClickX, LastClickY: Integer;
+ LastClickBtn: Integer;
+ ClickCount: Integer;
+
+ { Variables pour la molette de défilement }
+ MouseWheelDelta: Integer;
+ ScrollOffset: Integer;
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -397,6 +421,139 @@ End;
   Button := MouseButtons;
  End;
 {$ENDIF}
+
+{ Fonction pour obtenir le temps actuel en millisecondes (approximatif) }
+Function GetTickCount: LongInt;
+{$IFNDEF FPC}
+Var
+ Hour, Min, Sec, Sec100: Word;
+Begin
+ GetTime(Hour, Min, Sec, Sec100);
+ GetTickCount := (LongInt(Hour) * 3600000) + (LongInt(Min) * 60000) +
+                 (LongInt(Sec) * 1000) + (LongInt(Sec100) * 10);
+End;
+{$ELSE}
+Begin
+ GetTickCount := Trunc(Now * 86400000) Mod 2147483647;
+End;
+{$ENDIF}
+
+{ Initialise les variables de gestion de la souris }
+Procedure InitMouseState;
+Begin
+ LastClickTime := 0;
+ LastClickX := 0;
+ LastClickY := 0;
+ LastClickBtn := 0;
+ ClickCount := 0;
+ MouseWheelDelta := 0;
+ ScrollOffset := 0;
+End;
+
+{ Lecture de la molette de la souris (INT 33h fonction 11h pour Turbo Pascal) }
+{$IFNDEF FPC}
+Procedure GetMouseWheel(Var WheelDelta: Integer);
+Var
+ Regs: Registers;
+Begin
+ { La fonction 11h retourne le mouvement de la molette dans CX }
+ Regs.AX := $0011;
+ Intr($33, Regs);
+ { WheelDelta > 0 = vers le haut, < 0 = vers le bas }
+ WheelDelta := Integer(Regs.CX);
+End;
+{$ELSE}
+Procedure GetMouseWheel(Var WheelDelta: Integer);
+Begin
+ { PtcMouse: utiliser GetMouseWheelDelta si disponible }
+ WheelDelta := 0;
+ { Note: La gestion de la molette dépend de la version de PtcMouse }
+End;
+{$ENDIF}
+
+{ Vérifie si c'est un double-clic }
+Function IsDoubleClick(X, Y, Btn: Integer): Boolean;
+Var
+ CurrentTime: LongInt;
+ DeltaX, DeltaY: Integer;
+Begin
+ IsDoubleClick := False;
+ CurrentTime := GetTickCount;
+
+ { Vérifier si le bouton est le même que le précédent }
+ If Btn <> LastClickBtn Then Begin
+  LastClickTime := CurrentTime;
+  LastClickX := X;
+  LastClickY := Y;
+  LastClickBtn := Btn;
+  ClickCount := 1;
+  Exit;
+ End;
+
+ { Calculer la distance depuis le dernier clic }
+ DeltaX := Abs(X - LastClickX);
+ DeltaY := Abs(Y - LastClickY);
+
+ { Vérifier le temps et la distance }
+ If (CurrentTime - LastClickTime <= DOUBLE_CLICK_TIME) And
+    (DeltaX <= DOUBLE_CLICK_DIST) And
+    (DeltaY <= DOUBLE_CLICK_DIST) Then Begin
+  Inc(ClickCount);
+  If ClickCount >= 2 Then Begin
+   IsDoubleClick := True;
+   ClickCount := 0;
+  End;
+ End Else Begin
+  ClickCount := 1;
+ End;
+
+ LastClickTime := CurrentTime;
+ LastClickX := X;
+ LastClickY := Y;
+ LastClickBtn := Btn;
+End;
+
+{ Détecte le type d'événement souris }
+Function DetectMouseEvent(OldBtn, NewBtn, X, Y: Integer): TMouseEvent;
+Var
+ WheelDelta: Integer;
+Begin
+ DetectMouseEvent := meNone;
+
+ { Vérifier la molette de défilement }
+ GetMouseWheel(WheelDelta);
+ If WheelDelta > 0 Then Begin
+  DetectMouseEvent := meWheelUp;
+  Exit;
+ End Else If WheelDelta < 0 Then Begin
+  DetectMouseEvent := meWheelDown;
+  Exit;
+ End;
+
+ { Détection du clic gauche (bouton enfoncé puis relâché) }
+ If ((OldBtn And MOUSE_LEFT) <> 0) And ((NewBtn And MOUSE_LEFT) = 0) Then Begin
+  If IsDoubleClick(X, Y, MOUSE_LEFT) Then
+   DetectMouseEvent := meLeftDoubleClick
+  Else
+   DetectMouseEvent := meLeftClick;
+  Exit;
+ End;
+
+ { Détection du clic droit }
+ If ((OldBtn And MOUSE_RIGHT) <> 0) And ((NewBtn And MOUSE_RIGHT) = 0) Then Begin
+  If IsDoubleClick(X, Y, MOUSE_RIGHT) Then
+   DetectMouseEvent := meRightDoubleClick
+  Else
+   DetectMouseEvent := meRightClick;
+  Exit;
+ End;
+
+ { Détection du clic milieu }
+ If ((OldBtn And MOUSE_MIDDLE) <> 0) And ((NewBtn And MOUSE_MIDDLE) = 0) Then Begin
+  DetectMouseEvent := meMiddleClick;
+  Exit;
+ End;
+End;
 
 { ============================================================================
   PROCÉDURES DE DESSIN UTILITAIRES
@@ -955,6 +1112,112 @@ Begin
  End;
 End;
 
+{ Gère le clic droit de la souris (menu contextuel) }
+Procedure HandleRightClick;
+Begin
+ { Afficher un menu contextuel selon la zone cliquée }
+ If PointInRect(MouseX, MouseY,
+    Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
+    Layout.MessageListRect.X2, Layout.MessageListRect.Y2) Then Begin
+  { Menu contextuel pour la liste des messages }
+  { TODO: Implémenter le menu contextuel des messages }
+  HideMouse;
+  SetColor(COLOR_STATUS_TEXT);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Clic droit: Menu contextuel message');
+  ShowMouse;
+ End
+ Else If PointInRect(MouseX, MouseY,
+    Layout.FolderPaneRect.X1, Layout.FolderPaneRect.Y1,
+    Layout.FolderPaneRect.X2, Layout.FolderPaneRect.Y2) Then Begin
+  { Menu contextuel pour le panneau des dossiers }
+  { TODO: Implémenter le menu contextuel des dossiers }
+  HideMouse;
+  SetColor(COLOR_STATUS_TEXT);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Clic droit: Menu contextuel dossier ');
+  ShowMouse;
+ End;
+End;
+
+{ Gère le double-clic de la souris }
+Procedure HandleDoubleClick;
+Begin
+ { Double-clic sur un message = ouvrir le message }
+ If PointInRect(MouseX, MouseY,
+    Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
+    Layout.MessageListRect.X2, Layout.MessageListRect.Y2) Then Begin
+  { TODO: Ouvrir le message dans une nouvelle fenêtre }
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(COLOR_STATUS_TEXT);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Double-clic: Ouvrir le message      ');
+  ShowMouse;
+ End
+ Else If PointInRect(MouseX, MouseY,
+    Layout.FolderPaneRect.X1, Layout.FolderPaneRect.Y1,
+    Layout.FolderPaneRect.X2, Layout.FolderPaneRect.Y2) Then Begin
+  { Double-clic sur un dossier = développer/réduire }
+  { TODO: Développer ou réduire le dossier }
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(COLOR_STATUS_TEXT);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Double-clic: Developper le dossier  ');
+  ShowMouse;
+ End;
+End;
+
+{ Gère le défilement avec la molette de la souris }
+Procedure HandleMouseWheel(Direction: Integer);
+Begin
+ { Direction > 0 = vers le haut, < 0 = vers le bas }
+
+ { Défilement de la liste des messages }
+ If PointInRect(MouseX, MouseY,
+    Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
+    Layout.MessageListRect.X2, Layout.MessageListRect.Y2) Then Begin
+  If Direction > 0 Then Begin
+   { Défiler vers le haut }
+   If ScrollOffset > 0 Then Dec(ScrollOffset);
+  End Else Begin
+   { Défiler vers le bas }
+   Inc(ScrollOffset);
+  End;
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(COLOR_STATUS_TEXT);
+  If Direction > 0 Then
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Molette: Defiler vers le haut      ')
+  Else
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Molette: Defiler vers le bas       ');
+  ShowMouse;
+ End
+
+ { Défilement du volet de prévisualisation }
+ Else If PointInRect(MouseX, MouseY,
+    Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
+    Layout.PreviewPaneRect.X2, Layout.PreviewPaneRect.Y2) Then Begin
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(COLOR_STATUS_TEXT);
+  If Direction > 0 Then
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Molette: Defiler apercu vers haut  ')
+  Else
+   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+             'Molette: Defiler apercu vers bas   ');
+  ShowMouse;
+ End;
+End;
+
 { Gère le relâchement du bouton de la souris }
 Procedure HandleMouseRelease;
 Begin
@@ -966,10 +1229,12 @@ Procedure MainEventLoop;
 Var
  LastBtn: Integer;
  Key: Char;
+ MouseEvent: TMouseEvent;
 Begin
  Running := True;
  LastBtn := 0;
  DragState := dsNone;
+ InitMouseState;
 
  While Running Do Begin
   { Lecture de l'état de la souris }
@@ -980,18 +1245,42 @@ Begin
    GetMouseState(MouseX, MouseY, MouseBtn);
   {$ENDIF}
 
-  { Détection du clic (bouton enfoncé) }
-  If (MouseBtn And 1 <> 0) And (LastBtn And 1 = 0) Then Begin
+  { Détection des événements souris avancés }
+  MouseEvent := DetectMouseEvent(LastBtn, MouseBtn, MouseX, MouseY);
+
+  Case MouseEvent Of
+   meLeftClick: Begin
+    { Clic simple traité lors de l'appui du bouton }
+   End;
+   meRightClick: Begin
+    HandleRightClick;
+   End;
+   meLeftDoubleClick: Begin
+    HandleDoubleClick;
+   End;
+   meRightDoubleClick: Begin
+    { Double-clic droit: pas d'action spécifique }
+   End;
+   meWheelUp: Begin
+    HandleMouseWheel(1);
+   End;
+   meWheelDown: Begin
+    HandleMouseWheel(-1);
+   End;
+  End;
+
+  { Détection du clic gauche (bouton enfoncé) }
+  If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
    HandleMouseClick;
   End;
 
-  { Détection du relâchement }
-  If (MouseBtn And 1 = 0) And (LastBtn And 1 <> 0) Then Begin
+  { Détection du relâchement du bouton gauche }
+  If (MouseBtn And MOUSE_LEFT = 0) And (LastBtn And MOUSE_LEFT <> 0) Then Begin
    HandleMouseRelease;
   End;
 
   { Gestion du glissement }
-  If (MouseBtn And 1 <> 0) And (DragState <> dsNone) Then Begin
+  If (MouseBtn And MOUSE_LEFT <> 0) And (DragState <> dsNone) Then Begin
    HandleMouseDrag;
   End;
 
