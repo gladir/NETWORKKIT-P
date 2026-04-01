@@ -1619,7 +1619,8 @@ Begin
    Bar(X, Y + 4, X + 12, Y + 12);
    SetColor(COLOR_BUTTON_DARK);
    Rectangle(X, Y + 4, X + 12, Y + 12);
-   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   Line(X, Y + 4, X + 6, Y);
+   Line(X + 6, Y, X + 12, Y + 4);
    { Flèche entrante }
    SetColor(LightGreen);
    Line(X + 6, Y + 6, X + 6, Y + 10);
@@ -1633,7 +1634,8 @@ Begin
    Bar(X, Y + 4, X + 12, Y + 12);
    SetColor(COLOR_BUTTON_DARK);
    Rectangle(X, Y + 4, X + 12, Y + 12);
-   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   Line(X, Y + 4, X + 6, Y);
+   Line(X + 6, Y, X + 12, Y + 4);
    { Flèche sortante }
    SetColor(LightBlue);
    Line(X + 6, Y + 10, X + 6, Y + 6);
@@ -1671,7 +1673,8 @@ Begin
    Bar(X, Y + 4, X + 12, Y + 12);
    SetColor(COLOR_BUTTON_DARK);
    Rectangle(X, Y + 4, X + 12, Y + 12);
-   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   Line(X, Y + 4, X + 6, Y);
+   Line(X + 6, Y, X + 12, Y + 4);
    { X pour spam }
    SetColor(White);
    Line(X + 3, Y + 6, X + 9, Y + 10);
@@ -1684,7 +1687,8 @@ Begin
    Bar(X, Y + 4, X + 12, Y + 12);
    SetColor(COLOR_BUTTON_DARK);
    Rectangle(X, Y + 4, X + 12, Y + 12);
-   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   Line(X, Y + 4, X + 6, Y);
+   Line(X + 6, Y, X + 12, Y + 4);
   End;
  End;
 End;
