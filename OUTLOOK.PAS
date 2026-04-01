@@ -28,7 +28,7 @@
       - Menu Outils: Comptes, Options, Règles de messages
       - Menu Aide: À propos, Aide en ligne
 
-  4.  [ ] Barre d'outils graphique avec icônes
+  4.  [x] Barre d'outils graphique avec icônes
       - Icônes: Nouveau message, Répondre, Répondre à tous, Transférer
       - Icônes: Envoyer/Recevoir, Supprimer, Imprimer, Carnet d'adresses
       - États visuels: normal, survol, appuyé, désactivé
@@ -326,6 +326,24 @@ Type
   DropWidth, DropHeight: Integer; { Dimensions du menu déroulant }
  End;
 
+ { État visuel d'un bouton de barre d'outils }
+ TToolButtonState = (tbsNormal, tbsHover, tbsPressed, tbsDisabled);
+
+ { Type d'icône pour un bouton }
+ TToolIconType = (tiNewMsg, tiReply, tiReplyAll, tiForward,
+                  tiSendRecv, tiDelete, tiPrint, tiAddressBook, tiSeparator);
+
+ { Structure pour un bouton de barre d'outils }
+ TToolButton = Record
+  X, Y, W, H: Integer;       { Position et dimensions }
+  Caption: String[15];       { Texte du bouton }
+  Tooltip: String[40];       { Infobulle }
+  IconType: TToolIconType;   { Type d'icône }
+  CommandID: Integer;        { Commande associée }
+  State: TToolButtonState;   { État actuel }
+  Enabled: Boolean;          { Actif ou non }
+ End;
+
 Const
  { Identifiants des commandes de menu }
  CMD_FILE_NEW      = 101;
@@ -359,8 +377,18 @@ Const
  CMD_HELP_ABOUT    = 601;
  CMD_HELP_HELP     = 602;
 
+ { Commandes de barre d'outils }
+ CMD_TB_SENDRECV   = 701;
+ CMD_TB_ADDRESSBOOK= 702;
+
  { Nombre maximum de menus dans la barre }
  MAX_MENUS = 6;
+
+ { Nombre maximum de boutons dans la barre d'outils }
+ MAX_TOOLBAR_BUTTONS = 12;
+
+ { Temps d'affichage de l'infobulle (ms) }
+ TOOLTIP_DELAY = 500;
 
 Var
  Layout: TWindowLayout;
@@ -389,6 +417,19 @@ Var
  ActiveMenu: Integer;        { Index du menu actif (-1 = aucun) }
  ActiveMenuItem: Integer;    { Index de l'élément survolé (-1 = aucun) }
  MenuBarActive: Boolean;     { True si la barre de menu est active }
+
+ { Variables pour la barre d'outils }
+ ToolButtons: Array[0..MAX_TOOLBAR_BUTTONS-1] of TToolButton;
+ ToolButtonCount: Integer;
+ HoveredToolButton: Integer;  { Index du bouton survolé (-1 = aucun) }
+ PressedToolButton: Integer;  { Index du bouton appuyé (-1 = aucun) }
+
+ { Variables pour les infobulles }
+ TooltipVisible: Boolean;
+ TooltipX, TooltipY: Integer;
+ TooltipText: String[40];
+ TooltipStartTime: LongInt;
+ LastMouseX, LastMouseY: Integer;
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -648,11 +689,345 @@ Begin
  End;
 End;
 
-{ Dessine un bouton de la barre d'outils }
+{ Dessine un bouton de la barre d'outils avec état }
 Procedure DrawToolButton(X, Y, W, H: Integer; Pressed: Boolean);
 Begin
  FillRect(X, Y, X + W, Y + H, COLOR_BUTTON_FACE);
  Draw3DRect(X, Y, X + W, Y + H, Not Pressed);
+End;
+
+{ Dessine un bouton de barre d'outils avec état complet }
+Procedure DrawToolButtonEx(Var Btn: TToolButton);
+Var
+ BgColor: Word;
+Begin
+ { Choisir la couleur de fond selon l'état }
+ Case Btn.State Of
+  tbsNormal:   BgColor := COLOR_BUTTON_FACE;
+  tbsHover:    BgColor := COLOR_LIST_SELECTED;
+  tbsPressed:  BgColor := COLOR_BUTTON_FACE;
+  tbsDisabled: BgColor := COLOR_BUTTON_FACE;
+ End;
+
+ { Dessiner le fond du bouton }
+ FillRect(Btn.X, Btn.Y, Btn.X + Btn.W, Btn.Y + Btn.H, BgColor);
+
+ { Dessiner le relief 3D selon l'état }
+ Case Btn.State Of
+  tbsNormal:   Draw3DRect(Btn.X, Btn.Y, Btn.X + Btn.W, Btn.Y + Btn.H, True);
+  tbsHover:    Draw3DRect(Btn.X, Btn.Y, Btn.X + Btn.W, Btn.Y + Btn.H, True);
+  tbsPressed:  Draw3DRect(Btn.X, Btn.Y, Btn.X + Btn.W, Btn.Y + Btn.H, False);
+  tbsDisabled: Begin End; { Pas de bordure pour désactivé }
+ End;
+End;
+
+{ Dessine une icône de bouton de barre d'outils }
+Procedure DrawToolbarIcon(X, Y: Integer; IconType: TToolIconType; Disabled: Boolean);
+Var
+ IconColor: Word;
+Begin
+ If Disabled Then
+  IconColor := COLOR_BUTTON_DARK
+ Else
+  IconColor := COLOR_MENU_TEXT;
+
+ SetColor(IconColor);
+
+ Case IconType Of
+  tiNewMsg: Begin
+   { Icône enveloppe avec '+' }
+   Rectangle(X, Y + 2, X + 14, Y + 12);
+   Line(X, Y + 2, X + 7, Y + 7);
+   Line(X + 14, Y + 2, X + 7, Y + 7);
+   { Signe + }
+   SetColor(LightGreen);
+   If Not Disabled Then Begin
+    Line(X + 11, Y, X + 11, Y + 6);
+    Line(X + 8, Y + 3, X + 14, Y + 3);
+   End;
+  End;
+
+  tiReply: Begin
+   { Flèche vers la gauche }
+   Line(X + 2, Y + 6, X + 12, Y + 6);
+   Line(X + 2, Y + 6, X + 6, Y + 2);
+   Line(X + 2, Y + 6, X + 6, Y + 10);
+  End;
+
+  tiReplyAll: Begin
+   { Deux flèches vers la gauche }
+   Line(X + 4, Y + 6, X + 12, Y + 6);
+   Line(X + 4, Y + 6, X + 8, Y + 2);
+   Line(X + 4, Y + 6, X + 8, Y + 10);
+   Line(X, Y + 6, X + 4, Y + 2);
+   Line(X, Y + 6, X + 4, Y + 10);
+  End;
+
+  tiForward: Begin
+   { Flèche vers la droite }
+   Line(X + 2, Y + 6, X + 12, Y + 6);
+   Line(X + 12, Y + 6, X + 8, Y + 2);
+   Line(X + 12, Y + 6, X + 8, Y + 10);
+  End;
+
+  tiSendRecv: Begin
+   { Flèches bidirectionnelles }
+   { Flèche vers le haut }
+   Line(X + 4, Y + 2, X + 4, Y + 10);
+   Line(X + 4, Y + 2, X + 2, Y + 5);
+   Line(X + 4, Y + 2, X + 6, Y + 5);
+   { Flèche vers le bas }
+   Line(X + 10, Y + 2, X + 10, Y + 10);
+   Line(X + 10, Y + 10, X + 8, Y + 7);
+   Line(X + 10, Y + 10, X + 12, Y + 7);
+  End;
+
+  tiDelete: Begin
+   { Croix }
+   SetColor(LightRed);
+   If Disabled Then SetColor(COLOR_BUTTON_DARK);
+   Line(X + 2, Y + 2, X + 12, Y + 12);
+   Line(X + 12, Y + 2, X + 2, Y + 12);
+   Line(X + 3, Y + 2, X + 13, Y + 12);
+   Line(X + 13, Y + 2, X + 3, Y + 12);
+  End;
+
+  tiPrint: Begin
+   { Imprimante }
+   Rectangle(X + 2, Y, X + 12, Y + 4);
+   Rectangle(X, Y + 4, X + 14, Y + 10);
+   Rectangle(X + 3, Y + 8, X + 11, Y + 14);
+  End;
+
+  tiAddressBook: Begin
+   { Carnet }
+   Rectangle(X + 2, Y, X + 12, Y + 14);
+   Line(X + 4, Y + 3, X + 10, Y + 3);
+   Line(X + 4, Y + 6, X + 10, Y + 6);
+   Line(X + 4, Y + 9, X + 10, Y + 9);
+   { Reliure }
+   SetColor(COLOR_BUTTON_DARK);
+   Line(X + 2, Y, X + 2, Y + 14);
+  End;
+
+  tiSeparator: Begin
+   { Séparateur vertical }
+   SetColor(COLOR_BUTTON_DARK);
+   Line(X, Y + 2, X, Y + 14);
+   SetColor(COLOR_BUTTON_LIGHT);
+   Line(X + 1, Y + 2, X + 1, Y + 14);
+  End;
+ End;
+End;
+
+{ Initialise les boutons de la barre d'outils }
+Procedure InitializeToolbar;
+Var
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ I: Integer;
+Begin
+ ToolButtonCount := 0;
+ HoveredToolButton := -1;
+ PressedToolButton := -1;
+ TooltipVisible := False;
+
+ BtnY := Layout.ToolBarRect.Y1 + 3;
+ BtnW := 60;
+ BtnH := 22;
+ BtnX := 4;
+
+ { Bouton Nouveau message }
+ ToolButtons[0].X := BtnX;
+ ToolButtons[0].Y := BtnY;
+ ToolButtons[0].W := BtnW;
+ ToolButtons[0].H := BtnH;
+ ToolButtons[0].Caption := 'Nouveau';
+ ToolButtons[0].Tooltip := 'Creer un nouveau message (Ctrl+N)';
+ ToolButtons[0].IconType := tiNewMsg;
+ ToolButtons[0].CommandID := CMD_MSG_NEW;
+ ToolButtons[0].State := tbsNormal;
+ ToolButtons[0].Enabled := True;
+
+ { Bouton Répondre }
+ BtnX := BtnX + BtnW + 4;
+ ToolButtons[1].X := BtnX;
+ ToolButtons[1].Y := BtnY;
+ ToolButtons[1].W := BtnW;
+ ToolButtons[1].H := BtnH;
+ ToolButtons[1].Caption := 'Repondre';
+ ToolButtons[1].Tooltip := 'Repondre a l''expediteur (Ctrl+R)';
+ ToolButtons[1].IconType := tiReply;
+ ToolButtons[1].CommandID := CMD_MSG_REPLY;
+ ToolButtons[1].State := tbsNormal;
+ ToolButtons[1].Enabled := True;
+
+ { Bouton Répondre à tous }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 70;
+ ToolButtons[2].X := BtnX;
+ ToolButtons[2].Y := BtnY;
+ ToolButtons[2].W := BtnW;
+ ToolButtons[2].H := BtnH;
+ ToolButtons[2].Caption := 'Rep.tous';
+ ToolButtons[2].Tooltip := 'Repondre a tous les destinataires';
+ ToolButtons[2].IconType := tiReplyAll;
+ ToolButtons[2].CommandID := CMD_MSG_REPLYALL;
+ ToolButtons[2].State := tbsNormal;
+ ToolButtons[2].Enabled := True;
+
+ { Bouton Transférer }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 70;
+ ToolButtons[3].X := BtnX;
+ ToolButtons[3].Y := BtnY;
+ ToolButtons[3].W := BtnW;
+ ToolButtons[3].H := BtnH;
+ ToolButtons[3].Caption := 'Transferer';
+ ToolButtons[3].Tooltip := 'Transferer ce message (Ctrl+F)';
+ ToolButtons[3].IconType := tiForward;
+ ToolButtons[3].CommandID := CMD_MSG_FORWARD;
+ ToolButtons[3].State := tbsNormal;
+ ToolButtons[3].Enabled := True;
+
+ { Séparateur }
+ BtnX := BtnX + BtnW + 8;
+ ToolButtons[4].X := BtnX;
+ ToolButtons[4].Y := BtnY;
+ ToolButtons[4].W := 2;
+ ToolButtons[4].H := BtnH;
+ ToolButtons[4].Caption := '';
+ ToolButtons[4].Tooltip := '';
+ ToolButtons[4].IconType := tiSeparator;
+ ToolButtons[4].CommandID := 0;
+ ToolButtons[4].State := tbsNormal;
+ ToolButtons[4].Enabled := False;
+
+ { Bouton Envoyer/Recevoir }
+ BtnX := BtnX + 8;
+ BtnW := 80;
+ ToolButtons[5].X := BtnX;
+ ToolButtons[5].Y := BtnY;
+ ToolButtons[5].W := BtnW;
+ ToolButtons[5].H := BtnH;
+ ToolButtons[5].Caption := 'Env/Recv';
+ ToolButtons[5].Tooltip := 'Envoyer et recevoir les messages';
+ ToolButtons[5].IconType := tiSendRecv;
+ ToolButtons[5].CommandID := CMD_TB_SENDRECV;
+ ToolButtons[5].State := tbsNormal;
+ ToolButtons[5].Enabled := True;
+
+ { Bouton Supprimer }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 65;
+ ToolButtons[6].X := BtnX;
+ ToolButtons[6].Y := BtnY;
+ ToolButtons[6].W := BtnW;
+ ToolButtons[6].H := BtnH;
+ ToolButtons[6].Caption := 'Supprimer';
+ ToolButtons[6].Tooltip := 'Supprimer le message selectionne';
+ ToolButtons[6].IconType := tiDelete;
+ ToolButtons[6].CommandID := CMD_MSG_DELETE;
+ ToolButtons[6].State := tbsNormal;
+ ToolButtons[6].Enabled := True;
+
+ { Bouton Imprimer }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 60;
+ ToolButtons[7].X := BtnX;
+ ToolButtons[7].Y := BtnY;
+ ToolButtons[7].W := BtnW;
+ ToolButtons[7].H := BtnH;
+ ToolButtons[7].Caption := 'Imprimer';
+ ToolButtons[7].Tooltip := 'Imprimer le message (Ctrl+P)';
+ ToolButtons[7].IconType := tiPrint;
+ ToolButtons[7].CommandID := CMD_FILE_PRINT;
+ ToolButtons[7].State := tbsNormal;
+ ToolButtons[7].Enabled := True;
+
+ { Bouton Carnet d'adresses }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 65;
+ ToolButtons[8].X := BtnX;
+ ToolButtons[8].Y := BtnY;
+ ToolButtons[8].W := BtnW;
+ ToolButtons[8].H := BtnH;
+ ToolButtons[8].Caption := 'Adresses';
+ ToolButtons[8].Tooltip := 'Ouvrir le carnet d''adresses';
+ ToolButtons[8].IconType := tiAddressBook;
+ ToolButtons[8].CommandID := CMD_TB_ADDRESSBOOK;
+ ToolButtons[8].State := tbsNormal;
+ ToolButtons[8].Enabled := True;
+
+ ToolButtonCount := 9;
+End;
+
+{ Trouve le bouton de barre d'outils à une position donnée }
+Function GetToolButtonAtPoint(X, Y: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ GetToolButtonAtPoint := -1;
+ For I := 0 To ToolButtonCount - 1 Do Begin
+  If ToolButtons[I].IconType <> tiSeparator Then Begin
+   If (X >= ToolButtons[I].X) And (X <= ToolButtons[I].X + ToolButtons[I].W) And
+      (Y >= ToolButtons[I].Y) And (Y <= ToolButtons[I].Y + ToolButtons[I].H) Then Begin
+    GetToolButtonAtPoint := I;
+    Exit;
+   End;
+  End;
+ End;
+End;
+
+{ Affiche une infobulle }
+Procedure ShowTooltip(X, Y: Integer; Text: String);
+Var
+ TipW, TipH: Integer;
+ TipX, TipY: Integer;
+Begin
+ If Text = '' Then Exit;
+
+ TipW := TextWidth(Text) + 8;
+ TipH := TextHeight(Text) + 6;
+
+ { Positionner l'infobulle sous le curseur }
+ TipX := X;
+ TipY := Y + 20;
+
+ { S'assurer que l'infobulle reste visible }
+ If TipX + TipW > SCREEN_WIDTH Then
+  TipX := SCREEN_WIDTH - TipW - 2;
+ If TipY + TipH > SCREEN_HEIGHT Then
+  TipY := Y - TipH - 5;
+
+ HideMouse;
+
+ { Fond de l'infobulle (jaune clair) }
+ SetFillStyle(SolidFill, LightYellow);
+ Bar(TipX, TipY, TipX + TipW, TipY + TipH);
+
+ { Bordure noire }
+ SetColor(Black);
+ Rectangle(TipX, TipY, TipX + TipW, TipY + TipH);
+
+ { Texte }
+ SetColor(Black);
+ OutTextXY(TipX + 4, TipY + 3, Text);
+
+ ShowMouse;
+
+ TooltipVisible := True;
+ TooltipX := TipX;
+ TooltipY := TipY;
+ TooltipText := Text;
+End;
+
+{ Cache l'infobulle et redessine la zone }
+Procedure HideTooltip;
+Begin
+ If TooltipVisible Then Begin
+  TooltipVisible := False;
+  DrawInterface;
+ End;
 End;
 
 { Dessine un texte centré dans un rectangle }
@@ -1139,73 +1514,52 @@ Begin
  OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, '?');
 End;
 
-{ Dessine la barre d'outils }
+{ Dessine la barre d'outils avec icônes et états }
 Procedure DrawToolBar;
 Var
- BtnX, BtnY, BtnW, BtnH: Integer;
+ I: Integer;
+ IconX, IconY: Integer;
+ TextX: Integer;
+ TextColor: Word;
 Begin
+ { Dessiner le fond de la barre d'outils }
  FillRect(Layout.ToolBarRect.X1, Layout.ToolBarRect.Y1,
           Layout.ToolBarRect.X2, Layout.ToolBarRect.Y2, COLOR_TOOLBAR_BG);
  Draw3DRect(Layout.ToolBarRect.X1, Layout.ToolBarRect.Y1,
             Layout.ToolBarRect.X2, Layout.ToolBarRect.Y2, True);
 
- BtnY := Layout.ToolBarRect.Y1 + 3;
- BtnW := 60;
- BtnH := 22;
+ { Dessiner chaque bouton }
+ For I := 0 To ToolButtonCount - 1 Do Begin
+  If ToolButtons[I].IconType = tiSeparator Then Begin
+   { Dessiner le séparateur }
+   DrawToolbarIcon(ToolButtons[I].X, ToolButtons[I].Y, tiSeparator, False);
+  End Else Begin
+   { Dessiner le bouton avec son état }
+   DrawToolButtonEx(ToolButtons[I]);
 
- { Bouton Nouveau message }
- BtnX := 4;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 8, BtnY + 6, 'Nouveau');
+   { Position de l'icône (à gauche du texte) }
+   IconX := ToolButtons[I].X + 3;
+   IconY := ToolButtons[I].Y + 4;
 
- { Bouton Répondre }
- BtnX := BtnX + BtnW + 4;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 4, BtnY + 6, 'Repondre');
+   { Dessiner l'icône }
+   DrawToolbarIcon(IconX, IconY, ToolButtons[I].IconType,
+                   Not ToolButtons[I].Enabled);
 
- { Bouton Répondre à tous }
- BtnX := BtnX + BtnW + 4;
- BtnW := 70;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 4, BtnY + 6, 'Rep.tous');
+   { Couleur du texte selon l'état }
+   If ToolButtons[I].Enabled Then Begin
+    If ToolButtons[I].State = tbsHover Then
+     TextColor := COLOR_LIST_SELECTED_TEXT
+    Else
+     TextColor := COLOR_MENU_TEXT;
+   End Else
+    TextColor := COLOR_BUTTON_DARK;
 
- { Bouton Transférer }
- BtnX := BtnX + BtnW + 4;
- BtnW := 70;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 4, BtnY + 6, 'Transferer');
-
- { Séparateur }
- BtnX := BtnX + BtnW + 8;
- SetColor(COLOR_BUTTON_DARK);
- Line(BtnX, BtnY + 2, BtnX, BtnY + BtnH - 2);
- SetColor(COLOR_BUTTON_LIGHT);
- Line(BtnX + 1, BtnY + 2, BtnX + 1, BtnY + BtnH - 2);
-
- { Bouton Envoyer/Recevoir }
- BtnX := BtnX + 8;
- BtnW := 80;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 4, BtnY + 6, 'Env/Recv');
-
- { Bouton Supprimer }
- BtnX := BtnX + BtnW + 4;
- BtnW := 65;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 4, BtnY + 6, 'Supprimer');
-
- { Bouton Adresses }
- BtnX := BtnX + BtnW + 4;
- BtnW := 65;
- DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(BtnX + 4, BtnY + 6, 'Adresses');
+   { Dessiner le texte du bouton }
+   TextX := IconX + 16;
+   SetColor(TextColor);
+   OutTextXY(TextX, ToolButtons[I].Y + 6, ToolButtons[I].Caption);
+  End;
+ End;
 End;
 
 { Dessine le panneau des dossiers (arbre de navigation) }
@@ -1663,12 +2017,102 @@ Begin
  End;
 End;
 
+{ Met à jour le survol des boutons de barre d'outils }
+Procedure UpdateToolbarHover;
+Var
+ NewHover: Integer;
+ I: Integer;
+ NeedRedraw: Boolean;
+Begin
+ NewHover := GetToolButtonAtPoint(MouseX, MouseY);
+ NeedRedraw := False;
+
+ If NewHover <> HoveredToolButton Then Begin
+  { Réinitialiser l'ancien bouton survolé }
+  If HoveredToolButton >= 0 Then Begin
+   ToolButtons[HoveredToolButton].State := tbsNormal;
+   NeedRedraw := True;
+  End;
+
+  { Mettre à jour le nouveau bouton survolé }
+  If NewHover >= 0 Then Begin
+   If ToolButtons[NewHover].Enabled Then Begin
+    ToolButtons[NewHover].State := tbsHover;
+    NeedRedraw := True;
+    { Démarrer le minuteur d'infobulle }
+    TooltipStartTime := GetTickCount;
+   End;
+  End;
+
+  { Cacher l'infobulle si on change de bouton }
+  If TooltipVisible Then
+   HideTooltip;
+
+  HoveredToolButton := NewHover;
+
+  { Redessiner la barre d'outils si nécessaire }
+  If NeedRedraw And Not TooltipVisible Then Begin
+   HideMouse;
+   DrawToolBar;
+   ShowMouse;
+  End;
+ End
+ Else Begin
+  { Afficher l'infobulle après le délai }
+  If (HoveredToolButton >= 0) And (Not TooltipVisible) And
+     (GetTickCount - TooltipStartTime >= TOOLTIP_DELAY) Then Begin
+   ShowTooltip(MouseX, MouseY, ToolButtons[HoveredToolButton].Tooltip);
+  End;
+ End;
+End;
+
+{ Gère le clic sur un bouton de barre d'outils }
+Procedure HandleToolbarClick;
+Var
+ BtnIdx: Integer;
+Begin
+ BtnIdx := GetToolButtonAtPoint(MouseX, MouseY);
+ If BtnIdx >= 0 Then Begin
+  If ToolButtons[BtnIdx].Enabled Then Begin
+   { Masquer l'infobulle }
+   If TooltipVisible Then HideTooltip;
+
+   { Mettre le bouton en état appuyé }
+   ToolButtons[BtnIdx].State := tbsPressed;
+   PressedToolButton := BtnIdx;
+   HideMouse;
+   DrawToolBar;
+   ShowMouse;
+  End;
+ End;
+End;
+
+{ Gère le relâchement d'un bouton de barre d'outils }
+Procedure HandleToolbarRelease;
+Begin
+ If PressedToolButton >= 0 Then Begin
+  { Vérifier si on est toujours sur le même bouton }
+  If GetToolButtonAtPoint(MouseX, MouseY) = PressedToolButton Then Begin
+   { Exécuter la commande du bouton }
+   ExecuteMenuCommand(ToolButtons[PressedToolButton].CommandID);
+  End;
+
+  { Réinitialiser l'état du bouton }
+  ToolButtons[PressedToolButton].State := tbsNormal;
+  PressedToolButton := -1;
+  HideMouse;
+  DrawToolBar;
+  ShowMouse;
+ End;
+End;
+
 { Boucle principale de gestion des événements }
 Procedure MainEventLoop;
 Var
  LastBtn: Integer;
  Key: Char;
  MouseEvent: TMouseEvent;
+ InToolbar: Boolean;
 Begin
  Running := True;
  LastBtn := 0;
@@ -1677,6 +2121,11 @@ Begin
  ActiveMenu := -1;
  ActiveMenuItem := -1;
  MenuBarActive := False;
+ HoveredToolButton := -1;
+ PressedToolButton := -1;
+ TooltipVisible := False;
+ LastMouseX := 0;
+ LastMouseY := 0;
 
  While Running Do Begin
   { Lecture de l'état de la souris }
@@ -1690,6 +2139,31 @@ Begin
   { Mise à jour du survol des menus }
   If ActiveMenu >= 0 Then
    UpdateMenuHover;
+
+  { Mise à jour du survol des boutons de barre d'outils }
+  InToolbar := (MouseY >= Layout.ToolBarRect.Y1) And
+               (MouseY <= Layout.ToolBarRect.Y2);
+  If (ActiveMenu < 0) And InToolbar Then
+   UpdateToolbarHover
+  Else If HoveredToolButton >= 0 Then Begin
+   { Réinitialiser quand on quitte la barre d'outils }
+   ToolButtons[HoveredToolButton].State := tbsNormal;
+   HoveredToolButton := -1;
+   If TooltipVisible Then HideTooltip;
+   HideMouse;
+   DrawToolBar;
+   ShowMouse;
+  End;
+
+  { Cacher l'infobulle si la souris bouge trop }
+  If TooltipVisible And
+     ((Abs(MouseX - LastMouseX) > 5) Or (Abs(MouseY - LastMouseY) > 5)) Then Begin
+   HideTooltip;
+   TooltipStartTime := GetTickCount;
+  End;
+
+  LastMouseX := MouseX;
+  LastMouseY := MouseY;
 
   { Détection des événements souris avancés }
   MouseEvent := DetectMouseEvent(LastBtn, MouseBtn, MouseX, MouseY);
@@ -1721,12 +2195,19 @@ Begin
 
   { Détection du clic gauche (bouton enfoncé) }
   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
-   HandleMouseClick;
+   { Vérifier d'abord si c'est un clic sur la barre d'outils }
+   If InToolbar And (ActiveMenu < 0) Then
+    HandleToolbarClick
+   Else
+    HandleMouseClick;
   End;
 
   { Détection du relâchement du bouton gauche }
   If (MouseBtn And MOUSE_LEFT = 0) And (LastBtn And MOUSE_LEFT <> 0) Then Begin
-   HandleMouseRelease;
+   If PressedToolButton >= 0 Then
+    HandleToolbarRelease
+   Else
+    HandleMouseRelease;
   End;
 
   { Gestion du glissement }
@@ -1740,13 +2221,14 @@ Begin
   If KeyPressed Then Begin
    Key := ReadKey;
    If Key = #27 Then Begin
-    If ActiveMenu >= 0 Then
+    If TooltipVisible Then
+     HideTooltip
+    Else If ActiveMenu >= 0 Then
      CloseDropdownMenu
     Else
      Running := False; { Échap pour quitter }
    End;
    If Key = #0 Then ReadKey; { Touches étendues }
-  End;
   End;
 
   { Petite pause pour ne pas saturer le CPU }
@@ -1776,6 +2258,9 @@ BEGIN
 
  { Initialisation des menus déroulants }
  InitializeMenus;
+
+ { Initialisation de la barre d'outils }
+ InitializeToolbar;
 
  { Affichage de l'interface }
  ShowMouse;
