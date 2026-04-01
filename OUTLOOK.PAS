@@ -34,7 +34,7 @@
       - États visuels: normal, survol, appuyé, désactivé
       - Infobulles au survol de la souris
 
-  5.  [ ] Arbre de navigation multi-comptes (panneau gauche)
+  5.  [x] Arbre de navigation multi-comptes (panneau gauche)
       - Structure hiérarchique: Comptes -> Dossiers -> Sous-dossiers
       - Dossiers standards: Boîte de réception, Éléments envoyés,
         Brouillons, Éléments supprimés, Courrier indésirable
@@ -344,6 +344,23 @@ Type
   Enabled: Boolean;          { Actif ou non }
  End;
 
+ { Type de dossier pour l'arbre de navigation }
+ TFolderType = (ftAccount, ftInbox, ftSent, ftDrafts, ftDeleted, ftJunk, ftCustom);
+
+ { Structure pour un noeud de l'arbre de dossiers }
+ TFolderNode = Record
+  Name: String[30];          { Nom du dossier }
+  FolderType: TFolderType;   { Type de dossier }
+  Level: Integer;            { Niveau d'indentation (0=compte, 1=dossier, 2=sous-dossier) }
+  ParentIndex: Integer;      { Index du parent (-1 si racine) }
+  Expanded: Boolean;         { Étendu ou replié }
+  Selected: Boolean;         { Sélectionné }
+  UnreadCount: Integer;      { Nombre de messages non lus }
+  TotalCount: Integer;       { Nombre total de messages }
+  Y: Integer;                { Position Y actuelle (calculée lors du dessin) }
+  Visible: Boolean;          { Visible dans l'arbre (dépend de l'expansion du parent) }
+ End;
+
 Const
  { Identifiants des commandes de menu }
  CMD_FILE_NEW      = 101;
@@ -390,6 +407,15 @@ Const
  { Temps d'affichage de l'infobulle (ms) }
  TOOLTIP_DELAY = 500;
 
+ { Nombre maximum de dossiers dans l'arbre }
+ MAX_FOLDERS = 30;
+
+ { Hauteur d'un noeud dans l'arbre }
+ FOLDER_NODE_HEIGHT = 16;
+
+ { Indentation par niveau }
+ FOLDER_INDENT = 16;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -430,6 +456,14 @@ Var
  TooltipText: String[40];
  TooltipStartTime: LongInt;
  LastMouseX, LastMouseY: Integer;
+
+ { Variables pour l'arbre de dossiers }
+ Folders: Array[0..MAX_FOLDERS-1] of TFolderNode;
+ FolderCount: Integer;
+ SelectedFolder: Integer;     { Index du dossier sélectionné }
+ HoveredFolder: Integer;      { Index du dossier survolé }
+ FolderScrollOffset: Integer; { Défilement de l'arbre }
+ DraggedFolder: Integer;      { Index du dossier en cours de glisser-déposer }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -1562,11 +1596,292 @@ Begin
  End;
 End;
 
+{ ============================================================================
+  PROCÉDURES POUR L'ARBRE DE NAVIGATION (PANNEAU DOSSIERS)
+  ============================================================================ }
+
+{ Dessine une icône de dossier selon son type }
+Procedure DrawFolderIcon(X, Y: Integer; FolderType: TFolderType; Expanded: Boolean);
+Begin
+ Case FolderType Of
+  ftAccount: Begin
+   { Icône de compte (ordinateur) }
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X, Y + 2, X + 12, Y + 10);
+   Rectangle(X + 2, Y + 10, X + 10, Y + 12);
+   SetColor(LightCyan);
+   Bar(X + 1, Y + 3, X + 11, Y + 9);
+  End;
+
+  ftInbox: Begin
+   { Icône boîte de réception (dossier avec flèche entrante) }
+   SetColor(Yellow);
+   Bar(X, Y + 4, X + 12, Y + 12);
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X, Y + 4, X + 12, Y + 12);
+   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   { Flèche entrante }
+   SetColor(LightGreen);
+   Line(X + 6, Y + 6, X + 6, Y + 10);
+   Line(X + 4, Y + 8, X + 6, Y + 10);
+   Line(X + 8, Y + 8, X + 6, Y + 10);
+  End;
+
+  ftSent: Begin
+   { Icône éléments envoyés (dossier avec flèche sortante) }
+   SetColor(LightCyan);
+   Bar(X, Y + 4, X + 12, Y + 12);
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X, Y + 4, X + 12, Y + 12);
+   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   { Flèche sortante }
+   SetColor(LightBlue);
+   Line(X + 6, Y + 10, X + 6, Y + 6);
+   Line(X + 4, Y + 8, X + 6, Y + 6);
+   Line(X + 8, Y + 8, X + 6, Y + 6);
+  End;
+
+  ftDrafts: Begin
+   { Icône brouillons (document avec crayon) }
+   SetColor(White);
+   Bar(X + 2, Y, X + 12, Y + 12);
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X + 2, Y, X + 12, Y + 12);
+   { Lignes de texte }
+   Line(X + 4, Y + 3, X + 10, Y + 3);
+   Line(X + 4, Y + 6, X + 10, Y + 6);
+   Line(X + 4, Y + 9, X + 8, Y + 9);
+  End;
+
+  ftDeleted: Begin
+   { Icône corbeille }
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X + 2, Y + 2, X + 10, Y + 12);
+   Line(X, Y + 2, X + 12, Y + 2);
+   Line(X + 4, Y, X + 8, Y);
+   { Lignes verticales de la corbeille }
+   Line(X + 4, Y + 4, X + 4, Y + 10);
+   Line(X + 6, Y + 4, X + 6, Y + 10);
+   Line(X + 8, Y + 4, X + 8, Y + 10);
+  End;
+
+  ftJunk: Begin
+   { Icône courrier indésirable (dossier rouge) }
+   SetColor(LightRed);
+   Bar(X, Y + 4, X + 12, Y + 12);
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X, Y + 4, X + 12, Y + 12);
+   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+   { X pour spam }
+   SetColor(White);
+   Line(X + 3, Y + 6, X + 9, Y + 10);
+   Line(X + 9, Y + 6, X + 3, Y + 10);
+  End;
+
+  ftCustom: Begin
+   { Icône dossier standard }
+   SetColor(Yellow);
+   Bar(X, Y + 4, X + 12, Y + 12);
+   SetColor(COLOR_BUTTON_DARK);
+   Rectangle(X, Y + 4, X + 12, Y + 12);
+   Line(X, Y + 4, X + 6, Y, X + 12, Y + 4);
+  End;
+ End;
+End;
+
+{ Dessine le symbole d'expansion/réduction }
+Procedure DrawExpandSymbol(X, Y: Integer; Expanded: Boolean);
+Begin
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(X, Y, X + 8, Y + 8);
+ SetColor(White);
+ Bar(X + 1, Y + 1, X + 7, Y + 7);
+ SetColor(Black);
+ { Ligne horizontale (toujours) }
+ Line(X + 2, Y + 4, X + 6, Y + 4);
+ { Ligne verticale (si replié) }
+ If Not Expanded Then
+  Line(X + 4, Y + 2, X + 4, Y + 6);
+End;
+
+{ Vérifie si un dossier a des enfants visibles }
+Function HasChildren(FolderIndex: Integer): Boolean;
+Var
+ I: Integer;
+Begin
+ HasChildren := False;
+ For I := 0 To FolderCount - 1 Do Begin
+  If Folders[I].ParentIndex = FolderIndex Then Begin
+   HasChildren := True;
+   Exit;
+  End;
+ End;
+End;
+
+{ Met à jour la visibilité de tous les dossiers selon l'état d'expansion des parents }
+Procedure UpdateFolderVisibility;
+Var
+ I, P: Integer;
+ IsVisible: Boolean;
+Begin
+ For I := 0 To FolderCount - 1 Do Begin
+  If Folders[I].Level = 0 Then
+   Folders[I].Visible := True
+  Else Begin
+   { Vérifier si tous les parents sont étendus }
+   IsVisible := True;
+   P := Folders[I].ParentIndex;
+   While (P >= 0) And IsVisible Do Begin
+    If Not Folders[P].Expanded Then
+     IsVisible := False;
+    P := Folders[P].ParentIndex;
+   End;
+   Folders[I].Visible := IsVisible;
+  End;
+ End;
+End;
+
+{ Ajoute un dossier à l'arbre }
+Procedure AddFolder(Name: String; FolderType: TFolderType; Level, ParentIndex: Integer;
+                    Expanded: Boolean; UnreadCount, TotalCount: Integer);
+Begin
+ If FolderCount < MAX_FOLDERS Then Begin
+  Folders[FolderCount].Name := Name;
+  Folders[FolderCount].FolderType := FolderType;
+  Folders[FolderCount].Level := Level;
+  Folders[FolderCount].ParentIndex := ParentIndex;
+  Folders[FolderCount].Expanded := Expanded;
+  Folders[FolderCount].Selected := False;
+  Folders[FolderCount].UnreadCount := UnreadCount;
+  Folders[FolderCount].TotalCount := TotalCount;
+  Folders[FolderCount].Y := 0;
+  Folders[FolderCount].Visible := True;
+  Inc(FolderCount);
+ End;
+End;
+
+{ Initialise l'arbre de dossiers avec une structure multi-comptes }
+Procedure InitializeFolderTree;
+Begin
+ FolderCount := 0;
+ SelectedFolder := 1; { Sélectionner la boîte de réception par défaut }
+ HoveredFolder := -1;
+ FolderScrollOffset := 0;
+ DraggedFolder := -1;
+
+ { Compte local }
+ AddFolder('Compte local', ftAccount, 0, -1, True, 0, 0);
+   AddFolder('Boite de reception', ftInbox, 1, 0, False, 5, 23);
+   AddFolder('Elements envoyes', ftSent, 1, 0, False, 0, 15);
+   AddFolder('Brouillons', ftDrafts, 1, 0, False, 2, 2);
+   AddFolder('Elements supprimes', ftDeleted, 1, 0, False, 0, 8);
+   AddFolder('Courrier indesirable', ftJunk, 1, 0, False, 3, 12);
+
+ { Compte travail }
+ AddFolder('Travail (IMAP)', ftAccount, 0, -1, True, 0, 0);
+   AddFolder('Boite de reception', ftInbox, 1, 6, True, 12, 156);
+     AddFolder('Projets', ftCustom, 2, 7, False, 0, 45);
+     AddFolder('Clients', ftCustom, 2, 7, False, 2, 32);
+   AddFolder('Elements envoyes', ftSent, 1, 6, False, 0, 89);
+   AddFolder('Brouillons', ftDrafts, 1, 6, False, 1, 3);
+   AddFolder('Elements supprimes', ftDeleted, 1, 6, False, 0, 5);
+   AddFolder('Courrier indesirable', ftJunk, 1, 6, False, 0, 2);
+
+ { Marquer le dossier sélectionné }
+ If SelectedFolder >= 0 Then
+  Folders[SelectedFolder].Selected := True;
+
+ UpdateFolderVisibility;
+End;
+
+{ Trouve le dossier à une position Y donnée }
+Function GetFolderAtPoint(X, Y: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ GetFolderAtPoint := -1;
+
+ { Vérifier si on est dans le panneau des dossiers }
+ If (X < Layout.FolderPaneRect.X1) Or (X > Layout.FolderPaneRect.X2) Or
+    (Y < Layout.FolderPaneRect.Y1 + 28) Or (Y > Layout.FolderPaneRect.Y2) Then
+  Exit;
+
+ For I := 0 To FolderCount - 1 Do Begin
+  If Folders[I].Visible And (Folders[I].Y > 0) Then Begin
+   If (Y >= Folders[I].Y) And (Y < Folders[I].Y + FOLDER_NODE_HEIGHT) Then Begin
+    GetFolderAtPoint := I;
+    Exit;
+   End;
+  End;
+ End;
+End;
+
+{ Vérifie si le clic est sur le symbole d'expansion }
+Function IsClickOnExpandSymbol(X, FolderIndex: Integer): Boolean;
+Var
+ SymbolX: Integer;
+Begin
+ IsClickOnExpandSymbol := False;
+ If (FolderIndex < 0) Or (FolderIndex >= FolderCount) Then Exit;
+ If Not HasChildren(FolderIndex) Then Exit;
+
+ SymbolX := Layout.FolderPaneRect.X1 + 4 + (Folders[FolderIndex].Level * FOLDER_INDENT);
+ IsClickOnExpandSymbol := (X >= SymbolX) And (X <= SymbolX + 10);
+End;
+
+{ Gère le clic sur un dossier }
+Procedure HandleFolderClick(X, Y: Integer);
+Var
+ FolderIdx: Integer;
+Begin
+ FolderIdx := GetFolderAtPoint(X, Y);
+
+ If FolderIdx >= 0 Then Begin
+  { Vérifier si on clique sur le symbole d'expansion }
+  If IsClickOnExpandSymbol(X, FolderIdx) Then Begin
+   Folders[FolderIdx].Expanded := Not Folders[FolderIdx].Expanded;
+   UpdateFolderVisibility;
+  End
+  Else Begin
+   { Sélectionner le dossier }
+   If SelectedFolder >= 0 Then
+    Folders[SelectedFolder].Selected := False;
+   SelectedFolder := FolderIdx;
+   Folders[FolderIdx].Selected := True;
+  End;
+
+  { Redessiner le panneau }
+  HideMouse;
+  DrawFolderPane;
+  ShowMouse;
+ End;
+End;
+
+{ Gère le survol de l'arbre de dossiers }
+Procedure UpdateFolderHover;
+Var
+ NewHover: Integer;
+Begin
+ NewHover := GetFolderAtPoint(MouseX, MouseY);
+
+ If NewHover <> HoveredFolder Then Begin
+  HoveredFolder := NewHover;
+  HideMouse;
+  DrawFolderPane;
+  ShowMouse;
+ End;
+End;
+
 { Dessine le panneau des dossiers (arbre de navigation) }
 Procedure DrawFolderPane;
 Var
- Y, Indent: Integer;
+ Y, I: Integer;
+ IndentX: Integer;
+ NodeText: String;
+ TextColor: Word;
+ BgColor: Word;
 Begin
+ { Fond du panneau }
  FillRect(Layout.FolderPaneRect.X1, Layout.FolderPaneRect.Y1,
           Layout.FolderPaneRect.X2, Layout.FolderPaneRect.Y2, COLOR_FOLDER_BG);
  Draw3DRect(Layout.FolderPaneRect.X1, Layout.FolderPaneRect.Y1,
@@ -1582,34 +1897,66 @@ Begin
  Line(Layout.FolderPaneRect.X1 + 2, Y, Layout.FolderPaneRect.X2 - 2, Y);
  Y := Y + 8;
 
- { Arbre des dossiers (simulation) }
- SetColor(COLOR_MENU_TEXT);
- Indent := 4;
+ { Dessiner l'arbre des dossiers }
+ For I := 0 To FolderCount - 1 Do Begin
+  If Not Folders[I].Visible Then Continue;
 
- { Compte local }
- OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, '[-] Compte local');
- Y := Y + 14;
- Indent := 20;
+  { Sauvegarder la position Y pour la détection des clics }
+  Folders[I].Y := Y;
 
- { Boîte de réception avec compteur }
- SetColor(COLOR_LIST_SELECTED);
- FillRect(Layout.FolderPaneRect.X1 + 2, Y - 1,
-          Layout.FolderPaneRect.X2 - 2, Y + 11, COLOR_LIST_SELECTED);
- SetColor(COLOR_LIST_SELECTED_TEXT);
- OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Boite de reception (5)');
- Y := Y + 14;
+  { Vérifier si on dépasse la zone visible }
+  If Y + FOLDER_NODE_HEIGHT > Layout.FolderPaneRect.Y2 - 2 Then
+   Break;
 
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Elements envoyes');
- Y := Y + 14;
+  IndentX := Layout.FolderPaneRect.X1 + 4 + (Folders[I].Level * FOLDER_INDENT);
 
- OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Brouillons');
- Y := Y + 14;
+  { Déterminer les couleurs selon l'état }
+  If Folders[I].Selected Then Begin
+   BgColor := COLOR_LIST_SELECTED;
+   TextColor := COLOR_LIST_SELECTED_TEXT;
+  End
+  Else If I = HoveredFolder Then Begin
+   BgColor := COLOR_BUTTON_FACE;
+   TextColor := COLOR_MENU_TEXT;
+  End
+  Else Begin
+   BgColor := COLOR_FOLDER_BG;
+   TextColor := COLOR_MENU_TEXT;
+  End;
 
- OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Elements supprimes');
- Y := Y + 14;
+  { Dessiner le fond si sélectionné ou survolé }
+  If Folders[I].Selected Or (I = HoveredFolder) Then Begin
+   FillRect(Layout.FolderPaneRect.X1 + 2, Y - 1,
+            Layout.FolderPaneRect.X2 - 2, Y + FOLDER_NODE_HEIGHT - 3, BgColor);
+  End;
 
- OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Courrier indesirable');
+  { Dessiner le symbole d'expansion si le dossier a des enfants }
+  If HasChildren(I) Then Begin
+   DrawExpandSymbol(IndentX, Y + 2, Folders[I].Expanded);
+   IndentX := IndentX + 12;
+  End
+  Else Begin
+   IndentX := IndentX + 12;
+  End;
+
+  { Dessiner l'icône du dossier }
+  DrawFolderIcon(IndentX, Y, Folders[I].FolderType, Folders[I].Expanded);
+  IndentX := IndentX + 16;
+
+  { Préparer le texte avec compteur de messages non lus }
+  If Folders[I].UnreadCount > 0 Then Begin
+   Str(Folders[I].UnreadCount, NodeText);
+   NodeText := Folders[I].Name + ' (' + NodeText + ')';
+  End
+  Else
+   NodeText := Folders[I].Name;
+
+  { Dessiner le texte }
+  SetColor(TextColor);
+  OutTextXY(IndentX, Y + 2, NodeText);
+
+  Y := Y + FOLDER_NODE_HEIGHT;
+ End;
 End;
 
 { Dessine la liste des messages }
@@ -2113,6 +2460,7 @@ Var
  Key: Char;
  MouseEvent: TMouseEvent;
  InToolbar: Boolean;
+ InFolderPane: Boolean;
 Begin
  Running := True;
  LastBtn := 0;
@@ -2126,6 +2474,7 @@ Begin
  TooltipVisible := False;
  LastMouseX := 0;
  LastMouseY := 0;
+ HoveredFolder := -1;
 
  While Running Do Begin
   { Lecture de l'état de la souris }
@@ -2143,6 +2492,11 @@ Begin
   { Mise à jour du survol des boutons de barre d'outils }
   InToolbar := (MouseY >= Layout.ToolBarRect.Y1) And
                (MouseY <= Layout.ToolBarRect.Y2);
+  InFolderPane := (MouseX >= Layout.FolderPaneRect.X1) And
+                  (MouseX <= Layout.FolderPaneRect.X2) And
+                  (MouseY >= Layout.FolderPaneRect.Y1 + 28) And
+                  (MouseY <= Layout.FolderPaneRect.Y2);
+
   If (ActiveMenu < 0) And InToolbar Then
    UpdateToolbarHover
   Else If HoveredToolButton >= 0 Then Begin
@@ -2152,6 +2506,16 @@ Begin
    If TooltipVisible Then HideTooltip;
    HideMouse;
    DrawToolBar;
+   ShowMouse;
+  End;
+
+  { Mise à jour du survol de l'arbre de dossiers }
+  If (ActiveMenu < 0) And (Not InToolbar) And InFolderPane Then
+   UpdateFolderHover
+  Else If HoveredFolder >= 0 Then Begin
+   HoveredFolder := -1;
+   HideMouse;
+   DrawFolderPane;
    ShowMouse;
   End;
 
@@ -2198,6 +2562,9 @@ Begin
    { Vérifier d'abord si c'est un clic sur la barre d'outils }
    If InToolbar And (ActiveMenu < 0) Then
     HandleToolbarClick
+   { Vérifier si c'est un clic sur l'arbre de dossiers }
+   Else If InFolderPane And (ActiveMenu < 0) Then
+    HandleFolderClick(MouseX, MouseY)
    Else
     HandleMouseClick;
   End;
@@ -2261,6 +2628,9 @@ BEGIN
 
  { Initialisation de la barre d'outils }
  InitializeToolbar;
+
+ { Initialisation de l'arbre de dossiers }
+ InitializeFolderTree;
 
  { Affichage de l'interface }
  ShowMouse;
