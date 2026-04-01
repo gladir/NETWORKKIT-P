@@ -183,7 +183,7 @@
 
   25. [ ] Support multi-langue de l'interface
       - Français (par défaut), English, Deutsch, Italiano
-      - Español, Português, Svenska, Dansk, 日本語 (rōmaji)
+      - Español, Português, Svenska, Dansk, Nihongo (en rōmaji)
       - Albanais (Shqip)
       - Fichiers de ressources de traduction externes
       - Détection automatique via variable LANGUAGE
