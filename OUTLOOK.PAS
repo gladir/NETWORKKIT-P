@@ -9,7 +9,7 @@
                          TODO - CLONE OUTLOOK EN PASCAL
   ============================================================================
 
-  1.  [ ] Interface graphique principale (fenêtre principale VGA/SVGA)
+  1.  [x] Interface graphique principale (fenêtre principale VGA/SVGA)
       - Créer la fenêtre principale avec barre de titre "Outlook Express"
       - Implémenter les zones: menu, barre d'outils, panneau de navigation,
         liste des messages, volet de lecture
@@ -226,8 +226,87 @@ Program OUTLOOK;
 Uses {$IFDEF FPC}
       Crt,PtcGraph,PtcCrt,PtcMouse
      {$ELSE}
-      Crt,Graph
+      Crt,Graph,DOS
      {$ENDIF};
+
+Const
+ { Dimensions de l'écran VGA 640x480 }
+ SCREEN_WIDTH = 640;
+ SCREEN_HEIGHT = 480;
+
+ { Couleurs style Windows 95/98 }
+ COLOR_DESKTOP = 1;       { Bleu foncé - fond bureau }
+ COLOR_TITLEBAR = 1;      { Bleu - barre de titre active }
+ COLOR_TITLEBAR_INACTIVE = 8; { Gris - barre de titre inactive }
+ COLOR_TITLEBAR_TEXT = 15; { Blanc - texte barre de titre }
+ COLOR_WINDOW_BG = 7;     { Gris clair - fond fenêtre }
+ COLOR_WINDOW_BORDER = 0; { Noir - bordure fenêtre }
+ COLOR_MENU_BG = 7;       { Gris clair - fond menu }
+ COLOR_MENU_TEXT = 0;     { Noir - texte menu }
+ COLOR_MENU_HIGHLIGHT = 1; { Bleu - surbrillance menu }
+ COLOR_MENU_HIGHLIGHT_TEXT = 15; { Blanc - texte surbrillance }
+ COLOR_TOOLBAR_BG = 7;    { Gris clair - fond barre d'outils }
+ COLOR_BUTTON_FACE = 7;   { Gris clair - face bouton }
+ COLOR_BUTTON_LIGHT = 15; { Blanc - bord clair bouton }
+ COLOR_BUTTON_DARK = 8;   { Gris foncé - bord sombre bouton }
+ COLOR_LIST_BG = 15;      { Blanc - fond liste }
+ COLOR_LIST_TEXT = 0;     { Noir - texte liste }
+ COLOR_LIST_SELECTED = 1; { Bleu - sélection liste }
+ COLOR_LIST_SELECTED_TEXT = 15; { Blanc - texte sélection }
+ COLOR_FOLDER_BG = 7;     { Gris clair - fond panneau dossiers }
+ COLOR_PREVIEW_BG = 15;   { Blanc - fond prévisualisation }
+ COLOR_SPLITTER = 8;      { Gris foncé - séparateur }
+ COLOR_SCROLLBAR = 7;     { Gris clair - barre de défilement }
+ COLOR_STATUS_BG = 7;     { Gris clair - barre d'état }
+ COLOR_STATUS_TEXT = 0;   { Noir - texte barre d'état }
+
+ { Hauteurs des zones fixes }
+ TITLEBAR_HEIGHT = 20;
+ MENUBAR_HEIGHT = 18;
+ TOOLBAR_HEIGHT = 28;
+ STATUSBAR_HEIGHT = 20;
+
+ { Largeur minimale des panneaux }
+ MIN_FOLDER_WIDTH = 100;
+ MIN_MESSAGE_WIDTH = 200;
+ MIN_PREVIEW_HEIGHT = 80;
+
+ { Taille de la zone de redimensionnement }
+ SPLITTER_SIZE = 4;
+
+Type
+ { Structure pour la disposition des zones de l'interface }
+ TWindowLayout = Record
+  TitleBarRect: Record X1, Y1, X2, Y2: Integer; End;
+  MenuBarRect: Record X1, Y1, X2, Y2: Integer; End;
+  ToolBarRect: Record X1, Y1, X2, Y2: Integer; End;
+  FolderPaneRect: Record X1, Y1, X2, Y2: Integer; End;
+  MessageListRect: Record X1, Y1, X2, Y2: Integer; End;
+  PreviewPaneRect: Record X1, Y1, X2, Y2: Integer; End;
+  StatusBarRect: Record X1, Y1, X2, Y2: Integer; End;
+  VSplitterRect: Record X1, Y1, X2, Y2: Integer; End;
+  HSplitterRect: Record X1, Y1, X2, Y2: Integer; End;
+  FolderPaneWidth: Integer;
+  PreviewPaneHeight: Integer;
+ End;
+
+ { État de la souris pour le redimensionnement }
+ TDragState = (dsNone, dsDragVSplitter, dsDragHSplitter);
+
+Var
+ Layout: TWindowLayout;
+ DragState: TDragState;
+ DragStartX, DragStartY: Integer;
+ Running: Boolean;
+ MouseX, MouseY: Integer;
+ MouseBtn: Integer;
+ {$IFDEF FPC}
+  MouseButtons: Word;
+ {$ENDIF}
+
+{ ============================================================================
+  PROCÉDURES D'INITIALISATION GRAPHIQUE
+  ============================================================================ }
 
 Procedure InitializeGraphics;
 Var
@@ -253,6 +332,10 @@ Begin
   Halt;
  End;
 End;
+
+{ ============================================================================
+  PROCÉDURES DE GESTION DE LA SOURIS
+  ============================================================================ }
 
 {$IFNDEF FPC}
  Function MouseDriverFound: Boolean;
@@ -280,7 +363,7 @@ End;
   Intr($33, Regs);
  End;
 
- Procedure GetMouseState(Var X, Y, Button: LongInt);
+ Procedure GetMouseState(Var X, Y, Button: Integer);
  Var
   Regs: Registers;
  Begin
@@ -298,15 +381,664 @@ End;
 
  Procedure ShowMouse;
  Begin
-  { Pas d'implémentation pour Free Pascal }
+  { PtcMouse gère l'affichage automatiquement }
  End;
 
  Procedure HideMouse;
  Begin
-  { Pas d'implémentation pour Free Pascal }
+  { PtcMouse gère l'affichage automatiquement }
+ End;
+
+ Procedure GetMouseState(Var X, Y, Button: Integer);
+ Begin
+  GetMouseState(MouseX, MouseY, MouseButtons);
+  X := MouseX;
+  Y := MouseY;
+  Button := MouseButtons;
  End;
 {$ENDIF}
 
+{ ============================================================================
+  PROCÉDURES DE DESSIN UTILITAIRES
+  ============================================================================ }
+
+{ Dessine un rectangle rempli }
+Procedure FillRect(X1, Y1, X2, Y2: Integer; Color: Word);
+Begin
+ SetFillStyle(SolidFill, Color);
+ Bar(X1, Y1, X2, Y2);
+End;
+
+{ Dessine un rectangle avec effet 3D (relief) }
+Procedure Draw3DRect(X1, Y1, X2, Y2: Integer; Raised: Boolean);
+Begin
+ If Raised Then Begin
+  SetColor(COLOR_BUTTON_LIGHT);
+  Line(X1, Y1, X2, Y1);
+  Line(X1, Y1, X1, Y2);
+  SetColor(COLOR_BUTTON_DARK);
+  Line(X1, Y2, X2, Y2);
+  Line(X2, Y1, X2, Y2);
+ End Else Begin
+  SetColor(COLOR_BUTTON_DARK);
+  Line(X1, Y1, X2, Y1);
+  Line(X1, Y1, X1, Y2);
+  SetColor(COLOR_BUTTON_LIGHT);
+  Line(X1, Y2, X2, Y2);
+  Line(X2, Y1, X2, Y2);
+ End;
+End;
+
+{ Dessine un bouton de la barre d'outils }
+Procedure DrawToolButton(X, Y, W, H: Integer; Pressed: Boolean);
+Begin
+ FillRect(X, Y, X + W, Y + H, COLOR_BUTTON_FACE);
+ Draw3DRect(X, Y, X + W, Y + H, Not Pressed);
+End;
+
+{ Dessine un texte centré dans un rectangle }
+Procedure DrawCenteredText(X1, Y1, X2, Y2: Integer; Text: String; Color: Word);
+Var
+ TextW, TextH: Integer;
+ TX, TY: Integer;
+Begin
+ SetColor(Color);
+ TextW := TextWidth(Text);
+ TextH := TextHeight(Text);
+ TX := X1 + ((X2 - X1 - TextW) Div 2);
+ TY := Y1 + ((Y2 - Y1 - TextH) Div 2);
+ OutTextXY(TX, TY, Text);
+End;
+
+{ ============================================================================
+  PROCÉDURES DE CALCUL DE LA DISPOSITION
+  ============================================================================ }
+
+{ Calcule les rectangles de toutes les zones de l'interface }
+Procedure CalculateLayout;
+Var
+ ClientTop, ClientBottom: Integer;
+ RightPaneLeft, RightPaneRight: Integer;
+ MessageListBottom: Integer;
+Begin
+ { Barre de titre }
+ Layout.TitleBarRect.X1 := 0;
+ Layout.TitleBarRect.Y1 := 0;
+ Layout.TitleBarRect.X2 := SCREEN_WIDTH - 1;
+ Layout.TitleBarRect.Y2 := TITLEBAR_HEIGHT - 1;
+
+ { Barre de menu }
+ Layout.MenuBarRect.X1 := 0;
+ Layout.MenuBarRect.Y1 := TITLEBAR_HEIGHT;
+ Layout.MenuBarRect.X2 := SCREEN_WIDTH - 1;
+ Layout.MenuBarRect.Y2 := TITLEBAR_HEIGHT + MENUBAR_HEIGHT - 1;
+
+ { Barre d'outils }
+ Layout.ToolBarRect.X1 := 0;
+ Layout.ToolBarRect.Y1 := TITLEBAR_HEIGHT + MENUBAR_HEIGHT;
+ Layout.ToolBarRect.X2 := SCREEN_WIDTH - 1;
+ Layout.ToolBarRect.Y2 := TITLEBAR_HEIGHT + MENUBAR_HEIGHT + TOOLBAR_HEIGHT - 1;
+
+ { Barre d'état }
+ Layout.StatusBarRect.X1 := 0;
+ Layout.StatusBarRect.Y1 := SCREEN_HEIGHT - STATUSBAR_HEIGHT;
+ Layout.StatusBarRect.X2 := SCREEN_WIDTH - 1;
+ Layout.StatusBarRect.Y2 := SCREEN_HEIGHT - 1;
+
+ { Zone cliente (entre toolbar et statusbar) }
+ ClientTop := TITLEBAR_HEIGHT + MENUBAR_HEIGHT + TOOLBAR_HEIGHT;
+ ClientBottom := SCREEN_HEIGHT - STATUSBAR_HEIGHT - 1;
+
+ { Panneau des dossiers (gauche) }
+ Layout.FolderPaneRect.X1 := 0;
+ Layout.FolderPaneRect.Y1 := ClientTop;
+ Layout.FolderPaneRect.X2 := Layout.FolderPaneWidth - 1;
+ Layout.FolderPaneRect.Y2 := ClientBottom;
+
+ { Séparateur vertical }
+ Layout.VSplitterRect.X1 := Layout.FolderPaneWidth;
+ Layout.VSplitterRect.Y1 := ClientTop;
+ Layout.VSplitterRect.X2 := Layout.FolderPaneWidth + SPLITTER_SIZE - 1;
+ Layout.VSplitterRect.Y2 := ClientBottom;
+
+ { Zone de droite }
+ RightPaneLeft := Layout.FolderPaneWidth + SPLITTER_SIZE;
+ RightPaneRight := SCREEN_WIDTH - 1;
+
+ { Calcul de la hauteur du volet de prévisualisation }
+ MessageListBottom := ClientBottom - Layout.PreviewPaneHeight - SPLITTER_SIZE;
+
+ { Liste des messages }
+ Layout.MessageListRect.X1 := RightPaneLeft;
+ Layout.MessageListRect.Y1 := ClientTop;
+ Layout.MessageListRect.X2 := RightPaneRight;
+ Layout.MessageListRect.Y2 := MessageListBottom;
+
+ { Séparateur horizontal }
+ Layout.HSplitterRect.X1 := RightPaneLeft;
+ Layout.HSplitterRect.Y1 := MessageListBottom + 1;
+ Layout.HSplitterRect.X2 := RightPaneRight;
+ Layout.HSplitterRect.Y2 := MessageListBottom + SPLITTER_SIZE;
+
+ { Volet de prévisualisation }
+ Layout.PreviewPaneRect.X1 := RightPaneLeft;
+ Layout.PreviewPaneRect.Y1 := MessageListBottom + SPLITTER_SIZE + 1;
+ Layout.PreviewPaneRect.X2 := RightPaneRight;
+ Layout.PreviewPaneRect.Y2 := ClientBottom;
+End;
+
+{ ============================================================================
+  PROCÉDURES DE DESSIN DES ZONES DE L'INTERFACE
+  ============================================================================ }
+
+{ Dessine la barre de titre }
+Procedure DrawTitleBar;
+Begin
+ FillRect(Layout.TitleBarRect.X1, Layout.TitleBarRect.Y1,
+          Layout.TitleBarRect.X2, Layout.TitleBarRect.Y2, COLOR_TITLEBAR);
+
+ { Icône de l'application (petit carré) }
+ SetColor(COLOR_TITLEBAR_TEXT);
+ Rectangle(4, 4, 16, 16);
+ Line(6, 10, 14, 10);
+
+ { Titre de la fenêtre }
+ SetColor(COLOR_TITLEBAR_TEXT);
+ OutTextXY(22, 5, 'Outlook Express');
+
+ { Boutons de contrôle de fenêtre (Minimiser, Maximiser, Fermer) }
+ { Bouton Minimiser }
+ DrawToolButton(SCREEN_WIDTH - 60, 3, 16, 14, False);
+ SetColor(COLOR_MENU_TEXT);
+ Line(SCREEN_WIDTH - 56, 12, SCREEN_WIDTH - 48, 12);
+
+ { Bouton Maximiser }
+ DrawToolButton(SCREEN_WIDTH - 40, 3, 16, 14, False);
+ SetColor(COLOR_MENU_TEXT);
+ Rectangle(SCREEN_WIDTH - 36, 6, SCREEN_WIDTH - 28, 13);
+
+ { Bouton Fermer }
+ DrawToolButton(SCREEN_WIDTH - 20, 3, 16, 14, False);
+ SetColor(COLOR_MENU_TEXT);
+ Line(SCREEN_WIDTH - 16, 6, SCREEN_WIDTH - 8, 13);
+ Line(SCREEN_WIDTH - 16, 13, SCREEN_WIDTH - 8, 6);
+End;
+
+{ Dessine la barre de menu }
+Procedure DrawMenuBar;
+Var
+ MenuX: Integer;
+Begin
+ FillRect(Layout.MenuBarRect.X1, Layout.MenuBarRect.Y1,
+          Layout.MenuBarRect.X2, Layout.MenuBarRect.Y2, COLOR_MENU_BG);
+ Draw3DRect(Layout.MenuBarRect.X1, Layout.MenuBarRect.Y1,
+            Layout.MenuBarRect.X2, Layout.MenuBarRect.Y2, True);
+
+ SetColor(COLOR_MENU_TEXT);
+ MenuX := 8;
+
+ OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Fichier');
+ MenuX := MenuX + TextWidth('Fichier') + 16;
+
+ OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Edition');
+ MenuX := MenuX + TextWidth('Edition') + 16;
+
+ OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Affichage');
+ MenuX := MenuX + TextWidth('Affichage') + 16;
+
+ OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Outils');
+ MenuX := MenuX + TextWidth('Outils') + 16;
+
+ OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Message');
+ MenuX := MenuX + TextWidth('Message') + 16;
+
+ OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, '?');
+End;
+
+{ Dessine la barre d'outils }
+Procedure DrawToolBar;
+Var
+ BtnX, BtnY, BtnW, BtnH: Integer;
+Begin
+ FillRect(Layout.ToolBarRect.X1, Layout.ToolBarRect.Y1,
+          Layout.ToolBarRect.X2, Layout.ToolBarRect.Y2, COLOR_TOOLBAR_BG);
+ Draw3DRect(Layout.ToolBarRect.X1, Layout.ToolBarRect.Y1,
+            Layout.ToolBarRect.X2, Layout.ToolBarRect.Y2, True);
+
+ BtnY := Layout.ToolBarRect.Y1 + 3;
+ BtnW := 60;
+ BtnH := 22;
+
+ { Bouton Nouveau message }
+ BtnX := 4;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 8, BtnY + 6, 'Nouveau');
+
+ { Bouton Répondre }
+ BtnX := BtnX + BtnW + 4;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 4, BtnY + 6, 'Repondre');
+
+ { Bouton Répondre à tous }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 70;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 4, BtnY + 6, 'Rep.tous');
+
+ { Bouton Transférer }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 70;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 4, BtnY + 6, 'Transferer');
+
+ { Séparateur }
+ BtnX := BtnX + BtnW + 8;
+ SetColor(COLOR_BUTTON_DARK);
+ Line(BtnX, BtnY + 2, BtnX, BtnY + BtnH - 2);
+ SetColor(COLOR_BUTTON_LIGHT);
+ Line(BtnX + 1, BtnY + 2, BtnX + 1, BtnY + BtnH - 2);
+
+ { Bouton Envoyer/Recevoir }
+ BtnX := BtnX + 8;
+ BtnW := 80;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 4, BtnY + 6, 'Env/Recv');
+
+ { Bouton Supprimer }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 65;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 4, BtnY + 6, 'Supprimer');
+
+ { Bouton Adresses }
+ BtnX := BtnX + BtnW + 4;
+ BtnW := 65;
+ DrawToolButton(BtnX, BtnY, BtnW, BtnH, False);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX + 4, BtnY + 6, 'Adresses');
+End;
+
+{ Dessine le panneau des dossiers (arbre de navigation) }
+Procedure DrawFolderPane;
+Var
+ Y, Indent: Integer;
+Begin
+ FillRect(Layout.FolderPaneRect.X1, Layout.FolderPaneRect.Y1,
+          Layout.FolderPaneRect.X2, Layout.FolderPaneRect.Y2, COLOR_FOLDER_BG);
+ Draw3DRect(Layout.FolderPaneRect.X1, Layout.FolderPaneRect.Y1,
+            Layout.FolderPaneRect.X2, Layout.FolderPaneRect.Y2, False);
+
+ { Titre du panneau }
+ SetColor(COLOR_MENU_TEXT);
+ Y := Layout.FolderPaneRect.Y1 + 4;
+ OutTextXY(Layout.FolderPaneRect.X1 + 4, Y, 'Dossiers');
+
+ Y := Y + 16;
+ SetColor(COLOR_BUTTON_DARK);
+ Line(Layout.FolderPaneRect.X1 + 2, Y, Layout.FolderPaneRect.X2 - 2, Y);
+ Y := Y + 8;
+
+ { Arbre des dossiers (simulation) }
+ SetColor(COLOR_MENU_TEXT);
+ Indent := 4;
+
+ { Compte local }
+ OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, '[-] Compte local');
+ Y := Y + 14;
+ Indent := 20;
+
+ { Boîte de réception avec compteur }
+ SetColor(COLOR_LIST_SELECTED);
+ FillRect(Layout.FolderPaneRect.X1 + 2, Y - 1,
+          Layout.FolderPaneRect.X2 - 2, Y + 11, COLOR_LIST_SELECTED);
+ SetColor(COLOR_LIST_SELECTED_TEXT);
+ OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Boite de reception (5)');
+ Y := Y + 14;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Elements envoyes');
+ Y := Y + 14;
+
+ OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Brouillons');
+ Y := Y + 14;
+
+ OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Elements supprimes');
+ Y := Y + 14;
+
+ OutTextXY(Layout.FolderPaneRect.X1 + Indent, Y, 'Courrier indesirable');
+End;
+
+{ Dessine la liste des messages }
+Procedure DrawMessageList;
+Var
+ Y, ColX: Integer;
+ ColDe, ColObjet, ColDate: Integer;
+Begin
+ FillRect(Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
+          Layout.MessageListRect.X2, Layout.MessageListRect.Y2, COLOR_LIST_BG);
+ Draw3DRect(Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
+            Layout.MessageListRect.X2, Layout.MessageListRect.Y2, False);
+
+ { En-têtes de colonnes }
+ Y := Layout.MessageListRect.Y1;
+ FillRect(Layout.MessageListRect.X1 + 1, Y + 1,
+          Layout.MessageListRect.X2 - 1, Y + 16, COLOR_BUTTON_FACE);
+ Draw3DRect(Layout.MessageListRect.X1 + 1, Y + 1,
+            Layout.MessageListRect.X2 - 1, Y + 16, True);
+
+ ColDe := Layout.MessageListRect.X1 + 4;
+ ColObjet := Layout.MessageListRect.X1 + 120;
+ ColDate := Layout.MessageListRect.X2 - 80;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(ColDe, Y + 4, 'De');
+ OutTextXY(ColObjet, Y + 4, 'Objet');
+ OutTextXY(ColDate, Y + 4, 'Date');
+
+ { Séparateurs de colonnes }
+ SetColor(COLOR_BUTTON_DARK);
+ Line(ColObjet - 4, Y + 2, ColObjet - 4, Y + 14);
+ Line(ColDate - 4, Y + 2, ColDate - 4, Y + 14);
+
+ { Messages de démonstration }
+ Y := Y + 18;
+
+ { Message 1 - Non lu (en gras simulé par couleur) }
+ SetColor(COLOR_LIST_SELECTED);
+ FillRect(Layout.MessageListRect.X1 + 1, Y,
+          Layout.MessageListRect.X2 - 1, Y + 14, COLOR_LIST_SELECTED);
+ SetColor(COLOR_LIST_SELECTED_TEXT);
+ OutTextXY(ColDe, Y + 2, 'Jean Dupont');
+ OutTextXY(ColObjet, Y + 2, 'Reunion demain');
+ OutTextXY(ColDate, Y + 2, '01/04/26');
+ Y := Y + 16;
+
+ { Message 2 }
+ SetColor(COLOR_LIST_TEXT);
+ OutTextXY(ColDe, Y + 2, 'Marie Martin');
+ OutTextXY(ColObjet, Y + 2, 'Re: Projet X');
+ OutTextXY(ColDate, Y + 2, '31/03/26');
+ Y := Y + 16;
+
+ { Message 3 }
+ OutTextXY(ColDe, Y + 2, 'Support Tech');
+ OutTextXY(ColObjet, Y + 2, 'Votre demande #1234');
+ OutTextXY(ColDate, Y + 2, '30/03/26');
+ Y := Y + 16;
+
+ { Message 4 }
+ OutTextXY(ColDe, Y + 2, 'Newsletter');
+ OutTextXY(ColObjet, Y + 2, 'Nouveautes de la semaine');
+ OutTextXY(ColDate, Y + 2, '29/03/26');
+ Y := Y + 16;
+
+ { Message 5 }
+ OutTextXY(ColDe, Y + 2, 'Admin Systeme');
+ OutTextXY(ColObjet, Y + 2, 'Maintenance prevue');
+ OutTextXY(ColDate, Y + 2, '28/03/26');
+End;
+
+{ Dessine le volet de prévisualisation }
+Procedure DrawPreviewPane;
+Var
+ Y: Integer;
+Begin
+ FillRect(Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
+          Layout.PreviewPaneRect.X2, Layout.PreviewPaneRect.Y2, COLOR_PREVIEW_BG);
+ Draw3DRect(Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
+            Layout.PreviewPaneRect.X2, Layout.PreviewPaneRect.Y2, False);
+
+ Y := Layout.PreviewPaneRect.Y1 + 4;
+
+ { En-têtes du message }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'De: Jean Dupont <jean.dupont@example.com>');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'A: moi@example.com');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Date: 01 avril 2026 09:30');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Objet: Reunion demain');
+
+ Y := Y + 8;
+ SetColor(COLOR_BUTTON_DARK);
+ Line(Layout.PreviewPaneRect.X1 + 2, Y, Layout.PreviewPaneRect.X2 - 2, Y);
+
+ { Corps du message }
+ Y := Y + 8;
+ SetColor(COLOR_LIST_TEXT);
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Bonjour,');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, '');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Je vous rappelle notre reunion de demain a 10h.');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Merci de confirmer votre presence.');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, '');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Cordialement,');
+ Y := Y + 14;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Jean Dupont');
+End;
+
+{ Dessine les séparateurs (splitters) }
+Procedure DrawSplitters;
+Begin
+ { Séparateur vertical }
+ FillRect(Layout.VSplitterRect.X1, Layout.VSplitterRect.Y1,
+          Layout.VSplitterRect.X2, Layout.VSplitterRect.Y2, COLOR_SPLITTER);
+ Draw3DRect(Layout.VSplitterRect.X1, Layout.VSplitterRect.Y1,
+            Layout.VSplitterRect.X2, Layout.VSplitterRect.Y2, True);
+
+ { Séparateur horizontal }
+ FillRect(Layout.HSplitterRect.X1, Layout.HSplitterRect.Y1,
+          Layout.HSplitterRect.X2, Layout.HSplitterRect.Y2, COLOR_SPLITTER);
+ Draw3DRect(Layout.HSplitterRect.X1, Layout.HSplitterRect.Y1,
+            Layout.HSplitterRect.X2, Layout.HSplitterRect.Y2, True);
+End;
+
+{ Dessine la barre d'état }
+Procedure DrawStatusBar;
+Begin
+ FillRect(Layout.StatusBarRect.X1, Layout.StatusBarRect.Y1,
+          Layout.StatusBarRect.X2, Layout.StatusBarRect.Y2, COLOR_STATUS_BG);
+ Draw3DRect(Layout.StatusBarRect.X1, Layout.StatusBarRect.Y1,
+            Layout.StatusBarRect.X2, Layout.StatusBarRect.Y2, False);
+
+ SetColor(COLOR_STATUS_TEXT);
+ OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+           '5 messages, 5 non lus | Connecte');
+End;
+
+{ ============================================================================
+  PROCÉDURE PRINCIPALE DE DESSIN
+  ============================================================================ }
+
+{ Dessine toute l'interface }
+Procedure DrawInterface;
+Begin
+ HideMouse;
+
+ { Fond de l'écran }
+ FillRect(0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1, COLOR_DESKTOP);
+
+ { Calcul de la disposition }
+ CalculateLayout;
+
+ { Dessin des éléments }
+ DrawTitleBar;
+ DrawMenuBar;
+ DrawToolBar;
+ DrawFolderPane;
+ DrawSplitters;
+ DrawMessageList;
+ DrawPreviewPane;
+ DrawStatusBar;
+
+ ShowMouse;
+End;
+
+{ ============================================================================
+  PROCÉDURES DE GESTION DES ÉVÉNEMENTS
+  ============================================================================ }
+
+{ Vérifie si un point est dans un rectangle }
+Function PointInRect(X, Y, X1, Y1, X2, Y2: Integer): Boolean;
+Begin
+ PointInRect := (X >= X1) And (X <= X2) And (Y >= Y1) And (Y <= Y2);
+End;
+
+{ Gère le redimensionnement des panneaux avec la souris }
+Procedure HandleMouseDrag;
+Var
+ NewWidth, NewHeight: Integer;
+Begin
+ Case DragState Of
+  dsDragVSplitter: Begin
+   { Redimensionnement du panneau des dossiers }
+   NewWidth := MouseX - SPLITTER_SIZE Div 2;
+   If NewWidth < MIN_FOLDER_WIDTH Then NewWidth := MIN_FOLDER_WIDTH;
+   If NewWidth > SCREEN_WIDTH - MIN_MESSAGE_WIDTH - SPLITTER_SIZE Then
+    NewWidth := SCREEN_WIDTH - MIN_MESSAGE_WIDTH - SPLITTER_SIZE;
+   If NewWidth <> Layout.FolderPaneWidth Then Begin
+    Layout.FolderPaneWidth := NewWidth;
+    DrawInterface;
+   End;
+  End;
+  dsDragHSplitter: Begin
+   { Redimensionnement du volet de prévisualisation }
+   NewHeight := Layout.StatusBarRect.Y1 - MouseY - SPLITTER_SIZE;
+   If NewHeight < MIN_PREVIEW_HEIGHT Then NewHeight := MIN_PREVIEW_HEIGHT;
+   If NewHeight > Layout.StatusBarRect.Y1 - Layout.ToolBarRect.Y2 -
+      MIN_PREVIEW_HEIGHT - SPLITTER_SIZE * 2 Then
+    NewHeight := Layout.StatusBarRect.Y1 - Layout.ToolBarRect.Y2 -
+                 MIN_PREVIEW_HEIGHT - SPLITTER_SIZE * 2;
+   If NewHeight <> Layout.PreviewPaneHeight Then Begin
+    Layout.PreviewPaneHeight := NewHeight;
+    DrawInterface;
+   End;
+  End;
+ End;
+End;
+
+{ Gère les clics de souris }
+Procedure HandleMouseClick;
+Begin
+ { Vérifie si le clic est sur le séparateur vertical }
+ If PointInRect(MouseX, MouseY,
+    Layout.VSplitterRect.X1, Layout.VSplitterRect.Y1,
+    Layout.VSplitterRect.X2, Layout.VSplitterRect.Y2) Then Begin
+  DragState := dsDragVSplitter;
+  Exit;
+ End;
+
+ { Vérifie si le clic est sur le séparateur horizontal }
+ If PointInRect(MouseX, MouseY,
+    Layout.HSplitterRect.X1, Layout.HSplitterRect.Y1,
+    Layout.HSplitterRect.X2, Layout.HSplitterRect.Y2) Then Begin
+  DragState := dsDragHSplitter;
+  Exit;
+ End;
+
+ { Vérifie si le clic est sur le bouton Fermer }
+ If PointInRect(MouseX, MouseY, SCREEN_WIDTH - 20, 3,
+    SCREEN_WIDTH - 4, 17) Then Begin
+  Running := False;
+  Exit;
+ End;
+End;
+
+{ Gère le relâchement du bouton de la souris }
+Procedure HandleMouseRelease;
+Begin
+ DragState := dsNone;
+End;
+
+{ Boucle principale de gestion des événements }
+Procedure MainEventLoop;
+Var
+ LastBtn: Integer;
+ Key: Char;
+Begin
+ Running := True;
+ LastBtn := 0;
+ DragState := dsNone;
+
+ While Running Do Begin
+  { Lecture de l'état de la souris }
+  {$IFDEF FPC}
+   GetMouseState(MouseX, MouseY, MouseButtons);
+   MouseBtn := MouseButtons;
+  {$ELSE}
+   GetMouseState(MouseX, MouseY, MouseBtn);
+  {$ENDIF}
+
+  { Détection du clic (bouton enfoncé) }
+  If (MouseBtn And 1 <> 0) And (LastBtn And 1 = 0) Then Begin
+   HandleMouseClick;
+  End;
+
+  { Détection du relâchement }
+  If (MouseBtn And 1 = 0) And (LastBtn And 1 <> 0) Then Begin
+   HandleMouseRelease;
+  End;
+
+  { Gestion du glissement }
+  If (MouseBtn And 1 <> 0) And (DragState <> dsNone) Then Begin
+   HandleMouseDrag;
+  End;
+
+  LastBtn := MouseBtn;
+
+  { Vérification des touches du clavier }
+  If KeyPressed Then Begin
+   Key := ReadKey;
+   If Key = #27 Then Running := False; { Échap pour quitter }
+   If Key = #0 Then ReadKey; { Touches étendues }
+  End;
+
+  { Petite pause pour ne pas saturer le CPU }
+  Delay(10);
+ End;
+End;
+
+{ ============================================================================
+  PROGRAMME PRINCIPAL
+  ============================================================================ }
+
 BEGIN
+ { Initialisation du mode graphique }
  InitializeGraphics;
+
+ { Vérification de la souris }
+ If Not MouseDriverFound Then Begin
+  CloseGraph;
+  WriteLn('Erreur: Pilote souris non trouve!');
+  WriteLn('Veuillez charger un pilote souris (MOUSE.COM ou equivalent).');
+  Halt(1);
+ End;
+
+ { Initialisation de la disposition par défaut }
+ Layout.FolderPaneWidth := 160;
+ Layout.PreviewPaneHeight := 150;
+
+ { Affichage de l'interface }
+ ShowMouse;
+ DrawInterface;
+
+ { Boucle principale }
+ MainEventLoop;
+
+ { Fermeture du mode graphique }
+ HideMouse;
+ CloseGraph;
+
+ WriteLn('Outlook Express - Ferme normalement.');
 END.
