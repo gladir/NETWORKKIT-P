@@ -415,10 +415,10 @@ End;
 
  Procedure GetMouseState(Var X, Y, Button: Integer);
  Begin
-  GetMouseState(MouseX, MouseY, MouseButtons);
-  X := MouseX;
-  Y := MouseY;
-  Button := MouseButtons;
+  { PtcMouse: Utiliser la fonction GetMouse du module PtcMouse }
+  X := GetMouseX;
+  Y := GetMouseY;
+  Button := GetMouseButtons;
  End;
 {$ENDIF}
 
