@@ -42,7 +42,7 @@
       - Icônes de dossiers personnalisées
       - Glisser-déposer pour déplacer les messages entre dossiers
 
-  6.  [ ] Liste des messages avec colonnes triables
+  6.  [x] Liste des messages avec colonnes triables
       - Colonnes: De, Objet, Date, Taille, Pièces jointes, Priorité
       - Tri ascendant/descendant par clic sur l'en-tête de colonne
       - Indicateurs visuels: lu/non lu (gras), drapeau, priorité haute/basse
@@ -361,6 +361,41 @@ Type
   Visible: Boolean;          { Visible dans l'arbre (dépend de l'expansion du parent) }
  End;
 
+ { Priorité d'un message }
+ TMessagePriority = (mpLow, mpNormal, mpHigh);
+
+ { Type de colonne pour la liste des messages }
+ TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
+
+ { Ordre de tri }
+ TSortOrder = (soNone, soAscending, soDescending);
+
+ { Structure pour un message }
+ TMessage = Record
+  MsgID: String[20];        { Identifiant unique }
+  FromName: String[40];     { Nom de l'expediteur }
+  FromEmail: String[60];    { Adresse email }
+  Subject: String[80];      { Objet }
+  DateStr: String[10];      { Date au format JJ/MM/AA }
+  DateSort: LongInt;        { Date pour le tri (secondes depuis 1970) }
+  Size: LongInt;            { Taille en octets }
+  Priority: TMessagePriority; { Priorite du message }
+  HasAttachment: Boolean;   { Contient des pieces jointes }
+  IsRead: Boolean;          { Message lu }
+  IsFlagged: Boolean;       { Message marque d'un drapeau }
+  IsSelected: Boolean;      { Message selectionne }
+  Y: Integer;               { Position Y pour le clic }
+ End;
+
+ { Structure pour une colonne de la liste des messages }
+ TColumnHeader = Record
+  ColType: TColumnType;     { Type de colonne }
+  Title: String[15];        { Titre de la colonne }
+  X: Integer;               { Position X }
+  Width: Integer;           { Largeur de la colonne }
+  Sortable: Boolean;        { Triable ou non }
+ End;
+
 Const
  { Identifiants des commandes de menu }
  CMD_FILE_NEW      = 101;
@@ -416,6 +451,18 @@ Const
  { Indentation par niveau }
  FOLDER_INDENT = 16;
 
+ { Nombre maximum de messages dans la liste }
+ MAX_MESSAGES = 100;
+
+ { Nombre maximum de colonnes }
+ MAX_COLUMNS = 7;
+
+ { Hauteur d'une ligne de message }
+ MESSAGE_ROW_HEIGHT = 16;
+
+ { Largeur de l'en-tete de colonne }
+ COLUMN_HEADER_HEIGHT = 18;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -464,6 +511,30 @@ Var
  HoveredFolder: Integer;      { Index du dossier survolé }
  FolderScrollOffset: Integer; { Défilement de l'arbre }
  DraggedFolder: Integer;      { Index du dossier en cours de glisser-déposer }
+
+ { Variables pour la liste des messages }
+ Messages: Array[0..MAX_MESSAGES-1] of TMessage;
+ MessageCount: Integer;
+ SelectedMessage: Integer;    { Index du message selectionne (-1 = aucun) }
+ LastSelectedMessage: Integer; { Pour la selection multiple avec Shift }
+ MessageScrollOffset: Integer; { Defilement de la liste }
+ CtrlKeyDown: Boolean;        { Touche Ctrl enfoncee }
+ ShiftKeyDown: Boolean;       { Touche Shift enfoncee }
+
+ { Variables pour les colonnes de messages }
+ Columns: Array[0..MAX_COLUMNS-1] of TColumnHeader;
+ ColumnCount: Integer;
+ SortColumn: Integer;         { Index de la colonne de tri (-1 = aucun) }
+ SortOrder: TSortOrder;       { Ordre de tri actuel }
+ HoveredColumn: Integer;      { Index de la colonne survolee }
+
+ { Variables pour le menu contextuel des messages }
+ ContextMenuVisible: Boolean;
+ ContextMenuX, ContextMenuY: Integer;
+ ContextMenuWidth, ContextMenuHeight: Integer;
+ ContextMenuItems: Array[0..7] of TMenuItem;
+ ContextMenuItemCount: Integer;
+ HoveredContextItem: Integer;
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -1876,6 +1947,656 @@ Begin
  End;
 End;
 
+{ ============================================================================
+  PROCEDURES POUR LA LISTE DES MESSAGES (TODO 6)
+  ============================================================================ }
+
+{ Initialise les colonnes de la liste des messages }
+Procedure InitializeMessageColumns;
+Begin
+ ColumnCount := 7;
+
+ { Colonne Priorite (icone) }
+ Columns[0].ColType := ctPriority;
+ Columns[0].Title := '!';
+ Columns[0].Width := 20;
+ Columns[0].Sortable := True;
+
+ { Colonne Piece jointe (icone) }
+ Columns[1].ColType := ctAttachment;
+ Columns[1].Title := '@';
+ Columns[1].Width := 20;
+ Columns[1].Sortable := True;
+
+ { Colonne Drapeau (icone) }
+ Columns[2].ColType := ctFlag;
+ Columns[2].Title := '*';
+ Columns[2].Width := 20;
+ Columns[2].Sortable := True;
+
+ { Colonne De }
+ Columns[3].ColType := ctFrom;
+ Columns[3].Title := 'De';
+ Columns[3].Width := 120;
+ Columns[3].Sortable := True;
+
+ { Colonne Objet }
+ Columns[4].ColType := ctSubject;
+ Columns[4].Title := 'Objet';
+ Columns[4].Width := 200;
+ Columns[4].Sortable := True;
+
+ { Colonne Date }
+ Columns[5].ColType := ctDate;
+ Columns[5].Title := 'Date';
+ Columns[5].Width := 70;
+ Columns[5].Sortable := True;
+
+ { Colonne Taille }
+ Columns[6].ColType := ctSize;
+ Columns[6].Title := 'Taille';
+ Columns[6].Width := 60;
+ Columns[6].Sortable := True;
+End;
+
+{ Formate une taille en octets pour l'affichage }
+Function FormatSize(Size: LongInt): String;
+Var
+ S: String;
+Begin
+ If Size < 1024 Then Begin
+  Str(Size, S);
+  FormatSize := S + ' o';
+ End
+ Else If Size < 1048576 Then Begin
+  Str(Size Div 1024, S);
+  FormatSize := S + ' Ko';
+ End
+ Else Begin
+  Str(Size Div 1048576, S);
+  FormatSize := S + ' Mo';
+ End;
+End;
+
+{ Initialise la liste des messages avec des donnees de demonstration }
+Procedure InitializeMessageList;
+Begin
+ MessageCount := 8;
+ SelectedMessage := 0;
+ LastSelectedMessage := 0;
+ MessageScrollOffset := 0;
+ SortColumn := 5;  { Tri par date par defaut }
+ SortOrder := soDescending;
+ CtrlKeyDown := False;
+ ShiftKeyDown := False;
+ ContextMenuVisible := False;
+ HoveredColumn := -1;
+
+ { Message 1 - Non lu, priorite haute }
+ Messages[0].MsgID := 'MSG001';
+ Messages[0].FromName := 'Jean Dupont';
+ Messages[0].FromEmail := 'jean.dupont@example.com';
+ Messages[0].Subject := 'URGENT: Reunion demain matin';
+ Messages[0].DateStr := '01/04/26';
+ Messages[0].DateSort := 1743465600;
+ Messages[0].Size := 2450;
+ Messages[0].Priority := mpHigh;
+ Messages[0].HasAttachment := True;
+ Messages[0].IsRead := False;
+ Messages[0].IsFlagged := True;
+ Messages[0].IsSelected := True;
+
+ { Message 2 - Lu }
+ Messages[1].MsgID := 'MSG002';
+ Messages[1].FromName := 'Marie Martin';
+ Messages[1].FromEmail := 'marie.martin@example.com';
+ Messages[1].Subject := 'Re: Projet Alpha - Avancement';
+ Messages[1].DateStr := '31/03/26';
+ Messages[1].DateSort := 1743379200;
+ Messages[1].Size := 15230;
+ Messages[1].Priority := mpNormal;
+ Messages[1].HasAttachment := True;
+ Messages[1].IsRead := True;
+ Messages[1].IsFlagged := False;
+ Messages[1].IsSelected := False;
+
+ { Message 3 - Lu }
+ Messages[2].MsgID := 'MSG003';
+ Messages[2].FromName := 'Support Technique';
+ Messages[2].FromEmail := 'support@techcorp.com';
+ Messages[2].Subject := 'Votre demande #1234 a ete traitee';
+ Messages[2].DateStr := '30/03/26';
+ Messages[2].DateSort := 1743292800;
+ Messages[2].Size := 5670;
+ Messages[2].Priority := mpNormal;
+ Messages[2].HasAttachment := False;
+ Messages[2].IsRead := True;
+ Messages[2].IsFlagged := False;
+ Messages[2].IsSelected := False;
+
+ { Message 4 - Non lu, priorite basse }
+ Messages[3].MsgID := 'MSG004';
+ Messages[3].FromName := 'Newsletter Info';
+ Messages[3].FromEmail := 'news@infolettre.com';
+ Messages[3].Subject := 'Les nouveautes de la semaine';
+ Messages[3].DateStr := '29/03/26';
+ Messages[3].DateSort := 1743206400;
+ Messages[3].Size := 45000;
+ Messages[3].Priority := mpLow;
+ Messages[3].HasAttachment := False;
+ Messages[3].IsRead := False;
+ Messages[3].IsFlagged := False;
+ Messages[3].IsSelected := False;
+
+ { Message 5 - Lu }
+ Messages[4].MsgID := 'MSG005';
+ Messages[4].FromName := 'Admin Systeme';
+ Messages[4].FromEmail := 'admin@company.local';
+ Messages[4].Subject := 'Maintenance planifiee ce weekend';
+ Messages[4].DateStr := '28/03/26';
+ Messages[4].DateSort := 1743120000;
+ Messages[4].Size := 1234;
+ Messages[4].Priority := mpNormal;
+ Messages[4].HasAttachment := False;
+ Messages[4].IsRead := True;
+ Messages[4].IsFlagged := True;
+ Messages[4].IsSelected := False;
+
+ { Message 6 - Non lu }
+ Messages[5].MsgID := 'MSG006';
+ Messages[5].FromName := 'Pierre Durand';
+ Messages[5].FromEmail := 'p.durand@mail.fr';
+ Messages[5].Subject := 'Documents a signer';
+ Messages[5].DateStr := '27/03/26';
+ Messages[5].DateSort := 1743033600;
+ Messages[5].Size := 125000;
+ Messages[5].Priority := mpHigh;
+ Messages[5].HasAttachment := True;
+ Messages[5].IsRead := False;
+ Messages[5].IsFlagged := False;
+ Messages[5].IsSelected := False;
+
+ { Message 7 - Lu }
+ Messages[6].MsgID := 'MSG007';
+ Messages[6].FromName := 'Sophie Leblanc';
+ Messages[6].FromEmail := 'sophie.l@webmail.com';
+ Messages[6].Subject := 'Invitation anniversaire';
+ Messages[6].DateStr := '25/03/26';
+ Messages[6].DateSort := 1742860800;
+ Messages[6].Size := 8900;
+ Messages[6].Priority := mpNormal;
+ Messages[6].HasAttachment := True;
+ Messages[6].IsRead := True;
+ Messages[6].IsFlagged := False;
+ Messages[6].IsSelected := False;
+
+ { Message 8 - Lu }
+ Messages[7].MsgID := 'MSG008';
+ Messages[7].FromName := 'Service Client';
+ Messages[7].FromEmail := 'service@boutique.fr';
+ Messages[7].Subject := 'Votre commande a ete expediee';
+ Messages[7].DateStr := '24/03/26';
+ Messages[7].DateSort := 1742774400;
+ Messages[7].Size := 3200;
+ Messages[7].Priority := mpNormal;
+ Messages[7].HasAttachment := False;
+ Messages[7].IsRead := True;
+ Messages[7].IsFlagged := False;
+ Messages[7].IsSelected := False;
+
+ { Initialiser les colonnes }
+ InitializeMessageColumns;
+End;
+
+{ Dessine l'indicateur de tri sur un en-tete de colonne }
+Procedure DrawSortIndicator(X, Y: Integer; Ascending: Boolean);
+Begin
+ SetColor(COLOR_MENU_TEXT);
+ If Ascending Then Begin
+  { Triangle vers le haut }
+  Line(X, Y + 6, X + 4, Y);
+  Line(X + 4, Y, X + 8, Y + 6);
+  Line(X, Y + 6, X + 8, Y + 6);
+ End
+ Else Begin
+  { Triangle vers le bas }
+  Line(X, Y, X + 4, Y + 6);
+  Line(X + 4, Y + 6, X + 8, Y);
+  Line(X, Y, X + 8, Y);
+ End;
+End;
+
+{ Compare deux messages selon la colonne de tri }
+Function CompareMessages(Idx1, Idx2: Integer): Integer;
+Var
+ Result: Integer;
+Begin
+ Result := 0;
+
+ Case Columns[SortColumn].ColType Of
+  ctPriority: Begin
+   If Ord(Messages[Idx1].Priority) < Ord(Messages[Idx2].Priority) Then
+    Result := -1
+   Else If Ord(Messages[Idx1].Priority) > Ord(Messages[Idx2].Priority) Then
+    Result := 1;
+  End;
+
+  ctAttachment: Begin
+   If Messages[Idx1].HasAttachment And Not Messages[Idx2].HasAttachment Then
+    Result := -1
+   Else If Not Messages[Idx1].HasAttachment And Messages[Idx2].HasAttachment Then
+    Result := 1;
+  End;
+
+  ctFlag: Begin
+   If Messages[Idx1].IsFlagged And Not Messages[Idx2].IsFlagged Then
+    Result := -1
+   Else If Not Messages[Idx1].IsFlagged And Messages[Idx2].IsFlagged Then
+    Result := 1;
+  End;
+
+  ctFrom: Begin
+   If Messages[Idx1].FromName < Messages[Idx2].FromName Then
+    Result := -1
+   Else If Messages[Idx1].FromName > Messages[Idx2].FromName Then
+    Result := 1;
+  End;
+
+  ctSubject: Begin
+   If Messages[Idx1].Subject < Messages[Idx2].Subject Then
+    Result := -1
+   Else If Messages[Idx1].Subject > Messages[Idx2].Subject Then
+    Result := 1;
+  End;
+
+  ctDate: Begin
+   If Messages[Idx1].DateSort < Messages[Idx2].DateSort Then
+    Result := -1
+   Else If Messages[Idx1].DateSort > Messages[Idx2].DateSort Then
+    Result := 1;
+  End;
+
+  ctSize: Begin
+   If Messages[Idx1].Size < Messages[Idx2].Size Then
+    Result := -1
+   Else If Messages[Idx1].Size > Messages[Idx2].Size Then
+    Result := 1;
+  End;
+ End;
+
+ { Inverser si tri descendant }
+ If SortOrder = soDescending Then
+  Result := -Result;
+
+ CompareMessages := Result;
+End;
+
+{ Trie la liste des messages selon la colonne active }
+Procedure SortMessageList;
+Var
+ I, J: Integer;
+ Temp: TMessage;
+Begin
+ If (SortColumn < 0) Or (SortColumn >= ColumnCount) Then Exit;
+ If SortOrder = soNone Then Exit;
+
+ { Tri a bulles simple (suffisant pour une demo) }
+ For I := 0 To MessageCount - 2 Do Begin
+  For J := 0 To MessageCount - I - 2 Do Begin
+   If CompareMessages(J, J + 1) > 0 Then Begin
+    Temp := Messages[J];
+    Messages[J] := Messages[J + 1];
+    Messages[J + 1] := Temp;
+   End;
+  End;
+ End;
+End;
+
+{ Dessine l'icone de priorite }
+Procedure DrawPriorityIcon(X, Y: Integer; Priority: TMessagePriority);
+Begin
+ Case Priority Of
+  mpHigh: Begin
+   SetColor(LightRed);
+   OutTextXY(X + 4, Y, '!');
+  End;
+  mpLow: Begin
+   SetColor(LightBlue);
+   OutTextXY(X + 2, Y, 'v');
+  End;
+ End;
+End;
+
+{ Dessine l'icone de piece jointe }
+Procedure DrawAttachmentIcon(X, Y: Integer);
+Begin
+ SetColor(COLOR_MENU_TEXT);
+ { Dessine un trombone simplifie }
+ Line(X + 3, Y + 2, X + 3, Y + 10);
+ Line(X + 3, Y + 10, X + 8, Y + 10);
+ Line(X + 8, Y + 10, X + 8, Y + 4);
+ Line(X + 8, Y + 4, X + 5, Y + 4);
+ Line(X + 5, Y + 4, X + 5, Y + 8);
+End;
+
+{ Dessine l'icone de drapeau }
+Procedure DrawFlagIcon(X, Y: Integer);
+Begin
+ SetColor(LightRed);
+ { Mat du drapeau }
+ Line(X + 3, Y + 2, X + 3, Y + 12);
+ { Drapeau triangulaire }
+ Line(X + 3, Y + 2, X + 10, Y + 5);
+ Line(X + 10, Y + 5, X + 3, Y + 8);
+End;
+
+{ Calcule les positions X des colonnes }
+Procedure CalculateColumnPositions;
+Var
+ I, X: Integer;
+Begin
+ X := Layout.MessageListRect.X1 + 2;
+ For I := 0 To ColumnCount - 1 Do Begin
+  Columns[I].X := X;
+  X := X + Columns[I].Width;
+ End;
+End;
+
+{ Trouve l'index de la colonne a une position X }
+Function GetColumnAtPoint(X: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ GetColumnAtPoint := -1;
+ For I := 0 To ColumnCount - 1 Do Begin
+  If (X >= Columns[I].X) And (X < Columns[I].X + Columns[I].Width) Then Begin
+   GetColumnAtPoint := I;
+   Exit;
+  End;
+ End;
+End;
+
+{ Trouve l'index du message a une position Y }
+Function GetMessageAtPoint(X, Y: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ GetMessageAtPoint := -1;
+
+ { Verifier si on est dans la zone des messages }
+ If (X < Layout.MessageListRect.X1) Or (X > Layout.MessageListRect.X2) Then Exit;
+ If (Y < Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT) Then Exit;
+ If (Y > Layout.MessageListRect.Y2) Then Exit;
+
+ For I := 0 To MessageCount - 1 Do Begin
+  If (Messages[I].Y > 0) And
+     (Y >= Messages[I].Y) And
+     (Y < Messages[I].Y + MESSAGE_ROW_HEIGHT) Then Begin
+   GetMessageAtPoint := I;
+   Exit;
+  End;
+ End;
+End;
+
+{ Deselectionne tous les messages }
+Procedure DeselectAllMessages;
+Var
+ I: Integer;
+Begin
+ For I := 0 To MessageCount - 1 Do
+  Messages[I].IsSelected := False;
+End;
+
+{ Compte le nombre de messages selectionnes }
+Function GetSelectedMessageCount: Integer;
+Var
+ I, Count: Integer;
+Begin
+ Count := 0;
+ For I := 0 To MessageCount - 1 Do
+  If Messages[I].IsSelected Then Inc(Count);
+ GetSelectedMessageCount := Count;
+End;
+
+{ Selectionne une plage de messages (pour Shift+clic) }
+Procedure SelectMessageRange(FromIdx, ToIdx: Integer);
+Var
+ I, StartIdx, EndIdx: Integer;
+Begin
+ If FromIdx < ToIdx Then Begin
+  StartIdx := FromIdx;
+  EndIdx := ToIdx;
+ End
+ Else Begin
+  StartIdx := ToIdx;
+  EndIdx := FromIdx;
+ End;
+
+ For I := StartIdx To EndIdx Do
+  Messages[I].IsSelected := True;
+End;
+
+{ Gere le clic sur l'en-tete de colonne }
+Procedure HandleColumnHeaderClick(ColIdx: Integer);
+Begin
+ If (ColIdx < 0) Or (ColIdx >= ColumnCount) Then Exit;
+ If Not Columns[ColIdx].Sortable Then Exit;
+
+ If SortColumn = ColIdx Then Begin
+  { Basculer l'ordre de tri }
+  If SortOrder = soAscending Then
+   SortOrder := soDescending
+  Else
+   SortOrder := soAscending;
+ End
+ Else Begin
+  SortColumn := ColIdx;
+  SortOrder := soAscending;
+ End;
+
+ SortMessageList;
+End;
+
+{ Gere le clic sur un message }
+Procedure HandleMessageClick(MsgIdx: Integer);
+Begin
+ If (MsgIdx < 0) Or (MsgIdx >= MessageCount) Then Exit;
+
+ If ShiftKeyDown And (LastSelectedMessage >= 0) Then Begin
+  { Selection de plage avec Shift }
+  DeselectAllMessages;
+  SelectMessageRange(LastSelectedMessage, MsgIdx);
+  SelectedMessage := MsgIdx;
+ End
+ Else If CtrlKeyDown Then Begin
+  { Selection multiple avec Ctrl }
+  Messages[MsgIdx].IsSelected := Not Messages[MsgIdx].IsSelected;
+  If Messages[MsgIdx].IsSelected Then Begin
+   SelectedMessage := MsgIdx;
+   LastSelectedMessage := MsgIdx;
+  End;
+ End
+ Else Begin
+  { Selection simple }
+  DeselectAllMessages;
+  Messages[MsgIdx].IsSelected := True;
+  SelectedMessage := MsgIdx;
+  LastSelectedMessage := MsgIdx;
+ End;
+End;
+
+{ Initialise le menu contextuel des messages }
+Procedure InitializeContextMenu;
+Begin
+ ContextMenuItemCount := 8;
+
+ ContextMenuItems[0].Caption := 'Ouvrir';
+ ContextMenuItems[0].Shortcut := 'Entree';
+ ContextMenuItems[0].Separator := False;
+ ContextMenuItems[0].Enabled := True;
+ ContextMenuItems[0].ItemID := CMD_FILE_OPEN;
+
+ ContextMenuItems[1].Caption := '';
+ ContextMenuItems[1].Shortcut := '';
+ ContextMenuItems[1].Separator := True;
+ ContextMenuItems[1].Enabled := True;
+ ContextMenuItems[1].ItemID := 0;
+
+ ContextMenuItems[2].Caption := 'Repondre';
+ ContextMenuItems[2].Shortcut := 'Ctrl+R';
+ ContextMenuItems[2].Separator := False;
+ ContextMenuItems[2].Enabled := True;
+ ContextMenuItems[2].ItemID := CMD_MSG_REPLY;
+
+ ContextMenuItems[3].Caption := 'Repondre a tous';
+ ContextMenuItems[3].Shortcut := 'Ctrl+Maj+R';
+ ContextMenuItems[3].Separator := False;
+ ContextMenuItems[3].Enabled := True;
+ ContextMenuItems[3].ItemID := CMD_MSG_REPLYALL;
+
+ ContextMenuItems[4].Caption := 'Transferer';
+ ContextMenuItems[4].Shortcut := 'Ctrl+F';
+ ContextMenuItems[4].Separator := False;
+ ContextMenuItems[4].Enabled := True;
+ ContextMenuItems[4].ItemID := CMD_MSG_FORWARD;
+
+ ContextMenuItems[5].Caption := '';
+ ContextMenuItems[5].Shortcut := '';
+ ContextMenuItems[5].Separator := True;
+ ContextMenuItems[5].Enabled := True;
+ ContextMenuItems[5].ItemID := 0;
+
+ ContextMenuItems[6].Caption := 'Marquer comme lu';
+ ContextMenuItems[6].Shortcut := '';
+ ContextMenuItems[6].Separator := False;
+ ContextMenuItems[6].Enabled := True;
+ ContextMenuItems[6].ItemID := 801;
+
+ ContextMenuItems[7].Caption := 'Supprimer';
+ ContextMenuItems[7].Shortcut := 'Suppr';
+ ContextMenuItems[7].Separator := False;
+ ContextMenuItems[7].Enabled := True;
+ ContextMenuItems[7].ItemID := CMD_MSG_DELETE;
+End;
+
+{ Affiche le menu contextuel }
+Procedure ShowContextMenu(X, Y: Integer);
+Var
+ I, MaxWidth, ItemHeight: Integer;
+Begin
+ InitializeContextMenu;
+
+ { Calculer les dimensions }
+ MaxWidth := 150;
+ ItemHeight := 0;
+ For I := 0 To ContextMenuItemCount - 1 Do Begin
+  If ContextMenuItems[I].Separator Then
+   ItemHeight := ItemHeight + 6
+  Else
+   ItemHeight := ItemHeight + 18;
+ End;
+
+ ContextMenuX := X;
+ ContextMenuY := Y;
+ ContextMenuWidth := MaxWidth;
+ ContextMenuHeight := ItemHeight + 4;
+
+ { Ajuster si hors ecran }
+ If ContextMenuX + ContextMenuWidth > GetMaxX Then
+  ContextMenuX := GetMaxX - ContextMenuWidth;
+ If ContextMenuY + ContextMenuHeight > GetMaxY Then
+  ContextMenuY := GetMaxY - ContextMenuHeight;
+
+ ContextMenuVisible := True;
+ HoveredContextItem := -1;
+End;
+
+{ Dessine le menu contextuel }
+Procedure DrawContextMenu;
+Var
+ I, Y: Integer;
+Begin
+ If Not ContextMenuVisible Then Exit;
+
+ { Fond du menu }
+ FillRect(ContextMenuX, ContextMenuY,
+          ContextMenuX + ContextMenuWidth, ContextMenuY + ContextMenuHeight,
+          COLOR_BUTTON_FACE);
+ Draw3DRect(ContextMenuX, ContextMenuY,
+            ContextMenuX + ContextMenuWidth, ContextMenuY + ContextMenuHeight,
+            True);
+
+ Y := ContextMenuY + 2;
+
+ For I := 0 To ContextMenuItemCount - 1 Do Begin
+  If ContextMenuItems[I].Separator Then Begin
+   SetColor(COLOR_BUTTON_DARK);
+   Line(ContextMenuX + 2, Y + 2, ContextMenuX + ContextMenuWidth - 2, Y + 2);
+   SetColor(COLOR_BUTTON_LIGHT);
+   Line(ContextMenuX + 2, Y + 3, ContextMenuX + ContextMenuWidth - 2, Y + 3);
+   Y := Y + 6;
+  End
+  Else Begin
+   { Fond de l'element survole }
+   If I = HoveredContextItem Then Begin
+    FillRect(ContextMenuX + 2, Y,
+             ContextMenuX + ContextMenuWidth - 2, Y + 16,
+             COLOR_LIST_SELECTED);
+    SetColor(COLOR_LIST_SELECTED_TEXT);
+   End
+   Else Begin
+    If ContextMenuItems[I].Enabled Then
+     SetColor(COLOR_MENU_TEXT)
+    Else
+     SetColor(COLOR_BUTTON_DARK);
+   End;
+
+   OutTextXY(ContextMenuX + 6, Y + 3, ContextMenuItems[I].Caption);
+
+   { Raccourci a droite }
+   If ContextMenuItems[I].Shortcut <> '' Then
+    OutTextXY(ContextMenuX + ContextMenuWidth - 50, Y + 3,
+              ContextMenuItems[I].Shortcut);
+
+   Y := Y + 18;
+  End;
+ End;
+End;
+
+{ Cache le menu contextuel }
+Procedure HideContextMenu;
+Begin
+ ContextMenuVisible := False;
+ HoveredContextItem := -1;
+End;
+
+{ Trouve l'element du menu contextuel a une position }
+Function GetContextMenuItemAtPoint(X, Y: Integer): Integer;
+Var
+ I, ItemY: Integer;
+Begin
+ GetContextMenuItemAtPoint := -1;
+ If Not ContextMenuVisible Then Exit;
+
+ If (X < ContextMenuX) Or (X > ContextMenuX + ContextMenuWidth) Or
+    (Y < ContextMenuY) Or (Y > ContextMenuY + ContextMenuHeight) Then Exit;
+
+ ItemY := ContextMenuY + 2;
+ For I := 0 To ContextMenuItemCount - 1 Do Begin
+  If ContextMenuItems[I].Separator Then Begin
+   ItemY := ItemY + 6;
+  End
+  Else Begin
+   If (Y >= ItemY) And (Y < ItemY + 18) Then Begin
+    If ContextMenuItems[I].Enabled Then
+     GetContextMenuItemAtPoint := I;
+    Exit;
+   End;
+   ItemY := ItemY + 18;
+  End;
+ End;
+End;
+
 { Dessine le panneau des dossiers (arbre de navigation) }
 Procedure DrawFolderPane;
 Var
@@ -1966,71 +2687,129 @@ End;
 { Dessine la liste des messages }
 Procedure DrawMessageList;
 Var
- Y, ColX: Integer;
- ColDe, ColObjet, ColDate: Integer;
+ Y, I, J: Integer;
+ TextColor: Word;
+ BgColor: Word;
+ DisplayText: String;
+ MaxY: Integer;
 Begin
+ { Calculer les positions des colonnes }
+ CalculateColumnPositions;
+
+ { Fond de la liste }
  FillRect(Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
           Layout.MessageListRect.X2, Layout.MessageListRect.Y2, COLOR_LIST_BG);
  Draw3DRect(Layout.MessageListRect.X1, Layout.MessageListRect.Y1,
             Layout.MessageListRect.X2, Layout.MessageListRect.Y2, False);
 
- { En-têtes de colonnes }
+ { En-tetes de colonnes }
  Y := Layout.MessageListRect.Y1;
  FillRect(Layout.MessageListRect.X1 + 1, Y + 1,
-          Layout.MessageListRect.X2 - 1, Y + 16, COLOR_BUTTON_FACE);
+          Layout.MessageListRect.X2 - 1, Y + COLUMN_HEADER_HEIGHT - 1, COLOR_BUTTON_FACE);
  Draw3DRect(Layout.MessageListRect.X1 + 1, Y + 1,
-            Layout.MessageListRect.X2 - 1, Y + 16, True);
+            Layout.MessageListRect.X2 - 1, Y + COLUMN_HEADER_HEIGHT - 1, True);
 
- ColDe := Layout.MessageListRect.X1 + 4;
- ColObjet := Layout.MessageListRect.X1 + 120;
- ColDate := Layout.MessageListRect.X2 - 80;
+ { Dessiner chaque en-tete de colonne }
+ For I := 0 To ColumnCount - 1 Do Begin
+  { Separateur vertical }
+  If I > 0 Then Begin
+   SetColor(COLOR_BUTTON_DARK);
+   Line(Columns[I].X - 1, Y + 2, Columns[I].X - 1, Y + COLUMN_HEADER_HEIGHT - 3);
+  End;
 
- SetColor(COLOR_MENU_TEXT);
- OutTextXY(ColDe, Y + 4, 'De');
- OutTextXY(ColObjet, Y + 4, 'Objet');
- OutTextXY(ColDate, Y + 4, 'Date');
+  { Titre de la colonne }
+  SetColor(COLOR_MENU_TEXT);
+  OutTextXY(Columns[I].X + 4, Y + 4, Columns[I].Title);
 
- { Séparateurs de colonnes }
- SetColor(COLOR_BUTTON_DARK);
- Line(ColObjet - 4, Y + 2, ColObjet - 4, Y + 14);
- Line(ColDate - 4, Y + 2, ColDate - 4, Y + 14);
+  { Indicateur de tri }
+  If (I = SortColumn) And (SortOrder <> soNone) Then Begin
+   DrawSortIndicator(Columns[I].X + Columns[I].Width - 14, Y + 5,
+                     SortOrder = soAscending);
+  End;
+ End;
 
- { Messages de démonstration }
- Y := Y + 18;
+ { Messages }
+ Y := Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT + 1;
+ MaxY := Layout.MessageListRect.Y2 - MESSAGE_ROW_HEIGHT;
 
- { Message 1 - Non lu (en gras simulé par couleur) }
- SetColor(COLOR_LIST_SELECTED);
- FillRect(Layout.MessageListRect.X1 + 1, Y,
-          Layout.MessageListRect.X2 - 1, Y + 14, COLOR_LIST_SELECTED);
- SetColor(COLOR_LIST_SELECTED_TEXT);
- OutTextXY(ColDe, Y + 2, 'Jean Dupont');
- OutTextXY(ColObjet, Y + 2, 'Reunion demain');
- OutTextXY(ColDate, Y + 2, '01/04/26');
- Y := Y + 16;
+ For I := 0 To MessageCount - 1 Do Begin
+  If Y > MaxY Then Break;
 
- { Message 2 }
- SetColor(COLOR_LIST_TEXT);
- OutTextXY(ColDe, Y + 2, 'Marie Martin');
- OutTextXY(ColObjet, Y + 2, 'Re: Projet X');
- OutTextXY(ColDate, Y + 2, '31/03/26');
- Y := Y + 16;
+  { Sauvegarder la position Y pour la detection des clics }
+  Messages[I].Y := Y;
 
- { Message 3 }
- OutTextXY(ColDe, Y + 2, 'Support Tech');
- OutTextXY(ColObjet, Y + 2, 'Votre demande #1234');
- OutTextXY(ColDate, Y + 2, '30/03/26');
- Y := Y + 16;
+  { Determiner les couleurs selon l'etat }
+  If Messages[I].IsSelected Then Begin
+   BgColor := COLOR_LIST_SELECTED;
+   TextColor := COLOR_LIST_SELECTED_TEXT;
+  End
+  Else Begin
+   BgColor := COLOR_LIST_BG;
+   If Messages[I].IsRead Then
+    TextColor := COLOR_LIST_TEXT
+   Else
+    TextColor := COLOR_MENU_TEXT; { Plus fonce pour les non lus }
+  End;
 
- { Message 4 }
- OutTextXY(ColDe, Y + 2, 'Newsletter');
- OutTextXY(ColObjet, Y + 2, 'Nouveautes de la semaine');
- OutTextXY(ColDate, Y + 2, '29/03/26');
- Y := Y + 16;
+  { Dessiner le fond si selectionne }
+  If Messages[I].IsSelected Then Begin
+   FillRect(Layout.MessageListRect.X1 + 1, Y,
+            Layout.MessageListRect.X2 - 1, Y + MESSAGE_ROW_HEIGHT - 1, BgColor);
+  End;
 
- { Message 5 }
- OutTextXY(ColDe, Y + 2, 'Admin Systeme');
- OutTextXY(ColObjet, Y + 2, 'Maintenance prevue');
- OutTextXY(ColDate, Y + 2, '28/03/26');
+  { Dessiner chaque colonne }
+  For J := 0 To ColumnCount - 1 Do Begin
+   Case Columns[J].ColType Of
+    ctPriority: Begin
+     DrawPriorityIcon(Columns[J].X, Y + 1, Messages[I].Priority);
+    End;
+
+    ctAttachment: Begin
+     If Messages[I].HasAttachment Then
+      DrawAttachmentIcon(Columns[J].X, Y + 1);
+    End;
+
+    ctFlag: Begin
+     If Messages[I].IsFlagged Then
+      DrawFlagIcon(Columns[J].X, Y + 1);
+    End;
+
+    ctFrom: Begin
+     SetColor(TextColor);
+     { Tronquer si trop long }
+     DisplayText := Messages[I].FromName;
+     If Length(DisplayText) > 15 Then
+      DisplayText := Copy(DisplayText, 1, 14) + '...';
+     OutTextXY(Columns[J].X + 2, Y + 2, DisplayText);
+    End;
+
+    ctSubject: Begin
+     SetColor(TextColor);
+     { Tronquer si trop long }
+     DisplayText := Messages[I].Subject;
+     If Length(DisplayText) > 28 Then
+      DisplayText := Copy(DisplayText, 1, 27) + '...';
+     OutTextXY(Columns[J].X + 2, Y + 2, DisplayText);
+    End;
+
+    ctDate: Begin
+     SetColor(TextColor);
+     OutTextXY(Columns[J].X + 2, Y + 2, Messages[I].DateStr);
+    End;
+
+    ctSize: Begin
+     SetColor(TextColor);
+     OutTextXY(Columns[J].X + 2, Y + 2, FormatSize(Messages[I].Size));
+    End;
+   End;
+  End;
+
+  Y := Y + MESSAGE_ROW_HEIGHT;
+ End;
+
+ { Dessiner le menu contextuel si visible }
+ If ContextMenuVisible Then
+  DrawContextMenu;
 End;
 
 { Dessine le volet de prévisualisation }
@@ -2465,6 +3244,9 @@ Var
  MouseEvent: TMouseEvent;
  InToolbar: Boolean;
  InFolderPane: Boolean;
+ InMessageList: Boolean;
+ InMessageListHeader: Boolean;
+ ClickedCol, ClickedMsg: Integer;
 Begin
  Running := True;
  LastBtn := 0;
@@ -2479,6 +3261,7 @@ Begin
  LastMouseX := 0;
  LastMouseY := 0;
  HoveredFolder := -1;
+ ContextMenuVisible := False;
 
  While Running Do Begin
   { Lecture de l'état de la souris }
@@ -2493,6 +3276,14 @@ Begin
   If ActiveMenu >= 0 Then
    UpdateMenuHover;
 
+  { Mise à jour du survol du menu contextuel }
+  If ContextMenuVisible Then Begin
+   HoveredContextItem := GetContextMenuItemAtPoint(MouseX, MouseY);
+   HideMouse;
+   DrawContextMenu;
+   ShowMouse;
+  End;
+
   { Mise à jour du survol des boutons de barre d'outils }
   InToolbar := (MouseY >= Layout.ToolBarRect.Y1) And
                (MouseY <= Layout.ToolBarRect.Y2);
@@ -2500,6 +3291,14 @@ Begin
                   (MouseX <= Layout.FolderPaneRect.X2) And
                   (MouseY >= Layout.FolderPaneRect.Y1 + 28) And
                   (MouseY <= Layout.FolderPaneRect.Y2);
+  InMessageListHeader := (MouseX >= Layout.MessageListRect.X1) And
+                         (MouseX <= Layout.MessageListRect.X2) And
+                         (MouseY >= Layout.MessageListRect.Y1) And
+                         (MouseY <= Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT);
+  InMessageList := (MouseX >= Layout.MessageListRect.X1) And
+                   (MouseX <= Layout.MessageListRect.X2) And
+                   (MouseY >= Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT) And
+                   (MouseY <= Layout.MessageListRect.Y2);
 
   If (ActiveMenu < 0) And InToolbar Then
    UpdateToolbarHover
@@ -2541,9 +3340,32 @@ Begin
     { Clic simple traité lors de l'appui du bouton }
    End;
    meRightClick: Begin
-    { Fermer le menu si ouvert, sinon gérer clic droit }
-    If ActiveMenu >= 0 Then
+    { Fermer le menu contextuel si visible }
+    If ContextMenuVisible Then Begin
+     HideContextMenu;
+     HideMouse;
+     DrawMessageList;
+     ShowMouse;
+    End
+    { Fermer le menu si ouvert }
+    Else If ActiveMenu >= 0 Then
      CloseDropdownMenu
+    { Clic droit sur la liste des messages }
+    Else If InMessageList Then Begin
+     ClickedMsg := GetMessageAtPoint(MouseX, MouseY);
+     If ClickedMsg >= 0 Then Begin
+      { Selectionner le message si pas deja selectionne }
+      If Not Messages[ClickedMsg].IsSelected Then Begin
+       DeselectAllMessages;
+       Messages[ClickedMsg].IsSelected := True;
+       SelectedMessage := ClickedMsg;
+      End;
+      ShowContextMenu(MouseX, MouseY);
+      HideMouse;
+      DrawMessageList;
+      ShowMouse;
+     End;
+    End
     Else
      HandleRightClick;
    End;
@@ -2563,12 +3385,44 @@ Begin
 
   { Détection du clic gauche (bouton enfoncé) }
   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+   { Fermer le menu contextuel si clic ailleurs }
+   If ContextMenuVisible Then Begin
+    ClickedMsg := GetContextMenuItemAtPoint(MouseX, MouseY);
+    If ClickedMsg >= 0 Then Begin
+     { Executer la commande du menu }
+     { TODO: Implementer les actions des commandes }
+    End;
+    HideContextMenu;
+    HideMouse;
+    DrawMessageList;
+    ShowMouse;
+   End
    { Vérifier d'abord si c'est un clic sur la barre d'outils }
-   If InToolbar And (ActiveMenu < 0) Then
+   Else If InToolbar And (ActiveMenu < 0) Then
     HandleToolbarClick
    { Vérifier si c'est un clic sur l'arbre de dossiers }
    Else If InFolderPane And (ActiveMenu < 0) Then
     HandleFolderClick(MouseX, MouseY)
+   { Verifier si c'est un clic sur l'en-tete de colonne }
+   Else If InMessageListHeader And (ActiveMenu < 0) Then Begin
+    ClickedCol := GetColumnAtPoint(MouseX);
+    If ClickedCol >= 0 Then Begin
+     HandleColumnHeaderClick(ClickedCol);
+     HideMouse;
+     DrawMessageList;
+     ShowMouse;
+    End;
+   End
+   { Verifier si c'est un clic sur un message }
+   Else If InMessageList And (ActiveMenu < 0) Then Begin
+    ClickedMsg := GetMessageAtPoint(MouseX, MouseY);
+    If ClickedMsg >= 0 Then Begin
+     HandleMessageClick(ClickedMsg);
+     HideMouse;
+     DrawMessageList;
+     ShowMouse;
+    End;
+   End
    Else
     HandleMouseClick;
   End;
@@ -2635,6 +3489,9 @@ BEGIN
 
  { Initialisation de l'arbre de dossiers }
  InitializeFolderTree;
+
+ { Initialisation de la liste des messages }
+ InitializeMessageList;
 
  { Affichage de l'interface }
  ShowMouse;
