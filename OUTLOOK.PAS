@@ -375,8 +375,12 @@ Type
   MsgID: String[20];        { Identifiant unique }
   FromName: String[40];     { Nom de l'expediteur }
   FromEmail: String[60];    { Adresse email }
+  ToName: String[40];       { Nom du destinataire }
+  ToEmail: String[60];      { Adresse email destinataire }
+  CcEmail: String[80];      { Adresse(s) en copie }
   Subject: String[80];      { Objet }
   DateStr: String[10];      { Date au format JJ/MM/AA }
+  DateFull: String[25];     { Date complete pour affichage }
   DateSort: LongInt;        { Date pour le tri (secondes depuis 1970) }
   Size: LongInt;            { Taille en octets }
   Priority: TMessagePriority; { Priorite du message }
@@ -385,7 +389,12 @@ Type
   IsFlagged: Boolean;       { Message marque d'un drapeau }
   IsSelected: Boolean;      { Message selectionne }
   Y: Integer;               { Position Y pour le clic }
+  Body: Array[0..19] of String[80]; { Corps du message (max 20 lignes) }
+  BodyLineCount: Integer;   { Nombre de lignes du corps }
  End;
+
+ { Orientation du volet de previsualisation }
+ TPreviewOrientation = (poHorizontal, poVertical);
 
  { Structure pour une colonne de la liste des messages }
  TColumnHeader = Record
@@ -415,6 +424,8 @@ Const
  CMD_VIEW_SORTBY   = 302;
  CMD_VIEW_COLUMNS  = 303;
  CMD_VIEW_REFRESH  = 304;
+ CMD_VIEW_PREVIEW_ORIENT = 305; { Basculer orientation horizontal/vertical }
+ CMD_VIEW_PREVIEW_SHOW   = 306; { Afficher/masquer volet de previsualisation }
 
  CMD_TOOLS_ACCOUNTS= 401;
  CMD_TOOLS_OPTIONS = 402;
@@ -462,6 +473,13 @@ Const
 
  { Largeur de l'en-tete de colonne }
  COLUMN_HEADER_HEIGHT = 18;
+
+ { Constantes pour le volet de previsualisation }
+ PREVIEW_LINE_HEIGHT = 14;    { Hauteur d'une ligne de texte }
+ PREVIEW_SCROLLBAR_WIDTH = 14; { Largeur de la barre de defilement }
+ PREVIEW_SCROLL_STEP = 3;     { Lignes a faire defiler par clic molette }
+ PREVIEW_HEADER_LINES = 5;    { Nombre de lignes d'en-tete (De, A, Cc, Date, Objet) }
+ PREVIEW_MIN_HEIGHT = 80;     { Hauteur minimale du volet }
 
 Var
  Layout: TWindowLayout;
@@ -535,6 +553,16 @@ Var
  ContextMenuItems: Array[0..7] of TMenuItem;
  ContextMenuItemCount: Integer;
  HoveredContextItem: Integer;
+
+ { Variables pour le volet de previsualisation }
+ PreviewScrollY: Integer;     { Position de defilement vertical }
+ PreviewScrollX: Integer;     { Position de defilement horizontal }
+ PreviewMaxScrollY: Integer;  { Defilement vertical maximum }
+ PreviewMaxScrollX: Integer;  { Defilement horizontal maximum }
+ PreviewOrientation: TPreviewOrientation; { Orientation du volet }
+ PreviewVisible: Boolean;     { Volet visible ou masque }
+ PreviewHeaderHeight: Integer; { Hauteur de la zone d'en-tetes }
+ InPreviewPane: Boolean;      { Souris dans le volet de previsualisation }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -1220,7 +1248,8 @@ Begin
  Menus[2].X := MenuX;
  Menus[2].Width := TextWidth('Affichage') + 16;
  Menus[2].ItemCount := 0;
- AddMenuItem(Menus[2], 'Volet de lecture', '', False, CMD_VIEW_PREVIEW);
+ AddMenuItem(Menus[2], 'Volet de lecture', '', False, CMD_VIEW_PREVIEW_SHOW);
+ AddMenuItem(Menus[2], 'Orientation volet', '', False, CMD_VIEW_PREVIEW_ORIENT);
  AddMenuItem(Menus[2], '', '', True, 0); { Séparateur }
  AddMenuItem(Menus[2], 'Trier par...', '', False, CMD_VIEW_SORTBY);
  AddMenuItem(Menus[2], 'Colonnes...', '', False, CMD_VIEW_COLUMNS);
@@ -2032,12 +2061,26 @@ Begin
  ContextMenuVisible := False;
  HoveredColumn := -1;
 
+ { Initialiser les variables de previsualisation }
+ PreviewScrollY := 0;
+ PreviewScrollX := 0;
+ PreviewMaxScrollY := 0;
+ PreviewMaxScrollX := 0;
+ PreviewOrientation := poHorizontal;
+ PreviewVisible := True;
+ PreviewHeaderHeight := PREVIEW_LINE_HEIGHT * PREVIEW_HEADER_LINES + 20;
+ InPreviewPane := False;
+
  { Message 1 - Non lu, priorite haute }
  Messages[0].MsgID := 'MSG001';
  Messages[0].FromName := 'Jean Dupont';
  Messages[0].FromEmail := 'jean.dupont@example.com';
+ Messages[0].ToName := 'Moi';
+ Messages[0].ToEmail := 'moi@example.com';
+ Messages[0].CcEmail := '';
  Messages[0].Subject := 'URGENT: Reunion demain matin';
  Messages[0].DateStr := '01/04/26';
+ Messages[0].DateFull := '01 avril 2026, 09:30';
  Messages[0].DateSort := 1743465600;
  Messages[0].Size := 2450;
  Messages[0].Priority := mpHigh;
@@ -2045,13 +2088,25 @@ Begin
  Messages[0].IsRead := False;
  Messages[0].IsFlagged := True;
  Messages[0].IsSelected := True;
+ Messages[0].BodyLineCount := 7;
+ Messages[0].Body[0] := 'Bonjour,';
+ Messages[0].Body[1] := '';
+ Messages[0].Body[2] := 'Je vous rappelle notre reunion de demain a 10h.';
+ Messages[0].Body[3] := 'Merci de confirmer votre presence.';
+ Messages[0].Body[4] := '';
+ Messages[0].Body[5] := 'Cordialement,';
+ Messages[0].Body[6] := 'Jean Dupont';
 
  { Message 2 - Lu }
  Messages[1].MsgID := 'MSG002';
  Messages[1].FromName := 'Marie Martin';
  Messages[1].FromEmail := 'marie.martin@example.com';
+ Messages[1].ToName := 'Equipe Projet';
+ Messages[1].ToEmail := 'equipe@example.com';
+ Messages[1].CcEmail := 'manager@example.com';
  Messages[1].Subject := 'Re: Projet Alpha - Avancement';
  Messages[1].DateStr := '31/03/26';
+ Messages[1].DateFull := '31 mars 2026, 14:15';
  Messages[1].DateSort := 1743379200;
  Messages[1].Size := 15230;
  Messages[1].Priority := mpNormal;
@@ -2059,13 +2114,28 @@ Begin
  Messages[1].IsRead := True;
  Messages[1].IsFlagged := False;
  Messages[1].IsSelected := False;
+ Messages[1].BodyLineCount := 10;
+ Messages[1].Body[0] := 'Bonjour a tous,';
+ Messages[1].Body[1] := '';
+ Messages[1].Body[2] := 'Voici le rapport d''avancement du projet Alpha:';
+ Messages[1].Body[3] := '- Phase 1: terminee a 100%';
+ Messages[1].Body[4] := '- Phase 2: en cours, 65% complete';
+ Messages[1].Body[5] := '- Phase 3: planifiee pour le mois prochain';
+ Messages[1].Body[6] := '';
+ Messages[1].Body[7] := 'Voir le document joint pour les details.';
+ Messages[1].Body[8] := '';
+ Messages[1].Body[9] := 'Marie';
 
  { Message 3 - Lu }
  Messages[2].MsgID := 'MSG003';
  Messages[2].FromName := 'Support Technique';
  Messages[2].FromEmail := 'support@techcorp.com';
+ Messages[2].ToName := 'Client';
+ Messages[2].ToEmail := 'moi@example.com';
+ Messages[2].CcEmail := '';
  Messages[2].Subject := 'Votre demande #1234 a ete traitee';
  Messages[2].DateStr := '30/03/26';
+ Messages[2].DateFull := '30 mars 2026, 11:42';
  Messages[2].DateSort := 1743292800;
  Messages[2].Size := 5670;
  Messages[2].Priority := mpNormal;
@@ -2073,13 +2143,26 @@ Begin
  Messages[2].IsRead := True;
  Messages[2].IsFlagged := False;
  Messages[2].IsSelected := False;
+ Messages[2].BodyLineCount := 8;
+ Messages[2].Body[0] := 'Cher client,';
+ Messages[2].Body[1] := '';
+ Messages[2].Body[2] := 'Votre demande de support #1234 a ete traitee.';
+ Messages[2].Body[3] := 'Le probleme a ete resolu par notre equipe technique.';
+ Messages[2].Body[4] := '';
+ Messages[2].Body[5] := 'Si vous avez d''autres questions, n''hesitez pas.';
+ Messages[2].Body[6] := '';
+ Messages[2].Body[7] := 'L''equipe Support TechCorp';
 
  { Message 4 - Non lu, priorite basse }
  Messages[3].MsgID := 'MSG004';
  Messages[3].FromName := 'Newsletter Info';
  Messages[3].FromEmail := 'news@infolettre.com';
+ Messages[3].ToName := 'Abonne';
+ Messages[3].ToEmail := 'moi@example.com';
+ Messages[3].CcEmail := '';
  Messages[3].Subject := 'Les nouveautes de la semaine';
  Messages[3].DateStr := '29/03/26';
+ Messages[3].DateFull := '29 mars 2026, 08:00';
  Messages[3].DateSort := 1743206400;
  Messages[3].Size := 45000;
  Messages[3].Priority := mpLow;
@@ -2087,13 +2170,30 @@ Begin
  Messages[3].IsRead := False;
  Messages[3].IsFlagged := False;
  Messages[3].IsSelected := False;
+ Messages[3].BodyLineCount := 12;
+ Messages[3].Body[0] := 'Bonjour cher abonne,';
+ Messages[3].Body[1] := '';
+ Messages[3].Body[2] := 'Decouvrez les nouveautes de cette semaine:';
+ Messages[3].Body[3] := '';
+ Messages[3].Body[4] := '1. Nouvelle fonctionnalite de recherche avancee';
+ Messages[3].Body[5] := '2. Amelioration des performances';
+ Messages[3].Body[6] := '3. Correction de bugs mineurs';
+ Messages[3].Body[7] := '4. Nouvelle interface utilisateur';
+ Messages[3].Body[8] := '';
+ Messages[3].Body[9] := 'Pour plus d''informations, visitez notre site.';
+ Messages[3].Body[10] := '';
+ Messages[3].Body[11] := 'L''equipe Newsletter';
 
  { Message 5 - Lu }
  Messages[4].MsgID := 'MSG005';
  Messages[4].FromName := 'Admin Systeme';
  Messages[4].FromEmail := 'admin@company.local';
+ Messages[4].ToName := 'Tous les employes';
+ Messages[4].ToEmail := 'all@company.local';
+ Messages[4].CcEmail := 'direction@company.local';
  Messages[4].Subject := 'Maintenance planifiee ce weekend';
  Messages[4].DateStr := '28/03/26';
+ Messages[4].DateFull := '28 mars 2026, 16:30';
  Messages[4].DateSort := 1743120000;
  Messages[4].Size := 1234;
  Messages[4].Priority := mpNormal;
@@ -2101,13 +2201,27 @@ Begin
  Messages[4].IsRead := True;
  Messages[4].IsFlagged := True;
  Messages[4].IsSelected := False;
+ Messages[4].BodyLineCount := 9;
+ Messages[4].Body[0] := 'Chers collegues,';
+ Messages[4].Body[1] := '';
+ Messages[4].Body[2] := 'Une maintenance est planifiee ce weekend:';
+ Messages[4].Body[3] := '- Debut: Samedi 30 mars, 22h00';
+ Messages[4].Body[4] := '- Fin prevue: Dimanche 31 mars, 06h00';
+ Messages[4].Body[5] := '';
+ Messages[4].Body[6] := 'Les services seront temporairement indisponibles.';
+ Messages[4].Body[7] := '';
+ Messages[4].Body[8] := 'L''equipe IT';
 
  { Message 6 - Non lu }
  Messages[5].MsgID := 'MSG006';
  Messages[5].FromName := 'Pierre Durand';
  Messages[5].FromEmail := 'p.durand@mail.fr';
+ Messages[5].ToName := 'Moi';
+ Messages[5].ToEmail := 'moi@example.com';
+ Messages[5].CcEmail := 'secretariat@mail.fr';
  Messages[5].Subject := 'Documents a signer';
  Messages[5].DateStr := '27/03/26';
+ Messages[5].DateFull := '27 mars 2026, 10:15';
  Messages[5].DateSort := 1743033600;
  Messages[5].Size := 125000;
  Messages[5].Priority := mpHigh;
@@ -2115,13 +2229,26 @@ Begin
  Messages[5].IsRead := False;
  Messages[5].IsFlagged := False;
  Messages[5].IsSelected := False;
+ Messages[5].BodyLineCount := 8;
+ Messages[5].Body[0] := 'Bonjour,';
+ Messages[5].Body[1] := '';
+ Messages[5].Body[2] := 'Veuillez trouver ci-joint les documents a signer.';
+ Messages[5].Body[3] := 'Merci de les retourner signes avant vendredi.';
+ Messages[5].Body[4] := '';
+ Messages[5].Body[5] := 'En cas de questions, n''hesitez pas a me contacter.';
+ Messages[5].Body[6] := '';
+ Messages[5].Body[7] := 'Pierre Durand';
 
  { Message 7 - Lu }
  Messages[6].MsgID := 'MSG007';
  Messages[6].FromName := 'Sophie Leblanc';
  Messages[6].FromEmail := 'sophie.l@webmail.com';
+ Messages[6].ToName := 'Amis';
+ Messages[6].ToEmail := 'moi@example.com';
+ Messages[6].CcEmail := 'autres.amis@webmail.com';
  Messages[6].Subject := 'Invitation anniversaire';
  Messages[6].DateStr := '25/03/26';
+ Messages[6].DateFull := '25 mars 2026, 18:45';
  Messages[6].DateSort := 1742860800;
  Messages[6].Size := 8900;
  Messages[6].Priority := mpNormal;
@@ -2129,13 +2256,29 @@ Begin
  Messages[6].IsRead := True;
  Messages[6].IsFlagged := False;
  Messages[6].IsSelected := False;
+ Messages[6].BodyLineCount := 11;
+ Messages[6].Body[0] := 'Salut!';
+ Messages[6].Body[1] := '';
+ Messages[6].Body[2] := 'Je vous invite a mon anniversaire!';
+ Messages[6].Body[3] := '';
+ Messages[6].Body[4] := 'Date: Samedi 5 avril 2026';
+ Messages[6].Body[5] := 'Heure: 19h00';
+ Messages[6].Body[6] := 'Lieu: Chez moi';
+ Messages[6].Body[7] := '';
+ Messages[6].Body[8] := 'Voir le plan en piece jointe.';
+ Messages[6].Body[9] := '';
+ Messages[6].Body[10] := 'A bientot! Sophie';
 
  { Message 8 - Lu }
  Messages[7].MsgID := 'MSG008';
  Messages[7].FromName := 'Service Client';
  Messages[7].FromEmail := 'service@boutique.fr';
+ Messages[7].ToName := 'Client';
+ Messages[7].ToEmail := 'moi@example.com';
+ Messages[7].CcEmail := '';
  Messages[7].Subject := 'Votre commande a ete expediee';
  Messages[7].DateStr := '24/03/26';
+ Messages[7].DateFull := '24 mars 2026, 14:00';
  Messages[7].DateSort := 1742774400;
  Messages[7].Size := 3200;
  Messages[7].Priority := mpNormal;
@@ -2143,6 +2286,16 @@ Begin
  Messages[7].IsRead := True;
  Messages[7].IsFlagged := False;
  Messages[7].IsSelected := False;
+ Messages[7].BodyLineCount := 9;
+ Messages[7].Body[0] := 'Cher client,';
+ Messages[7].Body[1] := '';
+ Messages[7].Body[2] := 'Votre commande #98765 a ete expediee.';
+ Messages[7].Body[3] := '';
+ Messages[7].Body[4] := 'Numero de suivi: FR123456789';
+ Messages[7].Body[5] := 'Livraison estimee: 2-3 jours ouvrables';
+ Messages[7].Body[6] := '';
+ Messages[7].Body[7] := 'Merci pour votre achat!';
+ Messages[7].Body[8] := 'L''equipe Boutique';
 
  { Initialiser les colonnes }
  InitializeMessageColumns;
@@ -2812,48 +2965,147 @@ Begin
   DrawContextMenu;
 End;
 
-{ Dessine le volet de prévisualisation }
+{ Dessine la barre de defilement verticale du volet de previsualisation }
+Procedure DrawPreviewScrollbarV;
+Var
+ ScrollbarX, ScrollbarY1, ScrollbarY2: Integer;
+ ThumbHeight, ThumbY: Integer;
+ ContentHeight, ViewHeight: Integer;
+Begin
+ If Not PreviewVisible Then Exit;
+ If PreviewMaxScrollY <= 0 Then Exit;
+
+ ScrollbarX := Layout.PreviewPaneRect.X2 - PREVIEW_SCROLLBAR_WIDTH;
+ ScrollbarY1 := Layout.PreviewPaneRect.Y1 + PreviewHeaderHeight + 1;
+ ScrollbarY2 := Layout.PreviewPaneRect.Y2 - 1;
+
+ { Fond de la barre de defilement }
+ FillRect(ScrollbarX, ScrollbarY1, Layout.PreviewPaneRect.X2 - 1, ScrollbarY2,
+          COLOR_BUTTON_FACE);
+ Draw3DRect(ScrollbarX, ScrollbarY1, Layout.PreviewPaneRect.X2 - 1, ScrollbarY2,
+            False);
+
+ { Calcul du curseur }
+ ViewHeight := ScrollbarY2 - ScrollbarY1 - 4;
+ ContentHeight := PreviewMaxScrollY + ViewHeight;
+ If ContentHeight > 0 Then Begin
+  ThumbHeight := (ViewHeight * ViewHeight) Div ContentHeight;
+  If ThumbHeight < 20 Then ThumbHeight := 20;
+  If ThumbHeight > ViewHeight Then ThumbHeight := ViewHeight;
+
+  ThumbY := ScrollbarY1 + 2 + ((PreviewScrollY * (ViewHeight - ThumbHeight)) Div PreviewMaxScrollY);
+
+  { Dessiner le curseur }
+  FillRect(ScrollbarX + 2, ThumbY, Layout.PreviewPaneRect.X2 - 3, ThumbY + ThumbHeight - 1,
+           COLOR_BUTTON_FACE);
+  Draw3DRect(ScrollbarX + 2, ThumbY, Layout.PreviewPaneRect.X2 - 3, ThumbY + ThumbHeight - 1,
+             True);
+ End;
+End;
+
+{ Dessine le volet de previsualisation }
 Procedure DrawPreviewPane;
 Var
- Y: Integer;
+ Y, I, BodyY, BodyTop, BodyBottom: Integer;
+ MsgIdx: Integer;
+ HeaderText: String;
+ ContentWidth: Integer;
 Begin
+ { Si le volet est masque, ne rien dessiner }
+ If Not PreviewVisible Then Exit;
+
+ { Fond du volet }
  FillRect(Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
           Layout.PreviewPaneRect.X2, Layout.PreviewPaneRect.Y2, COLOR_PREVIEW_BG);
  Draw3DRect(Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
             Layout.PreviewPaneRect.X2, Layout.PreviewPaneRect.Y2, False);
 
+ { Si aucun message selectionne, afficher un message par defaut }
+ If (SelectedMessage < 0) Or (SelectedMessage >= MessageCount) Then Begin
+  SetColor(COLOR_BUTTON_DARK);
+  Y := (Layout.PreviewPaneRect.Y1 + Layout.PreviewPaneRect.Y2) Div 2;
+  OutTextXY(Layout.PreviewPaneRect.X1 + 20, Y, 'Selectionnez un message pour le previsualiser');
+  Exit;
+ End;
+
+ MsgIdx := SelectedMessage;
+ ContentWidth := Layout.PreviewPaneRect.X2 - Layout.PreviewPaneRect.X1 - PREVIEW_SCROLLBAR_WIDTH - 8;
+
  Y := Layout.PreviewPaneRect.Y1 + 4;
 
- { En-têtes du message }
+ { En-tete De: }
  SetColor(COLOR_MENU_TEXT);
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'De: Jean Dupont <jean.dupont@example.com>');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'A: moi@example.com');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Date: 01 avril 2026 09:30');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Objet: Reunion demain');
+ HeaderText := 'De: ' + Messages[MsgIdx].FromName + ' <' + Messages[MsgIdx].FromEmail + '>';
+ If Length(HeaderText) > 70 Then
+  HeaderText := Copy(HeaderText, 1, 67) + '...';
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, HeaderText);
+ Y := Y + PREVIEW_LINE_HEIGHT;
 
+ { En-tete A: }
+ HeaderText := 'A: ' + Messages[MsgIdx].ToEmail;
+ If Length(HeaderText) > 70 Then
+  HeaderText := Copy(HeaderText, 1, 67) + '...';
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, HeaderText);
+ Y := Y + PREVIEW_LINE_HEIGHT;
+
+ { En-tete Cc: (si present) }
+ If Messages[MsgIdx].CcEmail <> '' Then Begin
+  HeaderText := 'Cc: ' + Messages[MsgIdx].CcEmail;
+  If Length(HeaderText) > 70 Then
+   HeaderText := Copy(HeaderText, 1, 67) + '...';
+  OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, HeaderText);
+  Y := Y + PREVIEW_LINE_HEIGHT;
+ End;
+
+ { En-tete Date: }
+ HeaderText := 'Date: ' + Messages[MsgIdx].DateFull;
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, HeaderText);
+ Y := Y + PREVIEW_LINE_HEIGHT;
+
+ { En-tete Objet: }
+ HeaderText := 'Objet: ' + Messages[MsgIdx].Subject;
+ If Length(HeaderText) > 70 Then
+  HeaderText := Copy(HeaderText, 1, 67) + '...';
+ OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, HeaderText);
  Y := Y + 8;
+
+ { Ligne de separation }
  SetColor(COLOR_BUTTON_DARK);
- Line(Layout.PreviewPaneRect.X1 + 2, Y, Layout.PreviewPaneRect.X2 - 2, Y);
+ Line(Layout.PreviewPaneRect.X1 + 2, Y, Layout.PreviewPaneRect.X2 - PREVIEW_SCROLLBAR_WIDTH - 2, Y);
+ SetColor(COLOR_BUTTON_LIGHT);
+ Line(Layout.PreviewPaneRect.X1 + 2, Y + 1, Layout.PreviewPaneRect.X2 - PREVIEW_SCROLLBAR_WIDTH - 2, Y + 1);
 
- { Corps du message }
- Y := Y + 8;
+ { Zone de contenu du message avec defilement }
+ BodyTop := Y + 4;
+ BodyBottom := Layout.PreviewPaneRect.Y2 - 2;
+ BodyY := BodyTop - (PreviewScrollY * PREVIEW_LINE_HEIGHT);
+
+ { Calculer le defilement maximum }
+ PreviewMaxScrollY := Messages[MsgIdx].BodyLineCount - ((BodyBottom - BodyTop) Div PREVIEW_LINE_HEIGHT);
+ If PreviewMaxScrollY < 0 Then PreviewMaxScrollY := 0;
+
+ { Ajuster le defilement si necessaire }
+ If PreviewScrollY > PreviewMaxScrollY Then PreviewScrollY := PreviewMaxScrollY;
+ If PreviewScrollY < 0 Then PreviewScrollY := 0;
+
+ { Definir le rectangle de decoupage pour le corps }
+ SetViewPort(Layout.PreviewPaneRect.X1 + 2, BodyTop,
+             Layout.PreviewPaneRect.X2 - PREVIEW_SCROLLBAR_WIDTH - 2, BodyBottom, True);
+
+ { Dessiner les lignes du corps du message }
  SetColor(COLOR_LIST_TEXT);
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Bonjour,');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, '');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Je vous rappelle notre reunion de demain a 10h.');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Merci de confirmer votre presence.');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, '');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Cordialement,');
- Y := Y + 14;
- OutTextXY(Layout.PreviewPaneRect.X1 + 4, Y, 'Jean Dupont');
+ For I := 0 To Messages[MsgIdx].BodyLineCount - 1 Do Begin
+  If (BodyY >= BodyTop - PREVIEW_LINE_HEIGHT) And (BodyY <= BodyBottom) Then Begin
+   OutTextXY(2 - PreviewScrollX, BodyY - BodyTop, Messages[MsgIdx].Body[I]);
+  End;
+  BodyY := BodyY + PREVIEW_LINE_HEIGHT;
+ End;
+
+ { Restaurer le viewport complet }
+ SetViewPort(0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1, True);
+
+ { Dessiner la barre de defilement verticale si necessaire }
+ DrawPreviewScrollbarV;
 End;
 
 { Dessine les séparateurs (splitters) }
@@ -3110,10 +3362,20 @@ Begin
  End
 
  { Défilement du volet de prévisualisation }
- Else If PointInRect(MouseX, MouseY,
+ Else If PreviewVisible And PointInRect(MouseX, MouseY,
     Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
     Layout.PreviewPaneRect.X2, Layout.PreviewPaneRect.Y2) Then Begin
+  If Direction > 0 Then Begin
+   { Défiler vers le haut }
+   PreviewScrollY := PreviewScrollY - PREVIEW_SCROLL_STEP;
+   If PreviewScrollY < 0 Then PreviewScrollY := 0;
+  End Else Begin
+   { Défiler vers le bas }
+   PreviewScrollY := PreviewScrollY + PREVIEW_SCROLL_STEP;
+   If PreviewScrollY > PreviewMaxScrollY Then PreviewScrollY := PreviewMaxScrollY;
+  End;
   HideMouse;
+  DrawPreviewPane;
   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
   SetColor(COLOR_STATUS_TEXT);
