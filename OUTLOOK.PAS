@@ -49,7 +49,7 @@
       - Sélection multiple avec Ctrl+clic et Shift+clic
       - Menu contextuel au clic droit
 
-  7.  [ ] Volet de prévisualisation des messages
+  7.  [x] Volet de prévisualisation des messages
       - Affichage des en-têtes: De, À, Cc, Objet, Date
       - Zone de contenu avec défilement vertical et horizontal
       - Basculer entre affichage horizontal et vertical
@@ -1470,6 +1470,56 @@ Begin
    DrawInterface;
   End;
 
+  CMD_VIEW_PREVIEW_SHOW: Begin
+   { Basculer affichage/masquage du volet de previsualisation }
+   PreviewVisible := Not PreviewVisible;
+   HideMouse;
+   If PreviewVisible Then Begin
+    { Restaurer la hauteur du volet }
+    Layout.PreviewPaneHeight := 150;
+    CalculateLayout;
+    DrawInterface;
+    FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+             Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+    SetColor(COLOR_STATUS_TEXT);
+    OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+              'Volet de lecture: Affiche          ');
+   End
+   Else Begin
+    { Masquer le volet - donner tout l'espace a la liste }
+    Layout.PreviewPaneHeight := 0;
+    CalculateLayout;
+    DrawInterface;
+    FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+             Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+    SetColor(COLOR_STATUS_TEXT);
+    OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+              'Volet de lecture: Masque           ');
+   End;
+   ShowMouse;
+  End;
+
+  CMD_VIEW_PREVIEW_ORIENT: Begin
+   { Basculer orientation du volet de previsualisation }
+   If PreviewOrientation = poHorizontal Then
+    PreviewOrientation := poVertical
+   Else
+    PreviewOrientation := poHorizontal;
+   HideMouse;
+   CalculateLayout;
+   DrawInterface;
+   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+   SetColor(COLOR_STATUS_TEXT);
+   If PreviewOrientation = poHorizontal Then
+    OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+              'Orientation: Horizontale           ')
+   Else
+    OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+              'Orientation: Verticale             ');
+   ShowMouse;
+  End;
+
   CMD_TOOLS_OPTIONS: Begin
    HideMouse;
    FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
@@ -2552,8 +2602,12 @@ End;
 
 { Gere le clic sur un message }
 Procedure HandleMessageClick(MsgIdx: Integer);
+Var
+ OldSelected: Integer;
 Begin
  If (MsgIdx < 0) Or (MsgIdx >= MessageCount) Then Exit;
+
+ OldSelected := SelectedMessage;
 
  If ShiftKeyDown And (LastSelectedMessage >= 0) Then Begin
   { Selection de plage avec Shift }
@@ -2575,6 +2629,12 @@ Begin
   Messages[MsgIdx].IsSelected := True;
   SelectedMessage := MsgIdx;
   LastSelectedMessage := MsgIdx;
+ End;
+
+ { Reinitialiser le defilement du volet de previsualisation si nouveau message }
+ If SelectedMessage <> OldSelected Then Begin
+  PreviewScrollY := 0;
+  PreviewScrollX := 0;
  End;
 End;
 
