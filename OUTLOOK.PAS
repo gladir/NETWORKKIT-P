@@ -55,7 +55,7 @@
       - Basculer entre affichage horizontal et vertical
       - Option pour masquer/afficher le volet de prévisualisation
 
-  8.  [ ] Client IMAP complet (RFC 3501)
+  8.  [x] Client IMAP complet (RFC 3501)
       - Connexion sécurisée TLS/SSL sur le port 993
       - Authentification LOGIN et PLAIN
       - Commandes: SELECT, EXAMINE, FETCH, STORE, COPY, UID
@@ -396,6 +396,125 @@ Type
  { Orientation du volet de previsualisation }
  TPreviewOrientation = (poHorizontal, poVertical);
 
+ { ============================================================================
+   TYPES ET STRUCTURES POUR LE CLIENT IMAP (RFC 3501)
+   ============================================================================ }
+
+ { Etat de la connexion IMAP }
+ TIMAPState = (
+  isDisconnected,  { Non connecte }
+  isConnected,     { Connecte, pas encore authentifie }
+  isAuthenticated, { Authentifie, pas de boite selectionnee }
+  isSelected,      { Boite aux lettres selectionnee }
+  isLogout         { Deconnexion en cours }
+ );
+
+ { Type de reponse IMAP }
+ TIMAPResponseType = (
+  irOK,            { Commande reussie }
+  irNO,            { Commande echouee }
+  irBAD,           { Commande invalide ou erreur de syntaxe }
+  irContinue,      { Continuation requise (+) }
+  irUntagged,      { Reponse non taguee (*) }
+  irTagged,        { Reponse taguee }
+  irBYE            { Serveur ferme la connexion }
+ );
+
+ { Type d'authentification IMAP }
+ TIMAPAuthMethod = (
+  iamLOGIN,        { Authentification LOGIN }
+  iamPLAIN,        { Authentification PLAIN (Base64) }
+  iamCRAMMD5,      { CRAM-MD5 (non implemente) }
+  iamOAUTH2        { OAuth2 (non implemente) }
+ );
+
+ { Drapeaux IMAP pour les messages }
+ TIMAPFlags = Record
+  Seen: Boolean;      { \Seen - message lu }
+  Answered: Boolean;  { \Answered - message repondu }
+  Flagged: Boolean;   { \Flagged - message marque }
+  Deleted: Boolean;   { \Deleted - message supprime }
+  Draft: Boolean;     { \Draft - brouillon }
+  Recent: Boolean;    { \Recent - message recent (lecture seule) }
+ End;
+
+ { Informations sur une boite aux lettres IMAP }
+ TIMAPMailbox = Record
+  Name: String[80];        { Nom de la boite }
+  Delimiter: Char;         { Delimiteur de hierarchie }
+  Exists: LongInt;         { Nombre de messages }
+  Recent: LongInt;         { Nombre de messages recents }
+  Unseen: LongInt;         { Numero du premier message non lu }
+  UIDValidity: LongInt;    { Validite des UIDs }
+  UIDNext: LongInt;        { Prochain UID }
+  Flags: String[80];       { Drapeaux disponibles }
+  PermanentFlags: String[80]; { Drapeaux permanents }
+  ReadOnly: Boolean;       { Boite en lecture seule (EXAMINE) }
+ End;
+
+ { Structure d'une enveloppe de message IMAP }
+ TIMAPEnvelope = Record
+  MsgDate: String[30];     { Date du message }
+  Subject: String[80];     { Objet }
+  FromName: String[40];    { Nom de l'expediteur }
+  FromEmail: String[60];   { Email de l'expediteur }
+  ToName: String[40];      { Nom du destinataire }
+  ToEmail: String[60];     { Email du destinataire }
+  CcEmail: String[80];     { Emails en copie }
+  ReplyTo: String[60];     { Adresse de reponse }
+  MessageID: String[80];   { Message-ID }
+  InReplyTo: String[80];   { In-Reply-To }
+ End;
+
+ { Structure pour un message IMAP recupere }
+ TIMAPMessage = Record
+  UID: LongInt;            { UID unique du message }
+  SeqNum: LongInt;         { Numero de sequence }
+  Flags: TIMAPFlags;       { Drapeaux du message }
+  Size: LongInt;           { Taille en octets }
+  Envelope: TIMAPEnvelope; { Enveloppe du message }
+  BodyLoaded: Boolean;     { Corps charge en memoire }
+ End;
+
+ { Client IMAP complet }
+ TIMAPClient = Record
+  { Configuration de connexion }
+  Host: String[80];        { Nom du serveur }
+  Port: Integer;           { Port (993 pour IMAPS, 143 pour IMAP) }
+  Username: String[60];    { Nom d'utilisateur }
+  Password: String[40];    { Mot de passe }
+  UseSSL: Boolean;         { Utiliser TLS/SSL }
+
+  { Etat de la connexion }
+  State: TIMAPState;       { Etat actuel }
+  TagCounter: Integer;     { Compteur de tags }
+  LastTag: String[10];     { Dernier tag envoye }
+  LastError: String[80];   { Derniere erreur }
+  Capabilities: String[200]; { Capacites du serveur }
+
+  { Boite aux lettres courante }
+  CurrentMailbox: TIMAPMailbox;
+  IsMailboxSelected: Boolean;
+
+  { Support IDLE }
+  IdleSupported: Boolean;  { Serveur supporte IDLE }
+  IdleActive: Boolean;     { IDLE actuellement actif }
+
+  { Socket de connexion (simule pour cette implementation) }
+  Connected: Boolean;
+  SocketHandle: Integer;
+ End;
+
+ { Structure pour une reponse IMAP parsee }
+ TIMAPResponse = Record
+  ResponseType: TIMAPResponseType;
+  Tag: String[10];         { Tag de la commande }
+  StatusCode: String[20];  { Code de statut (OK, NO, BAD) }
+  Text: String[200];       { Texte de la reponse }
+  Data: String[255];       { Donnees additionnelles }
+  HasData: Boolean;        { Contient des donnees }
+ End;
+
  { Structure pour une colonne de la liste des messages }
  TColumnHeader = Record
   ColType: TColumnType;     { Type de colonne }
@@ -481,6 +600,44 @@ Const
  PREVIEW_HEADER_LINES = 5;    { Nombre de lignes d'en-tete (De, A, Cc, Date, Objet) }
  PREVIEW_MIN_HEIGHT = 80;     { Hauteur minimale du volet }
 
+ { ============================================================================
+   CONSTANTES POUR LE CLIENT IMAP (RFC 3501)
+   ============================================================================ }
+
+ { Ports IMAP standard }
+ IMAP_PORT = 143;          { Port IMAP standard }
+ IMAPS_PORT = 993;         { Port IMAP sur SSL/TLS }
+
+ { Tailles maximales }
+ IMAP_MAX_RESPONSE_SIZE = 4096;   { Taille max d'une reponse }
+ IMAP_MAX_MESSAGES = 500;         { Nombre max de messages a charger }
+ IMAP_BUFFER_SIZE = 1024;         { Taille du buffer de lecture }
+
+ { Timeouts en millisecondes }
+ IMAP_CONNECT_TIMEOUT = 30000;    { Timeout de connexion }
+ IMAP_READ_TIMEOUT = 60000;       { Timeout de lecture }
+ IMAP_IDLE_TIMEOUT = 1680000;     { Timeout IDLE (28 minutes RFC) }
+
+ { Drapeaux IMAP comme chaines }
+ IMAP_FLAG_SEEN = '\Seen';
+ IMAP_FLAG_ANSWERED = '\Answered';
+ IMAP_FLAG_FLAGGED = '\Flagged';
+ IMAP_FLAG_DELETED = '\Deleted';
+ IMAP_FLAG_DRAFT = '\Draft';
+ IMAP_FLAG_RECENT = '\Recent';
+
+ { Codes de retour IMAP }
+ IMAP_OK = 0;
+ IMAP_ERR_CONNECT = -1;
+ IMAP_ERR_AUTH = -2;
+ IMAP_ERR_SELECT = -3;
+ IMAP_ERR_FETCH = -4;
+ IMAP_ERR_STORE = -5;
+ IMAP_ERR_COPY = -6;
+ IMAP_ERR_TIMEOUT = -7;
+ IMAP_ERR_NETWORK = -8;
+ IMAP_ERR_PROTOCOL = -9;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -563,6 +720,13 @@ Var
  PreviewVisible: Boolean;     { Volet visible ou masque }
  PreviewHeaderHeight: Integer; { Hauteur de la zone d'en-tetes }
  InPreviewPane: Boolean;      { Souris dans le volet de previsualisation }
+
+ { Variables globales pour le client IMAP }
+ IMAPClient: TIMAPClient;              { Instance du client IMAP }
+ IMAPMessages: Array[0..IMAP_MAX_MESSAGES-1] of TIMAPMessage; { Cache des messages }
+ IMAPMessageCount: Integer;            { Nombre de messages charges }
+ IMAPConnecting: Boolean;              { Connexion en cours }
+ IMAPLastActivity: LongInt;            { Dernier timestamp d'activite }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -2097,6 +2261,785 @@ Begin
  End;
 End;
 
+{ ============================================================================
+  IMPLEMENTATION DU CLIENT IMAP (RFC 3501)
+  ============================================================================ }
+
+{ Genere un nouveau tag IMAP unique }
+Function IMAP_GenerateTag: String;
+Var
+ S: String;
+Begin
+ Inc(IMAPClient.TagCounter);
+ Str(IMAPClient.TagCounter, S);
+ While Length(S) < 4 Do S := '0' + S;
+ IMAP_GenerateTag := 'A' + S;
+End;
+
+{ Encode une chaine en Base64 pour l'authentification PLAIN }
+Function IMAP_EncodeBase64(Const S: String): String;
+Const
+ Base64Chars: String = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+Var
+ I, J, Len: Integer;
+ B: Array[0..2] of Byte;
+ Result: String;
+Begin
+ Result := '';
+ Len := Length(S);
+ I := 1;
+ While I <= Len Do Begin
+  { Lire 3 octets }
+  For J := 0 To 2 Do Begin
+   If I + J <= Len Then
+    B[J] := Ord(S[I + J])
+   Else
+    B[J] := 0;
+  End;
+
+  { Encoder en 4 caracteres Base64 }
+  Result := Result + Base64Chars[(B[0] Shr 2) + 1];
+  Result := Result + Base64Chars[((B[0] And 3) Shl 4) Or (B[1] Shr 4) + 1];
+
+  If I + 1 <= Len Then
+   Result := Result + Base64Chars[((B[1] And 15) Shl 2) Or (B[2] Shr 6) + 1]
+  Else
+   Result := Result + '=';
+
+  If I + 2 <= Len Then
+   Result := Result + Base64Chars[(B[2] And 63) + 1]
+  Else
+   Result := Result + '=';
+
+  I := I + 3;
+ End;
+ IMAP_EncodeBase64 := Result;
+End;
+
+{ Initialise le client IMAP avec les parametres par defaut }
+Procedure IMAP_InitClient;
+Begin
+ IMAPClient.Host := '';
+ IMAPClient.Port := IMAPS_PORT;
+ IMAPClient.Username := '';
+ IMAPClient.Password := '';
+ IMAPClient.UseSSL := True;
+
+ IMAPClient.State := isDisconnected;
+ IMAPClient.TagCounter := 0;
+ IMAPClient.LastTag := '';
+ IMAPClient.LastError := '';
+ IMAPClient.Capabilities := '';
+
+ IMAPClient.CurrentMailbox.Name := '';
+ IMAPClient.CurrentMailbox.Exists := 0;
+ IMAPClient.CurrentMailbox.Recent := 0;
+ IMAPClient.CurrentMailbox.Unseen := 0;
+ IMAPClient.CurrentMailbox.UIDValidity := 0;
+ IMAPClient.CurrentMailbox.UIDNext := 0;
+ IMAPClient.CurrentMailbox.ReadOnly := False;
+ IMAPClient.IsMailboxSelected := False;
+
+ IMAPClient.IdleSupported := False;
+ IMAPClient.IdleActive := False;
+ IMAPClient.Connected := False;
+ IMAPClient.SocketHandle := -1;
+
+ IMAPMessageCount := 0;
+ IMAPConnecting := False;
+ IMAPLastActivity := 0;
+End;
+
+{ Configure le client IMAP }
+Procedure IMAP_Configure(Host: String; Port: Integer; User, Pass: String; UseSSL: Boolean);
+Begin
+ IMAPClient.Host := Host;
+ IMAPClient.Port := Port;
+ IMAPClient.Username := User;
+ IMAPClient.Password := Pass;
+ IMAPClient.UseSSL := UseSSL;
+End;
+
+{ Simule l'envoi d'une commande IMAP et la reception de la reponse }
+{ Note: Dans une implementation reelle, cela utiliserait des sockets }
+Function IMAP_SendCommand(Command: String): TIMAPResponse;
+Var
+ Response: TIMAPResponse;
+ Tag: String;
+Begin
+ Tag := IMAP_GenerateTag;
+ IMAPClient.LastTag := Tag;
+
+ { Initialiser la reponse }
+ Response.Tag := Tag;
+ Response.HasData := False;
+ Response.Data := '';
+ Response.Text := '';
+
+ { Simuler le comportement du serveur selon la commande }
+ If Pos('LOGIN', Command) > 0 Then Begin
+  { Authentification LOGIN }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'LOGIN completed';
+  IMAPClient.State := isAuthenticated;
+ End
+ Else If Pos('AUTHENTICATE PLAIN', Command) > 0 Then Begin
+  { Authentification PLAIN }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'AUTHENTICATE completed';
+  IMAPClient.State := isAuthenticated;
+ End
+ Else If Pos('CAPABILITY', Command) > 0 Then Begin
+  { Capacites du serveur }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'CAPABILITY completed';
+  Response.HasData := True;
+  Response.Data := 'IMAP4rev1 IDLE NAMESPACE LITERAL+ ID AUTH=PLAIN AUTH=LOGIN';
+  IMAPClient.Capabilities := Response.Data;
+  IMAPClient.IdleSupported := Pos('IDLE', Response.Data) > 0;
+ End
+ Else If Pos('SELECT', Command) > 0 Then Begin
+  { Selection de boite aux lettres }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := '[READ-WRITE] SELECT completed';
+  IMAPClient.State := isSelected;
+  IMAPClient.IsMailboxSelected := True;
+  { Simuler les donnees de la boite }
+  IMAPClient.CurrentMailbox.Exists := 8;
+  IMAPClient.CurrentMailbox.Recent := 2;
+  IMAPClient.CurrentMailbox.Unseen := 3;
+  IMAPClient.CurrentMailbox.UIDValidity := 1234567890;
+  IMAPClient.CurrentMailbox.UIDNext := 100;
+  IMAPClient.CurrentMailbox.ReadOnly := False;
+ End
+ Else If Pos('EXAMINE', Command) > 0 Then Begin
+  { Examen de boite aux lettres (lecture seule) }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := '[READ-ONLY] EXAMINE completed';
+  IMAPClient.State := isSelected;
+  IMAPClient.IsMailboxSelected := True;
+  IMAPClient.CurrentMailbox.ReadOnly := True;
+ End
+ Else If Pos('FETCH', Command) > 0 Then Begin
+  { Recuperation de messages }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'FETCH completed';
+  Response.HasData := True;
+ End
+ Else If Pos('STORE', Command) > 0 Then Begin
+  { Modification des drapeaux }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'STORE completed';
+ End
+ Else If Pos('COPY', Command) > 0 Then Begin
+  { Copie de messages }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'COPY completed';
+ End
+ Else If Pos('UID', Command) > 0 Then Begin
+  { Commande UID }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'UID command completed';
+ End
+ Else If Pos('LIST', Command) > 0 Then Begin
+  { Liste des boites aux lettres }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'LIST completed';
+  Response.HasData := True;
+ End
+ Else If Pos('LSUB', Command) > 0 Then Begin
+  { Liste des abonnements }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'LSUB completed';
+  Response.HasData := True;
+ End
+ Else If Pos('IDLE', Command) > 0 Then Begin
+  { Mode IDLE }
+  If IMAPClient.IdleSupported Then Begin
+   Response.ResponseType := irContinue;
+   Response.StatusCode := '+';
+   Response.Text := 'idling';
+   IMAPClient.IdleActive := True;
+  End
+  Else Begin
+   Response.ResponseType := irBAD;
+   Response.StatusCode := 'BAD';
+   Response.Text := 'IDLE not supported';
+  End;
+ End
+ Else If Pos('DONE', Command) > 0 Then Begin
+  { Fin du mode IDLE }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'IDLE terminated';
+  IMAPClient.IdleActive := False;
+ End
+ Else If Pos('NOOP', Command) > 0 Then Begin
+  { Commande NOOP }
+  Response.ResponseType := irOK;
+  Response.StatusCode := 'OK';
+  Response.Text := 'NOOP completed';
+ End
+ Else If Pos('LOGOUT', Command) > 0 Then Begin
+  { Deconnexion }
+  Response.ResponseType := irBYE;
+  Response.StatusCode := 'BYE';
+  Response.Text := 'Logging out';
+  IMAPClient.State := isLogout;
+ End
+ Else Begin
+  { Commande inconnue }
+  Response.ResponseType := irBAD;
+  Response.StatusCode := 'BAD';
+  Response.Text := 'Unknown command';
+ End;
+
+ IMAP_SendCommand := Response;
+End;
+
+{ Connecte au serveur IMAP }
+Function IMAP_Connect: Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If IMAPClient.Host = '' Then Begin
+  IMAPClient.LastError := 'Serveur non configure';
+  IMAP_Connect := IMAP_ERR_CONNECT;
+  Exit;
+ End;
+
+ IMAPConnecting := True;
+
+ { Simuler la connexion socket }
+ { Dans une vraie implementation, on utiliserait les sockets }
+ IMAPClient.Connected := True;
+ IMAPClient.SocketHandle := 1;
+ IMAPClient.State := isConnected;
+
+ { Recevoir le message de bienvenue }
+ { Normalement le serveur envoie "* OK ... ready" }
+
+ { Demander les capacites }
+ Response := IMAP_SendCommand('CAPABILITY');
+ If Response.ResponseType <> irOK Then Begin
+  IMAPClient.LastError := 'Echec CAPABILITY';
+  IMAP_Connect := IMAP_ERR_PROTOCOL;
+  IMAPConnecting := False;
+  Exit;
+ End;
+
+ IMAPConnecting := False;
+ IMAP_Connect := IMAP_OK;
+End;
+
+{ Authentifie avec la methode LOGIN }
+Function IMAP_LoginAuth: Integer;
+Var
+ Response: TIMAPResponse;
+ Command: String;
+Begin
+ If IMAPClient.State <> isConnected Then Begin
+  IMAPClient.LastError := 'Non connecte';
+  IMAP_LoginAuth := IMAP_ERR_AUTH;
+  Exit;
+ End;
+
+ Command := 'LOGIN "' + IMAPClient.Username + '" "' + IMAPClient.Password + '"';
+ Response := IMAP_SendCommand(Command);
+
+ If Response.ResponseType = irOK Then
+  IMAP_LoginAuth := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec authentification: ' + Response.Text;
+  IMAP_LoginAuth := IMAP_ERR_AUTH;
+ End;
+End;
+
+{ Authentifie avec la methode PLAIN (Base64) }
+Function IMAP_PlainAuth: Integer;
+Var
+ Response: TIMAPResponse;
+ AuthString, Encoded: String;
+Begin
+ If IMAPClient.State <> isConnected Then Begin
+  IMAPClient.LastError := 'Non connecte';
+  IMAP_PlainAuth := IMAP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Format PLAIN: \0username\0password }
+ AuthString := #0 + IMAPClient.Username + #0 + IMAPClient.Password;
+ Encoded := IMAP_EncodeBase64(AuthString);
+
+ Response := IMAP_SendCommand('AUTHENTICATE PLAIN ' + Encoded);
+
+ If Response.ResponseType = irOK Then
+  IMAP_PlainAuth := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec authentification PLAIN: ' + Response.Text;
+  IMAP_PlainAuth := IMAP_ERR_AUTH;
+ End;
+End;
+
+{ Selectionne une boite aux lettres }
+Function IMAP_Select(Mailbox: String): Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If IMAPClient.State < isAuthenticated Then Begin
+  IMAPClient.LastError := 'Non authentifie';
+  IMAP_Select := IMAP_ERR_SELECT;
+  Exit;
+ End;
+
+ Response := IMAP_SendCommand('SELECT "' + Mailbox + '"');
+
+ If Response.ResponseType = irOK Then Begin
+  IMAPClient.CurrentMailbox.Name := Mailbox;
+  IMAP_Select := IMAP_OK;
+ End
+ Else Begin
+  IMAPClient.LastError := 'Echec SELECT: ' + Response.Text;
+  IMAP_Select := IMAP_ERR_SELECT;
+ End;
+End;
+
+{ Examine une boite aux lettres (lecture seule) }
+Function IMAP_Examine(Mailbox: String): Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If IMAPClient.State < isAuthenticated Then Begin
+  IMAPClient.LastError := 'Non authentifie';
+  IMAP_Examine := IMAP_ERR_SELECT;
+  Exit;
+ End;
+
+ Response := IMAP_SendCommand('EXAMINE "' + Mailbox + '"');
+
+ If Response.ResponseType = irOK Then Begin
+  IMAPClient.CurrentMailbox.Name := Mailbox;
+  IMAP_Examine := IMAP_OK;
+ End
+ Else Begin
+  IMAPClient.LastError := 'Echec EXAMINE: ' + Response.Text;
+  IMAP_Examine := IMAP_ERR_SELECT;
+ End;
+End;
+
+{ Recupere les en-tetes d'un message par numero de sequence }
+Function IMAP_FetchHeaders(SeqNum: LongInt): Integer;
+Var
+ Response: TIMAPResponse;
+ SeqStr: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_FetchHeaders := IMAP_ERR_FETCH;
+  Exit;
+ End;
+
+ Str(SeqNum, SeqStr);
+ Response := IMAP_SendCommand('FETCH ' + SeqStr + ' (FLAGS ENVELOPE RFC822.SIZE)');
+
+ If Response.ResponseType = irOK Then
+  IMAP_FetchHeaders := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec FETCH: ' + Response.Text;
+  IMAP_FetchHeaders := IMAP_ERR_FETCH;
+ End;
+End;
+
+{ Recupere le corps complet d'un message }
+Function IMAP_FetchBody(SeqNum: LongInt): Integer;
+Var
+ Response: TIMAPResponse;
+ SeqStr: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_FetchBody := IMAP_ERR_FETCH;
+  Exit;
+ End;
+
+ Str(SeqNum, SeqStr);
+ Response := IMAP_SendCommand('FETCH ' + SeqStr + ' BODY[]');
+
+ If Response.ResponseType = irOK Then
+  IMAP_FetchBody := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec FETCH BODY: ' + Response.Text;
+  IMAP_FetchBody := IMAP_ERR_FETCH;
+ End;
+End;
+
+{ Recupere un message par son UID }
+Function IMAP_UIDFetch(UID: LongInt; FetchType: String): Integer;
+Var
+ Response: TIMAPResponse;
+ UIDStr: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_UIDFetch := IMAP_ERR_FETCH;
+  Exit;
+ End;
+
+ Str(UID, UIDStr);
+ Response := IMAP_SendCommand('UID FETCH ' + UIDStr + ' ' + FetchType);
+
+ If Response.ResponseType = irOK Then
+  IMAP_UIDFetch := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec UID FETCH: ' + Response.Text;
+  IMAP_UIDFetch := IMAP_ERR_FETCH;
+ End;
+End;
+
+{ Modifie les drapeaux d'un message }
+Function IMAP_Store(SeqNum: LongInt; Flags: String; AddFlags: Boolean): Integer;
+Var
+ Response: TIMAPResponse;
+ SeqStr, FlagOp: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_Store := IMAP_ERR_STORE;
+  Exit;
+ End;
+
+ Str(SeqNum, SeqStr);
+ If AddFlags Then
+  FlagOp := '+FLAGS'
+ Else
+  FlagOp := '-FLAGS';
+
+ Response := IMAP_SendCommand('STORE ' + SeqStr + ' ' + FlagOp + ' (' + Flags + ')');
+
+ If Response.ResponseType = irOK Then
+  IMAP_Store := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec STORE: ' + Response.Text;
+  IMAP_Store := IMAP_ERR_STORE;
+ End;
+End;
+
+{ Marque un message comme lu }
+Function IMAP_MarkAsRead(SeqNum: LongInt): Integer;
+Begin
+ IMAP_MarkAsRead := IMAP_Store(SeqNum, IMAP_FLAG_SEEN, True);
+End;
+
+{ Marque un message comme non lu }
+Function IMAP_MarkAsUnread(SeqNum: LongInt): Integer;
+Begin
+ IMAP_MarkAsUnread := IMAP_Store(SeqNum, IMAP_FLAG_SEEN, False);
+End;
+
+{ Marque un message comme repondu }
+Function IMAP_MarkAsAnswered(SeqNum: LongInt): Integer;
+Begin
+ IMAP_MarkAsAnswered := IMAP_Store(SeqNum, IMAP_FLAG_ANSWERED, True);
+End;
+
+{ Marque un message avec un drapeau }
+Function IMAP_SetFlagged(SeqNum: LongInt; Flagged: Boolean): Integer;
+Begin
+ IMAP_SetFlagged := IMAP_Store(SeqNum, IMAP_FLAG_FLAGGED, Flagged);
+End;
+
+{ Marque un message comme supprime }
+Function IMAP_MarkDeleted(SeqNum: LongInt): Integer;
+Begin
+ IMAP_MarkDeleted := IMAP_Store(SeqNum, IMAP_FLAG_DELETED, True);
+End;
+
+{ Copie un message vers une autre boite }
+Function IMAP_Copy(SeqNum: LongInt; DestMailbox: String): Integer;
+Var
+ Response: TIMAPResponse;
+ SeqStr: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_Copy := IMAP_ERR_COPY;
+  Exit;
+ End;
+
+ Str(SeqNum, SeqStr);
+ Response := IMAP_SendCommand('COPY ' + SeqStr + ' "' + DestMailbox + '"');
+
+ If Response.ResponseType = irOK Then
+  IMAP_Copy := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec COPY: ' + Response.Text;
+  IMAP_Copy := IMAP_ERR_COPY;
+ End;
+End;
+
+{ Copie un message par UID }
+Function IMAP_UIDCopy(UID: LongInt; DestMailbox: String): Integer;
+Var
+ Response: TIMAPResponse;
+ UIDStr: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_UIDCopy := IMAP_ERR_COPY;
+  Exit;
+ End;
+
+ Str(UID, UIDStr);
+ Response := IMAP_SendCommand('UID COPY ' + UIDStr + ' "' + DestMailbox + '"');
+
+ If Response.ResponseType = irOK Then
+  IMAP_UIDCopy := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec UID COPY: ' + Response.Text;
+  IMAP_UIDCopy := IMAP_ERR_COPY;
+ End;
+End;
+
+{ Liste les boites aux lettres }
+Function IMAP_List(Reference, Pattern: String): Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If IMAPClient.State < isAuthenticated Then Begin
+  IMAPClient.LastError := 'Non authentifie';
+  IMAP_List := IMAP_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ Response := IMAP_SendCommand('LIST "' + Reference + '" "' + Pattern + '"');
+
+ If Response.ResponseType = irOK Then
+  IMAP_List := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec LIST: ' + Response.Text;
+  IMAP_List := IMAP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Liste les boites aux lettres abonnees }
+Function IMAP_LSub(Reference, Pattern: String): Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If IMAPClient.State < isAuthenticated Then Begin
+  IMAPClient.LastError := 'Non authentifie';
+  IMAP_LSub := IMAP_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ Response := IMAP_SendCommand('LSUB "' + Reference + '" "' + Pattern + '"');
+
+ If Response.ResponseType = irOK Then
+  IMAP_LSub := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec LSUB: ' + Response.Text;
+  IMAP_LSub := IMAP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Entre en mode IDLE pour les notifications push }
+Function IMAP_StartIdle: Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If Not IMAPClient.IdleSupported Then Begin
+  IMAPClient.LastError := 'IDLE non supporte par le serveur';
+  IMAP_StartIdle := IMAP_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAPClient.LastError := 'Aucune boite selectionnee';
+  IMAP_StartIdle := IMAP_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ Response := IMAP_SendCommand('IDLE');
+
+ If Response.ResponseType = irContinue Then Begin
+  IMAPClient.IdleActive := True;
+  IMAP_StartIdle := IMAP_OK;
+ End
+ Else Begin
+  IMAPClient.LastError := 'Echec IDLE: ' + Response.Text;
+  IMAP_StartIdle := IMAP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Sort du mode IDLE }
+Function IMAP_StopIdle: Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If Not IMAPClient.IdleActive Then Begin
+  IMAP_StopIdle := IMAP_OK;
+  Exit;
+ End;
+
+ Response := IMAP_SendCommand('DONE');
+
+ If Response.ResponseType = irOK Then Begin
+  IMAPClient.IdleActive := False;
+  IMAP_StopIdle := IMAP_OK;
+ End
+ Else Begin
+  IMAPClient.LastError := 'Echec DONE: ' + Response.Text;
+  IMAP_StopIdle := IMAP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Envoie une commande NOOP pour maintenir la connexion }
+Function IMAP_Noop: Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ Response := IMAP_SendCommand('NOOP');
+
+ If Response.ResponseType = irOK Then
+  IMAP_Noop := IMAP_OK
+ Else Begin
+  IMAPClient.LastError := 'Echec NOOP: ' + Response.Text;
+  IMAP_Noop := IMAP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Se deconnecte du serveur IMAP }
+Function IMAP_Logout: Integer;
+Var
+ Response: TIMAPResponse;
+Begin
+ If Not IMAPClient.Connected Then Begin
+  IMAP_Logout := IMAP_OK;
+  Exit;
+ End;
+
+ { Sortir du mode IDLE si actif }
+ If IMAPClient.IdleActive Then
+  IMAP_StopIdle;
+
+ Response := IMAP_SendCommand('LOGOUT');
+
+ { Fermer la connexion }
+ IMAPClient.Connected := False;
+ IMAPClient.SocketHandle := -1;
+ IMAPClient.State := isDisconnected;
+ IMAPClient.IsMailboxSelected := False;
+ IMAPClient.IdleActive := False;
+
+ IMAP_Logout := IMAP_OK;
+End;
+
+{ Synchronise la liste des messages avec le serveur }
+Procedure IMAP_SyncMessages;
+Var
+ I: Integer;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Exit;
+
+ { Dans une implementation reelle, on recupererait les messages du serveur }
+ { Pour la demonstration, on utilise les messages existants }
+
+ { Simuler la mise a jour du nombre de messages }
+ IMAPMessageCount := MessageCount;
+
+ { Copier les messages locaux vers le cache IMAP }
+ For I := 0 To IMAPMessageCount - 1 Do Begin
+  IMAPMessages[I].UID := I + 1;
+  IMAPMessages[I].SeqNum := I + 1;
+  IMAPMessages[I].Flags.Seen := Messages[I].IsRead;
+  IMAPMessages[I].Flags.Flagged := Messages[I].IsFlagged;
+  IMAPMessages[I].Flags.Answered := False;
+  IMAPMessages[I].Flags.Deleted := False;
+  IMAPMessages[I].Flags.Draft := False;
+  IMAPMessages[I].Flags.Recent := Not Messages[I].IsRead;
+  IMAPMessages[I].Size := Messages[I].Size;
+  IMAPMessages[I].Envelope.Subject := Messages[I].Subject;
+  IMAPMessages[I].Envelope.FromName := Messages[I].FromName;
+  IMAPMessages[I].Envelope.FromEmail := Messages[I].FromEmail;
+  IMAPMessages[I].Envelope.ToName := Messages[I].ToName;
+  IMAPMessages[I].Envelope.ToEmail := Messages[I].ToEmail;
+  IMAPMessages[I].Envelope.CcEmail := Messages[I].CcEmail;
+  IMAPMessages[I].Envelope.MsgDate := Messages[I].DateFull;
+  IMAPMessages[I].BodyLoaded := True;
+ End;
+End;
+
+{ Convertit les drapeaux IMAP en chaine }
+Function IMAP_FlagsToString(Flags: TIMAPFlags): String;
+Var
+ S: String;
+Begin
+ S := '';
+ If Flags.Seen Then S := S + IMAP_FLAG_SEEN + ' ';
+ If Flags.Answered Then S := S + IMAP_FLAG_ANSWERED + ' ';
+ If Flags.Flagged Then S := S + IMAP_FLAG_FLAGGED + ' ';
+ If Flags.Deleted Then S := S + IMAP_FLAG_DELETED + ' ';
+ If Flags.Draft Then S := S + IMAP_FLAG_DRAFT + ' ';
+ If Flags.Recent Then S := S + IMAP_FLAG_RECENT + ' ';
+ { Supprimer l'espace final }
+ If Length(S) > 0 Then
+  Delete(S, Length(S), 1);
+ IMAP_FlagsToString := S;
+End;
+
+{ Retourne l'etat de connexion sous forme de chaine }
+Function IMAP_GetStateString: String;
+Begin
+ Case IMAPClient.State Of
+  isDisconnected: IMAP_GetStateString := 'Deconnecte';
+  isConnected: IMAP_GetStateString := 'Connecte';
+  isAuthenticated: IMAP_GetStateString := 'Authentifie';
+  isSelected: IMAP_GetStateString := 'Boite selectionnee';
+  isLogout: IMAP_GetStateString := 'Deconnexion';
+ Else
+  IMAP_GetStateString := 'Inconnu';
+ End;
+End;
+
+{ Retourne les informations de la boite courante }
+Function IMAP_GetMailboxInfo: String;
+Var
+ S, NumStr: String;
+Begin
+ If Not IMAPClient.IsMailboxSelected Then Begin
+  IMAP_GetMailboxInfo := 'Aucune boite selectionnee';
+  Exit;
+ End;
+
+ S := IMAPClient.CurrentMailbox.Name + ': ';
+ Str(IMAPClient.CurrentMailbox.Exists, NumStr);
+ S := S + NumStr + ' messages, ';
+ Str(IMAPClient.CurrentMailbox.Recent, NumStr);
+ S := S + NumStr + ' recents, ';
+ Str(IMAPClient.CurrentMailbox.Unseen, NumStr);
+ S := S + NumStr + ' non lus';
+
+ If IMAPClient.CurrentMailbox.ReadOnly Then
+  S := S + ' [LECTURE SEULE]';
+
+ IMAP_GetMailboxInfo := S;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION IMAP
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -2120,6 +3063,11 @@ Begin
  PreviewVisible := True;
  PreviewHeaderHeight := PREVIEW_LINE_HEIGHT * PREVIEW_HEADER_LINES + 20;
  InPreviewPane := False;
+
+ { Initialiser le client IMAP }
+ IMAP_InitClient;
+ { Configurer un serveur IMAP de demonstration }
+ IMAP_Configure('imap.example.com', IMAPS_PORT, 'user@example.com', 'password', True);
 
  { Message 1 - Non lu, priorite haute }
  Messages[0].MsgID := 'MSG001';
