@@ -63,7 +63,7 @@
       - Support IDLE pour les notifications push
       - Gestion des drapeaux: \Seen, \Answered, \Flagged, \Deleted, \Draft
 
-  9.  [ ] Client POP3 complet (RFC 1939)
+  9.  [x] Client POP3 complet (RFC 1939)
       - Connexion sécurisée TLS/SSL sur le port 995
       - Authentification USER/PASS et APOP
       - Commandes: STAT, LIST, RETR, DELE, TOP, UIDL
