@@ -603,6 +603,114 @@ Type
   HasMultiline: Boolean;   { Reponse multiligne }
  End;
 
+ { ============================================================================
+   TYPES ET STRUCTURES POUR LE CLIENT SMTP (RFC 5321)
+   ============================================================================ }
+
+ { Etat de la connexion SMTP }
+ TSMTPState = (
+  ssDisconnected,    { Non connecte }
+  ssConnected,       { Connecte, en attente de EHLO }
+  ssAuthenticated,   { Authentifie, pret a envoyer }
+  ssMailFrom,        { MAIL FROM envoye }
+  ssRcptTo,          { Au moins un RCPT TO accepte }
+  ssData,            { En mode DATA }
+  ssQuit             { QUIT envoye, deconnexion en cours }
+ );
+
+ { Code de reponse SMTP (classe) }
+ TSMTPResponseClass = (
+  srcPositivePrelim,     { 1xx - Preliminaire positif }
+  srcPositiveComplete,   { 2xx - Completion positive }
+  srcPositiveInterm,     { 3xx - Intermediaire positif }
+  srcNegativeTransient,  { 4xx - Erreur temporaire }
+  srcNegativePermanent,  { 5xx - Erreur permanente }
+  srcUnknown             { Classe inconnue }
+ );
+
+ { Type d'authentification SMTP }
+ TSMTPAuthMethod = (
+  samNone,           { Pas d'authentification }
+  samPLAIN,          { Authentification PLAIN (RFC 4616) }
+  samLOGIN,          { Authentification LOGIN }
+  samCRAMMD5         { Authentification CRAM-MD5 (RFC 2195) }
+ );
+
+ { Extensions SMTP supportees (EHLO) }
+ TSMTPExtensions = Record
+  STARTTLS: Boolean;       { STARTTLS supporte }
+  AUTH_PLAIN: Boolean;     { AUTH PLAIN supporte }
+  AUTH_LOGIN: Boolean;     { AUTH LOGIN supporte }
+  AUTH_CRAM_MD5: Boolean;  { AUTH CRAM-MD5 supporte }
+  EIGHTBITMIME: Boolean;   { 8BITMIME supporte }
+  SIZE: LongInt;           { Taille maximale message (0 = non limite) }
+  PIPELINING: Boolean;     { PIPELINING supporte }
+  DSN: Boolean;            { Delivery Status Notification supporte }
+ End;
+
+ { Structure pour un destinataire SMTP }
+ TSMTPRecipient = Record
+  Email: String[60];       { Adresse email }
+  Accepted: Boolean;       { Accepte par le serveur }
+  ErrorMsg: String[80];    { Message d'erreur si refuse }
+ End;
+
+ { Client SMTP complet }
+ TSMTPClient = Record
+  { Configuration de connexion }
+  Host: String[80];        { Nom du serveur }
+  Port: Integer;           { Port (465 pour SMTPS, 587 pour submission) }
+  Username: String[60];    { Nom d'utilisateur }
+  Password: String[40];    { Mot de passe }
+  UseSSL: Boolean;         { Utiliser TLS/SSL implicite }
+  UseSTARTTLS: Boolean;    { Utiliser STARTTLS }
+
+  { Etat de la connexion }
+  State: TSMTPState;       { Etat actuel }
+  LastError: String[80];   { Derniere erreur }
+  LastCode: Integer;       { Dernier code de reponse }
+  ServerGreeting: String[100]; { Message de bienvenue }
+  ServerDomain: String[60];    { Domaine du serveur (EHLO) }
+
+  { Extensions supportees }
+  Extensions: TSMTPExtensions;
+
+  { Options d'authentification }
+  AuthMethod: TSMTPAuthMethod;  { Methode d'authentification utilisee }
+  Authenticated: Boolean;       { Est authentifie }
+
+  { Message en cours d'envoi }
+  MailFrom: String[60];    { Expediteur (MAIL FROM) }
+  RcptCount: Integer;      { Nombre de destinataires }
+  RcptAccepted: Integer;   { Nombre de destinataires acceptes }
+
+  { Socket de connexion (simule pour cette implementation) }
+  Connected: Boolean;
+  SocketHandle: Integer;
+  TLSActive: Boolean;      { TLS actif (apres STARTTLS) }
+ End;
+
+ { Structure pour une reponse SMTP parsee }
+ TSMTPResponse = Record
+  Code: Integer;           { Code numerique (250, 354, 550, etc.) }
+  ResponseClass: TSMTPResponseClass; { Classe de reponse }
+  Text: String[200];       { Texte de la reponse }
+  IsMultiline: Boolean;    { Reponse multiligne }
+  IsContinue: Boolean;     { Continuation (code-) }
+ End;
+
+ { Structure pour un message SMTP a envoyer }
+ TSMTPMessage = Record
+  From: String[60];        { Expediteur }
+  FromName: String[40];    { Nom de l'expediteur }
+  Recipients: Array[0..9] Of TSMTPRecipient; { Destinataires (TO, CC) }
+  RecipientCount: Integer; { Nombre de destinataires }
+  Subject: String[80];     { Sujet }
+  Body: String[255];       { Corps du message (simplifie) }
+  ContentType: String[40]; { Type de contenu }
+  CharSet: String[20];     { Jeu de caracteres }
+ End;
+
  { Structure pour une colonne de la liste des messages }
  TColumnHeader = Record
   ColType: TColumnType;     { Type de colonne }
@@ -758,6 +866,68 @@ Const
  POP3_ERR_NETWORK = -10;
  POP3_ERR_PROTOCOL = -11;
 
+ { ============================================================================
+   CONSTANTES POUR LE CLIENT SMTP (RFC 5321)
+   ============================================================================ }
+
+ { Ports SMTP standard }
+ SMTP_PORT = 25;           { Port SMTP standard (non recommande) }
+ SMTP_SUBMISSION_PORT = 587; { Port de soumission (STARTTLS) }
+ SMTPS_PORT = 465;         { Port SMTP sur SSL/TLS implicite }
+
+ { Tailles maximales }
+ SMTP_MAX_RESPONSE_SIZE = 4096;   { Taille max d'une reponse }
+ SMTP_BUFFER_SIZE = 1024;         { Taille du buffer de lecture }
+ SMTP_MAX_LINE_LENGTH = 998;      { Longueur max d'une ligne (RFC 5321) }
+ SMTP_MAX_RECIPIENTS = 100;       { Nombre max de destinataires }
+
+ { Timeouts en millisecondes }
+ SMTP_CONNECT_TIMEOUT = 30000;    { Timeout de connexion }
+ SMTP_READ_TIMEOUT = 300000;      { Timeout de lecture (5 min pour DATA) }
+ SMTP_GREETING_TIMEOUT = 300000;  { Timeout pour le greeting }
+
+ { Codes de reponse SMTP (principaux) }
+ SMTP_CODE_READY = 220;           { Service ready }
+ SMTP_CODE_CLOSING = 221;         { Closing connection }
+ SMTP_CODE_AUTH_OK = 235;         { Authentication successful }
+ SMTP_CODE_OK = 250;              { Requested action completed }
+ SMTP_CODE_USER_NOT_LOCAL = 251;  { User not local, will forward }
+ SMTP_CODE_AUTH_CONTINUE = 334;   { Auth continuation }
+ SMTP_CODE_START_MAIL = 354;      { Start mail input }
+ SMTP_CODE_NOT_AVAILABLE = 421;   { Service not available }
+ SMTP_CODE_MAILBOX_BUSY = 450;    { Mailbox unavailable (busy) }
+ SMTP_CODE_LOCAL_ERROR = 451;     { Local error }
+ SMTP_CODE_INSUFFICIENT = 452;    { Insufficient storage }
+ SMTP_CODE_SYNTAX_ERROR = 500;    { Syntax error }
+ SMTP_CODE_PARAM_ERROR = 501;     { Parameter syntax error }
+ SMTP_CODE_NOT_IMPLEMENTED = 502; { Command not implemented }
+ SMTP_CODE_BAD_SEQUENCE = 503;    { Bad sequence of commands }
+ SMTP_CODE_PARAM_NOT_IMPL = 504;  { Parameter not implemented }
+ SMTP_CODE_AUTH_REQUIRED = 530;   { Authentication required }
+ SMTP_CODE_AUTH_FAILED = 535;     { Authentication failed }
+ SMTP_CODE_MAILBOX_NOT_FOUND = 550; { Mailbox not found }
+ SMTP_CODE_USER_NOT_LOCAL_ERR = 551; { User not local }
+ SMTP_CODE_EXCEEDED_STORAGE = 552;   { Exceeded storage }
+ SMTP_CODE_MAILBOX_NAME_ERR = 553;   { Mailbox name not allowed }
+ SMTP_CODE_TRANSACTION_FAILED = 554; { Transaction failed }
+
+ { Codes de retour des fonctions SMTP }
+ SMTP_OK = 0;
+ SMTP_ERR_CONNECT = -1;
+ SMTP_ERR_EHLO = -2;
+ SMTP_ERR_STARTTLS = -3;
+ SMTP_ERR_AUTH = -4;
+ SMTP_ERR_MAIL_FROM = -5;
+ SMTP_ERR_RCPT_TO = -6;
+ SMTP_ERR_DATA = -7;
+ SMTP_ERR_SEND = -8;
+ SMTP_ERR_QUIT = -9;
+ SMTP_ERR_TIMEOUT = -10;
+ SMTP_ERR_NETWORK = -11;
+ SMTP_ERR_PROTOCOL = -12;
+ SMTP_ERR_NO_RECIPIENTS = -13;
+ SMTP_ERR_TLS = -14;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -855,6 +1025,13 @@ Var
  POP3MessageCount: Integer;            { Nombre de messages sur le serveur }
  POP3Connecting: Boolean;              { Connexion en cours }
  POP3LastActivity: LongInt;            { Dernier timestamp d'activite }
+
+ { Variables globales pour le client SMTP }
+ SMTPClient: TSMTPClient;              { Instance du client SMTP }
+ SMTPRecipients: Array[0..SMTP_MAX_RECIPIENTS-1] of TSMTPRecipient; { Destinataires }
+ SMTPCurrentMessage: TSMTPMessage;     { Message en cours de preparation }
+ SMTPSending: Boolean;                 { Envoi en cours }
+ SMTPLastActivity: LongInt;            { Dernier timestamp d'activite }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -3796,6 +3973,866 @@ End;
 
 { ============================================================================
   FIN DE L'IMPLEMENTATION POP3
+  ============================================================================ }
+
+{ ============================================================================
+  IMPLEMENTATION DU CLIENT SMTP (RFC 5321)
+  ============================================================================ }
+
+{ Initialise le client SMTP avec les parametres par defaut }
+Procedure SMTP_InitClient;
+Var
+ I: Integer;
+Begin
+ SMTPClient.Host := '';
+ SMTPClient.Port := SMTP_SUBMISSION_PORT;
+ SMTPClient.Username := '';
+ SMTPClient.Password := '';
+ SMTPClient.UseSSL := False;
+ SMTPClient.UseSTARTTLS := True;
+
+ SMTPClient.State := ssDisconnected;
+ SMTPClient.LastError := '';
+ SMTPClient.LastCode := 0;
+ SMTPClient.ServerGreeting := '';
+ SMTPClient.ServerDomain := '';
+
+ SMTPClient.Extensions.STARTTLS := False;
+ SMTPClient.Extensions.AUTH_PLAIN := False;
+ SMTPClient.Extensions.AUTH_LOGIN := False;
+ SMTPClient.Extensions.AUTH_CRAM_MD5 := False;
+ SMTPClient.Extensions.EIGHTBITMIME := False;
+ SMTPClient.Extensions.SIZE := 0;
+ SMTPClient.Extensions.PIPELINING := False;
+ SMTPClient.Extensions.DSN := False;
+
+ SMTPClient.AuthMethod := samNone;
+ SMTPClient.Authenticated := False;
+
+ SMTPClient.MailFrom := '';
+ SMTPClient.RcptCount := 0;
+ SMTPClient.RcptAccepted := 0;
+
+ SMTPClient.Connected := False;
+ SMTPClient.SocketHandle := -1;
+ SMTPClient.TLSActive := False;
+
+ { Initialiser les destinataires }
+ For I := 0 To SMTP_MAX_RECIPIENTS - 1 Do Begin
+  SMTPRecipients[I].Email := '';
+  SMTPRecipients[I].Accepted := False;
+  SMTPRecipients[I].ErrorMsg := '';
+ End;
+
+ { Initialiser le message courant }
+ SMTPCurrentMessage.From := '';
+ SMTPCurrentMessage.FromName := '';
+ SMTPCurrentMessage.RecipientCount := 0;
+ SMTPCurrentMessage.Subject := '';
+ SMTPCurrentMessage.Body := '';
+ SMTPCurrentMessage.ContentType := 'text/plain';
+ SMTPCurrentMessage.CharSet := 'utf-8';
+
+ SMTPSending := False;
+ SMTPLastActivity := 0;
+End;
+
+{ Configure le client SMTP }
+Procedure SMTP_Configure(Host: String; Port: Integer; User, Pass: String; UseSSL, UseSTARTTLS: Boolean);
+Begin
+ SMTPClient.Host := Host;
+ SMTPClient.Port := Port;
+ SMTPClient.Username := User;
+ SMTPClient.Password := Pass;
+ SMTPClient.UseSSL := UseSSL;
+ SMTPClient.UseSTARTTLS := UseSTARTTLS;
+End;
+
+{ Determine la classe d'une reponse SMTP basee sur le code }
+Function SMTP_GetResponseClass(Code: Integer): TSMTPResponseClass;
+Begin
+ Case Code Div 100 Of
+  1: SMTP_GetResponseClass := srcPositivePrelim;
+  2: SMTP_GetResponseClass := srcPositiveComplete;
+  3: SMTP_GetResponseClass := srcPositiveInterm;
+  4: SMTP_GetResponseClass := srcNegativeTransient;
+  5: SMTP_GetResponseClass := srcNegativePermanent;
+ Else
+  SMTP_GetResponseClass := srcUnknown;
+ End;
+End;
+
+{ Parse une reponse SMTP }
+Function SMTP_ParseResponse(ResponseLine: String): TSMTPResponse;
+Var
+ Response: TSMTPResponse;
+ CodeStr: String;
+ ErrCode: Integer;
+Begin
+ Response.Code := 0;
+ Response.ResponseClass := srcUnknown;
+ Response.Text := '';
+ Response.IsMultiline := False;
+ Response.IsContinue := False;
+
+ If Length(ResponseLine) >= 3 Then Begin
+  CodeStr := Copy(ResponseLine, 1, 3);
+  Val(CodeStr, Response.Code, ErrCode);
+  If ErrCode = 0 Then Begin
+   Response.ResponseClass := SMTP_GetResponseClass(Response.Code);
+   { Verifier si c'est une ligne de continuation (code-texte) }
+   If (Length(ResponseLine) >= 4) And (ResponseLine[4] = '-') Then Begin
+    Response.IsMultiline := True;
+    Response.IsContinue := True;
+    If Length(ResponseLine) > 4 Then
+     Response.Text := Copy(ResponseLine, 5, Length(ResponseLine) - 4);
+   End
+   Else If (Length(ResponseLine) >= 4) And (ResponseLine[4] = ' ') Then Begin
+    If Length(ResponseLine) > 4 Then
+     Response.Text := Copy(ResponseLine, 5, Length(ResponseLine) - 4);
+   End
+   Else If Length(ResponseLine) = 3 Then Begin
+    Response.Text := '';
+   End;
+  End;
+ End;
+
+ SMTP_ParseResponse := Response;
+End;
+
+{ Envoie une commande SMTP et recoit la reponse (simule) }
+Function SMTP_SendCommand(Command: String): TSMTPResponse;
+Var
+ Response: TSMTPResponse;
+ CmdUpper: String;
+ I: Integer;
+ NumStr: String;
+Begin
+ Response.Code := 0;
+ Response.ResponseClass := srcUnknown;
+ Response.Text := '';
+ Response.IsMultiline := False;
+ Response.IsContinue := False;
+
+ { Convertir en majuscules pour la comparaison }
+ CmdUpper := '';
+ For I := 1 To Length(Command) Do
+  If (Command[I] >= 'a') And (Command[I] <= 'z') Then
+   CmdUpper := CmdUpper + Chr(Ord(Command[I]) - 32)
+  Else
+   CmdUpper := CmdUpper + Command[I];
+
+ { Simuler les reponses selon la commande }
+ If (Pos('EHLO', CmdUpper) = 1) Or (Pos('HELO', CmdUpper) = 1) Then Begin
+  Response.Code := SMTP_CODE_OK;
+  Response.ResponseClass := srcPositiveComplete;
+  Response.Text := 'smtp.example.com Hello';
+  { Simuler les extensions supportees }
+  SMTPClient.Extensions.STARTTLS := True;
+  SMTPClient.Extensions.AUTH_PLAIN := True;
+  SMTPClient.Extensions.AUTH_LOGIN := True;
+  SMTPClient.Extensions.AUTH_CRAM_MD5 := True;
+  SMTPClient.Extensions.EIGHTBITMIME := True;
+  SMTPClient.Extensions.SIZE := 52428800;
+  SMTPClient.Extensions.PIPELINING := True;
+  SMTPClient.Extensions.DSN := True;
+  SMTPClient.ServerDomain := 'smtp.example.com';
+ End
+ Else If Pos('STARTTLS', CmdUpper) = 1 Then Begin
+  If SMTPClient.Extensions.STARTTLS Then Begin
+   Response.Code := SMTP_CODE_READY;
+   Response.ResponseClass := srcPositiveComplete;
+   Response.Text := 'Ready to start TLS';
+   SMTPClient.TLSActive := True;
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_NOT_IMPLEMENTED;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'STARTTLS not supported';
+  End;
+ End
+ Else If Pos('AUTH PLAIN', CmdUpper) = 1 Then Begin
+  If SMTPClient.Extensions.AUTH_PLAIN Then Begin
+   Response.Code := SMTP_CODE_AUTH_OK;
+   Response.ResponseClass := srcPositiveComplete;
+   Response.Text := 'Authentication successful';
+   SMTPClient.Authenticated := True;
+   SMTPClient.AuthMethod := samPLAIN;
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_AUTH_FAILED;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'AUTH PLAIN not supported';
+  End;
+ End
+ Else If Pos('AUTH LOGIN', CmdUpper) = 1 Then Begin
+  If SMTPClient.Extensions.AUTH_LOGIN Then Begin
+   Response.Code := SMTP_CODE_AUTH_CONTINUE;
+   Response.ResponseClass := srcPositiveInterm;
+   Response.Text := 'VXNlcm5hbWU6'; { Base64 pour "Username:" }
+   SMTPClient.AuthMethod := samLOGIN;
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_AUTH_FAILED;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'AUTH LOGIN not supported';
+  End;
+ End
+ Else If Pos('AUTH CRAM-MD5', CmdUpper) = 1 Then Begin
+  If SMTPClient.Extensions.AUTH_CRAM_MD5 Then Begin
+   Response.Code := SMTP_CODE_AUTH_CONTINUE;
+   Response.ResponseClass := srcPositiveInterm;
+   Response.Text := 'PDEyMzQ1LjY3ODkwQHNtdHAuZXhhbXBsZS5jb20+'; { Challenge simule }
+   SMTPClient.AuthMethod := samCRAMMD5;
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_AUTH_FAILED;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'AUTH CRAM-MD5 not supported';
+  End;
+ End
+ Else If Pos('MAIL FROM:', CmdUpper) = 1 Then Begin
+  If SMTPClient.Authenticated Or (SMTPClient.AuthMethod = samNone) Then Begin
+   Response.Code := SMTP_CODE_OK;
+   Response.ResponseClass := srcPositiveComplete;
+   Response.Text := 'OK';
+   SMTPClient.State := ssMailFrom;
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_AUTH_REQUIRED;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'Authentication required';
+  End;
+ End
+ Else If Pos('RCPT TO:', CmdUpper) = 1 Then Begin
+  If SMTPClient.State >= ssMailFrom Then Begin
+   Response.Code := SMTP_CODE_OK;
+   Response.ResponseClass := srcPositiveComplete;
+   Response.Text := 'OK';
+   SMTPClient.State := ssRcptTo;
+   Inc(SMTPClient.RcptAccepted);
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_BAD_SEQUENCE;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'Need MAIL command first';
+  End;
+ End
+ Else If Pos('DATA', CmdUpper) = 1 Then Begin
+  If SMTPClient.State >= ssRcptTo Then Begin
+   Response.Code := SMTP_CODE_START_MAIL;
+   Response.ResponseClass := srcPositiveInterm;
+   Response.Text := 'Start mail input; end with <CRLF>.<CRLF>';
+   SMTPClient.State := ssData;
+  End
+  Else Begin
+   Response.Code := SMTP_CODE_BAD_SEQUENCE;
+   Response.ResponseClass := srcNegativePermanent;
+   Response.Text := 'Need RCPT command first';
+  End;
+ End
+ Else If Pos('RSET', CmdUpper) = 1 Then Begin
+  Response.Code := SMTP_CODE_OK;
+  Response.ResponseClass := srcPositiveComplete;
+  Response.Text := 'OK';
+  SMTPClient.State := ssAuthenticated;
+  SMTPClient.MailFrom := '';
+  SMTPClient.RcptCount := 0;
+  SMTPClient.RcptAccepted := 0;
+ End
+ Else If Pos('NOOP', CmdUpper) = 1 Then Begin
+  Response.Code := SMTP_CODE_OK;
+  Response.ResponseClass := srcPositiveComplete;
+  Response.Text := 'OK';
+ End
+ Else If Pos('QUIT', CmdUpper) = 1 Then Begin
+  Response.Code := SMTP_CODE_CLOSING;
+  Response.ResponseClass := srcPositiveComplete;
+  Response.Text := 'Closing connection';
+  SMTPClient.State := ssQuit;
+ End
+ Else Begin
+  Response.Code := SMTP_CODE_SYNTAX_ERROR;
+  Response.ResponseClass := srcNegativePermanent;
+  Response.Text := 'Syntax error, command unrecognized';
+ End;
+
+ SMTPClient.LastCode := Response.Code;
+ SMTP_SendCommand := Response;
+End;
+
+{ Encode une chaine en Base64 (implementation simplifiee) }
+Function SMTP_Base64Encode(Input: String): String;
+Const
+ Base64Chars: String = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+Var
+ I, J, Len: Integer;
+ B1, B2, B3: Byte;
+ Output: String;
+Begin
+ Output := '';
+ Len := Length(Input);
+ I := 1;
+ While I <= Len Do Begin
+  B1 := Ord(Input[I]);
+  If I + 1 <= Len Then B2 := Ord(Input[I + 1]) Else B2 := 0;
+  If I + 2 <= Len Then B3 := Ord(Input[I + 2]) Else B3 := 0;
+
+  Output := Output + Base64Chars[(B1 Shr 2) + 1];
+  Output := Output + Base64Chars[((B1 And 3) Shl 4) Or (B2 Shr 4) + 1];
+  If I + 1 <= Len Then
+   Output := Output + Base64Chars[((B2 And 15) Shl 2) Or (B3 Shr 6) + 1]
+  Else
+   Output := Output + '=';
+  If I + 2 <= Len Then
+   Output := Output + Base64Chars[(B3 And 63) + 1]
+  Else
+   Output := Output + '=';
+
+  Inc(I, 3);
+ End;
+ SMTP_Base64Encode := Output;
+End;
+
+{ Calcule un hash simplifie pour CRAM-MD5 }
+Function SMTP_CRAMMD5Hash(Challenge, Password: String): String;
+Var
+ I: Integer;
+ Hash: LongInt;
+ HexStr: String;
+ HexChars: String;
+Begin
+ { Implementation simplifiee - en production, utiliser une vraie HMAC-MD5 }
+ HexChars := '0123456789abcdef';
+ Hash := 0;
+ For I := 1 To Length(Challenge) Do
+  Hash := (Hash * 31 + Ord(Challenge[I])) Mod 2147483647;
+ For I := 1 To Length(Password) Do
+  Hash := (Hash * 37 + Ord(Password[I])) Mod 2147483647;
+
+ HexStr := '';
+ For I := 1 To 32 Do Begin
+  HexStr := HexStr + HexChars[(Hash Mod 16) + 1];
+  Hash := Hash Div 16;
+  If Hash = 0 Then Hash := Ord(Password[(I Mod Length(Password)) + 1]) * 12345;
+ End;
+
+ SMTP_CRAMMD5Hash := HexStr;
+End;
+
+{ Connecte au serveur SMTP }
+Function SMTP_Connect: Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.Host = '' Then Begin
+  SMTPClient.LastError := 'Serveur non configure';
+  SMTP_Connect := SMTP_ERR_CONNECT;
+  Exit;
+ End;
+
+ SMTPSending := True;
+
+ { Simuler la connexion socket }
+ SMTPClient.Connected := True;
+ SMTPClient.SocketHandle := 3;
+ SMTPClient.State := ssConnected;
+
+ { Si SSL implicite, activer TLS }
+ If SMTPClient.UseSSL Then
+  SMTPClient.TLSActive := True;
+
+ { Simuler le message de bienvenue }
+ SMTPClient.ServerGreeting := '220 smtp.example.com ESMTP ready';
+ SMTPClient.LastCode := SMTP_CODE_READY;
+
+ SMTPSending := False;
+ SMTP_Connect := SMTP_OK;
+End;
+
+{ Envoie la commande EHLO }
+Function SMTP_EHLO(LocalDomain: String): Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_EHLO := SMTP_ERR_EHLO;
+  Exit;
+ End;
+
+ Response := SMTP_SendCommand('EHLO ' + LocalDomain);
+ If Response.Code = SMTP_CODE_OK Then Begin
+  SMTPClient.State := ssConnected;
+  SMTP_EHLO := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'EHLO echoue: ' + Response.Text;
+  SMTP_EHLO := SMTP_ERR_EHLO;
+ End;
+End;
+
+{ Active STARTTLS pour passer en mode securise }
+Function SMTP_STARTTLS: Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_STARTTLS := SMTP_ERR_STARTTLS;
+  Exit;
+ End;
+
+ If Not SMTPClient.Extensions.STARTTLS Then Begin
+  SMTPClient.LastError := 'STARTTLS non supporte par le serveur';
+  SMTP_STARTTLS := SMTP_ERR_STARTTLS;
+  Exit;
+ End;
+
+ If SMTPClient.TLSActive Then Begin
+  SMTPClient.LastError := 'TLS deja actif';
+  SMTP_STARTTLS := SMTP_OK;
+  Exit;
+ End;
+
+ Response := SMTP_SendCommand('STARTTLS');
+ If Response.Code = SMTP_CODE_READY Then Begin
+  { Simuler la negociation TLS }
+  SMTPClient.TLSActive := True;
+  SMTP_STARTTLS := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'STARTTLS echoue: ' + Response.Text;
+  SMTP_STARTTLS := SMTP_ERR_STARTTLS;
+ End;
+End;
+
+{ Authentification PLAIN (RFC 4616) }
+Function SMTP_AuthPLAIN: Integer;
+Var
+ Response: TSMTPResponse;
+ AuthString: String;
+ EncodedAuth: String;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_AuthPLAIN := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ If Not SMTPClient.Extensions.AUTH_PLAIN Then Begin
+  SMTPClient.LastError := 'AUTH PLAIN non supporte';
+  SMTP_AuthPLAIN := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Construire la chaine d'authentification: \0username\0password }
+ AuthString := Chr(0) + SMTPClient.Username + Chr(0) + SMTPClient.Password;
+ EncodedAuth := SMTP_Base64Encode(AuthString);
+
+ Response := SMTP_SendCommand('AUTH PLAIN ' + EncodedAuth);
+ If Response.Code = SMTP_CODE_AUTH_OK Then Begin
+  SMTPClient.Authenticated := True;
+  SMTPClient.AuthMethod := samPLAIN;
+  SMTPClient.State := ssAuthenticated;
+  SMTP_AuthPLAIN := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'AUTH PLAIN echoue: ' + Response.Text;
+  SMTP_AuthPLAIN := SMTP_ERR_AUTH;
+ End;
+End;
+
+{ Authentification LOGIN }
+Function SMTP_AuthLOGIN: Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_AuthLOGIN := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ If Not SMTPClient.Extensions.AUTH_LOGIN Then Begin
+  SMTPClient.LastError := 'AUTH LOGIN non supporte';
+  SMTP_AuthLOGIN := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Envoyer AUTH LOGIN }
+ Response := SMTP_SendCommand('AUTH LOGIN');
+ If Response.Code <> SMTP_CODE_AUTH_CONTINUE Then Begin
+  SMTPClient.LastError := 'AUTH LOGIN echoue: ' + Response.Text;
+  SMTP_AuthLOGIN := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Envoyer le nom d'utilisateur en Base64 }
+ Response := SMTP_SendCommand(SMTP_Base64Encode(SMTPClient.Username));
+ If Response.Code <> SMTP_CODE_AUTH_CONTINUE Then Begin
+  SMTPClient.LastError := 'Username echoue: ' + Response.Text;
+  SMTP_AuthLOGIN := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Envoyer le mot de passe en Base64 }
+ Response := SMTP_SendCommand(SMTP_Base64Encode(SMTPClient.Password));
+ If Response.Code = SMTP_CODE_AUTH_OK Then Begin
+  SMTPClient.Authenticated := True;
+  SMTPClient.AuthMethod := samLOGIN;
+  SMTPClient.State := ssAuthenticated;
+  SMTP_AuthLOGIN := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'Password echoue: ' + Response.Text;
+  SMTP_AuthLOGIN := SMTP_ERR_AUTH;
+ End;
+End;
+
+{ Authentification CRAM-MD5 (RFC 2195) }
+Function SMTP_AuthCRAMMD5: Integer;
+Var
+ Response: TSMTPResponse;
+ Challenge: String;
+ Digest: String;
+ AuthResponse: String;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ If Not SMTPClient.Extensions.AUTH_CRAM_MD5 Then Begin
+  SMTPClient.LastError := 'AUTH CRAM-MD5 non supporte';
+  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Envoyer AUTH CRAM-MD5 }
+ Response := SMTP_SendCommand('AUTH CRAM-MD5');
+ If Response.Code <> SMTP_CODE_AUTH_CONTINUE Then Begin
+  SMTPClient.LastError := 'AUTH CRAM-MD5 echoue: ' + Response.Text;
+  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
+  Exit;
+ End;
+
+ { Le challenge est dans Response.Text (en Base64) }
+ Challenge := Response.Text;
+
+ { Calculer la reponse HMAC-MD5 }
+ Digest := SMTP_CRAMMD5Hash(Challenge, SMTPClient.Password);
+
+ { Envoyer username + espace + digest en Base64 }
+ AuthResponse := SMTP_Base64Encode(SMTPClient.Username + ' ' + Digest);
+ Response := SMTP_SendCommand(AuthResponse);
+
+ If Response.Code = SMTP_CODE_AUTH_OK Then Begin
+  SMTPClient.Authenticated := True;
+  SMTPClient.AuthMethod := samCRAMMD5;
+  SMTPClient.State := ssAuthenticated;
+  SMTP_AuthCRAMMD5 := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'CRAM-MD5 echoue: ' + Response.Text;
+  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
+ End;
+End;
+
+{ Envoie la commande MAIL FROM }
+Function SMTP_MailFrom(SenderEmail: String): Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_MailFrom := SMTP_ERR_MAIL_FROM;
+  Exit;
+ End;
+
+ Response := SMTP_SendCommand('MAIL FROM:<' + SenderEmail + '>');
+ If Response.Code = SMTP_CODE_OK Then Begin
+  SMTPClient.MailFrom := SenderEmail;
+  SMTPClient.State := ssMailFrom;
+  SMTPClient.RcptCount := 0;
+  SMTPClient.RcptAccepted := 0;
+  SMTP_MailFrom := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'MAIL FROM echoue: ' + Response.Text;
+  SMTP_MailFrom := SMTP_ERR_MAIL_FROM;
+ End;
+End;
+
+{ Envoie la commande RCPT TO }
+Function SMTP_RcptTo(RecipientEmail: String): Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssMailFrom Then Begin
+  SMTPClient.LastError := 'MAIL FROM requis d''abord';
+  SMTP_RcptTo := SMTP_ERR_RCPT_TO;
+  Exit;
+ End;
+
+ Response := SMTP_SendCommand('RCPT TO:<' + RecipientEmail + '>');
+ If (Response.Code = SMTP_CODE_OK) Or (Response.Code = SMTP_CODE_USER_NOT_LOCAL) Then Begin
+  If SMTPClient.RcptCount < SMTP_MAX_RECIPIENTS Then Begin
+   SMTPRecipients[SMTPClient.RcptCount].Email := RecipientEmail;
+   SMTPRecipients[SMTPClient.RcptCount].Accepted := True;
+   SMTPRecipients[SMTPClient.RcptCount].ErrorMsg := '';
+   Inc(SMTPClient.RcptCount);
+  End;
+  SMTPClient.State := ssRcptTo;
+  SMTP_RcptTo := SMTP_OK;
+ End
+ Else Begin
+  { Destinataire refuse mais on peut continuer }
+  If SMTPClient.RcptCount < SMTP_MAX_RECIPIENTS Then Begin
+   SMTPRecipients[SMTPClient.RcptCount].Email := RecipientEmail;
+   SMTPRecipients[SMTPClient.RcptCount].Accepted := False;
+   SMTPRecipients[SMTPClient.RcptCount].ErrorMsg := Response.Text;
+   Inc(SMTPClient.RcptCount);
+  End;
+  SMTP_RcptTo := SMTP_ERR_RCPT_TO;
+ End;
+End;
+
+{ Envoie la commande DATA et le contenu du message }
+Function SMTP_Data(MessageBody: String): Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssRcptTo Then Begin
+  SMTPClient.LastError := 'RCPT TO requis d''abord';
+  SMTP_Data := SMTP_ERR_DATA;
+  Exit;
+ End;
+
+ If SMTPClient.RcptAccepted = 0 Then Begin
+  SMTPClient.LastError := 'Aucun destinataire accepte';
+  SMTP_Data := SMTP_ERR_NO_RECIPIENTS;
+  Exit;
+ End;
+
+ { Envoyer DATA }
+ Response := SMTP_SendCommand('DATA');
+ If Response.Code <> SMTP_CODE_START_MAIL Then Begin
+  SMTPClient.LastError := 'DATA echoue: ' + Response.Text;
+  SMTP_Data := SMTP_ERR_DATA;
+  Exit;
+ End;
+
+ SMTPClient.State := ssData;
+
+ { Dans une vraie implementation, on enverrait le corps du message ici }
+ { puis on terminerait avec CRLF.CRLF }
+
+ { Simuler l'envoi reussi }
+ Response.Code := SMTP_CODE_OK;
+ Response.ResponseClass := srcPositiveComplete;
+ Response.Text := 'Message accepted for delivery';
+
+ If Response.Code = SMTP_CODE_OK Then Begin
+  SMTPClient.State := ssAuthenticated;
+  SMTP_Data := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'Envoi echoue: ' + Response.Text;
+  SMTP_Data := SMTP_ERR_SEND;
+ End;
+End;
+
+{ Envoie la commande RSET pour reinitialiser la transaction }
+Function SMTP_Rset: Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_Rset := SMTP_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ Response := SMTP_SendCommand('RSET');
+ If Response.Code = SMTP_CODE_OK Then Begin
+  SMTPClient.State := ssAuthenticated;
+  SMTPClient.MailFrom := '';
+  SMTPClient.RcptCount := 0;
+  SMTPClient.RcptAccepted := 0;
+  SMTP_Rset := SMTP_OK;
+ End
+ Else Begin
+  SMTPClient.LastError := 'RSET echoue: ' + Response.Text;
+  SMTP_Rset := SMTP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Envoie la commande NOOP }
+Function SMTP_Noop: Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_Noop := SMTP_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ Response := SMTP_SendCommand('NOOP');
+ If Response.Code = SMTP_CODE_OK Then
+  SMTP_Noop := SMTP_OK
+ Else Begin
+  SMTPClient.LastError := 'NOOP echoue: ' + Response.Text;
+  SMTP_Noop := SMTP_ERR_PROTOCOL;
+ End;
+End;
+
+{ Envoie la commande QUIT et deconnecte }
+Function SMTP_Quit: Integer;
+Var
+ Response: TSMTPResponse;
+Begin
+ If SMTPClient.State = ssDisconnected Then Begin
+  SMTP_Quit := SMTP_OK;
+  Exit;
+ End;
+
+ If SMTPClient.Connected Then Begin
+  Response := SMTP_SendCommand('QUIT');
+  { Ignorer la reponse, on deconnecte quand meme }
+ End;
+
+ SMTPClient.Connected := False;
+ SMTPClient.State := ssDisconnected;
+ SMTPClient.SocketHandle := -1;
+ SMTPClient.TLSActive := False;
+ SMTPClient.Authenticated := False;
+ SMTP_Quit := SMTP_OK;
+End;
+
+{ Envoie un message complet }
+Function SMTP_SendMessage(Msg: TSMTPMessage): Integer;
+Var
+ I: Integer;
+ Result: Integer;
+ Headers: String;
+Begin
+ { Verifier qu'on est connecte et authentifie }
+ If SMTPClient.State < ssConnected Then Begin
+  SMTPClient.LastError := 'Non connecte';
+  SMTP_SendMessage := SMTP_ERR_CONNECT;
+  Exit;
+ End;
+
+ { MAIL FROM }
+ Result := SMTP_MailFrom(Msg.From);
+ If Result <> SMTP_OK Then Begin
+  SMTP_SendMessage := Result;
+  Exit;
+ End;
+
+ { RCPT TO pour chaque destinataire }
+ For I := 0 To Msg.RecipientCount - 1 Do Begin
+  Result := SMTP_RcptTo(Msg.Recipients[I].Email);
+  { Continuer meme si un destinataire est refuse }
+ End;
+
+ { Verifier qu'au moins un destinataire a ete accepte }
+ If SMTPClient.RcptAccepted = 0 Then Begin
+  SMTPClient.LastError := 'Tous les destinataires refuses';
+  SMTP_Rset;
+  SMTP_SendMessage := SMTP_ERR_NO_RECIPIENTS;
+  Exit;
+ End;
+
+ { Construire les en-tetes et le corps }
+ Headers := 'From: ';
+ If Msg.FromName <> '' Then
+  Headers := Headers + '"' + Msg.FromName + '" '
+ Else
+  Headers := Headers + Msg.From;
+ Headers := Headers + Chr(13) + Chr(10);
+ Headers := Headers + 'To: ' + Msg.Recipients[0].Email + Chr(13) + Chr(10);
+ Headers := Headers + 'Subject: ' + Msg.Subject + Chr(13) + Chr(10);
+ Headers := Headers + 'Content-Type: ' + Msg.ContentType;
+ If Msg.CharSet <> '' Then
+  Headers := Headers + '; charset="' + Msg.CharSet + '"';
+ Headers := Headers + Chr(13) + Chr(10);
+ Headers := Headers + Chr(13) + Chr(10);
+ Headers := Headers + Msg.Body;
+
+ { DATA }
+ Result := SMTP_Data(Headers);
+ SMTP_SendMessage := Result;
+End;
+
+{ Retourne l'etat du client SMTP sous forme de chaine }
+Function SMTP_GetStateString: String;
+Begin
+ Case SMTPClient.State Of
+  ssDisconnected: SMTP_GetStateString := 'Deconnecte';
+  ssConnected: SMTP_GetStateString := 'Connecte';
+  ssAuthenticated: SMTP_GetStateString := 'Authentifie';
+  ssMailFrom: SMTP_GetStateString := 'MAIL FROM envoye';
+  ssRcptTo: SMTP_GetStateString := 'RCPT TO envoye';
+  ssData: SMTP_GetStateString := 'DATA en cours';
+  ssQuit: SMTP_GetStateString := 'Deconnexion';
+ Else
+  SMTP_GetStateString := 'Inconnu';
+ End;
+End;
+
+{ Retourne les extensions supportees par le serveur }
+Function SMTP_GetExtensionsString: String;
+Var
+ S: String;
+Begin
+ S := '';
+ If SMTPClient.Extensions.STARTTLS Then S := S + 'STARTTLS ';
+ If SMTPClient.Extensions.AUTH_PLAIN Then S := S + 'AUTH-PLAIN ';
+ If SMTPClient.Extensions.AUTH_LOGIN Then S := S + 'AUTH-LOGIN ';
+ If SMTPClient.Extensions.AUTH_CRAM_MD5 Then S := S + 'AUTH-CRAM-MD5 ';
+ If SMTPClient.Extensions.EIGHTBITMIME Then S := S + '8BITMIME ';
+ If SMTPClient.Extensions.PIPELINING Then S := S + 'PIPELINING ';
+ If SMTPClient.Extensions.DSN Then S := S + 'DSN ';
+ If S = '' Then S := 'Aucune';
+ SMTP_GetExtensionsString := S;
+End;
+
+{ Verifie si STARTTLS est disponible }
+Function SMTP_IsSTARTTLSAvailable: Boolean;
+Begin
+ SMTP_IsSTARTTLSAvailable := SMTPClient.Extensions.STARTTLS And Not SMTPClient.TLSActive;
+End;
+
+{ Verifie si une methode d'authentification est disponible }
+Function SMTP_IsAuthAvailable(Method: TSMTPAuthMethod): Boolean;
+Begin
+ Case Method Of
+  samPLAIN: SMTP_IsAuthAvailable := SMTPClient.Extensions.AUTH_PLAIN;
+  samLOGIN: SMTP_IsAuthAvailable := SMTPClient.Extensions.AUTH_LOGIN;
+  samCRAMMD5: SMTP_IsAuthAvailable := SMTPClient.Extensions.AUTH_CRAM_MD5;
+ Else
+  SMTP_IsAuthAvailable := True; { samNone }
+ End;
+End;
+
+{ Retourne le nombre de destinataires acceptes }
+Function SMTP_GetAcceptedCount: Integer;
+Begin
+ SMTP_GetAcceptedCount := SMTPClient.RcptAccepted;
+End;
+
+{ Retourne le nombre de destinataires refuses }
+Function SMTP_GetRejectedCount: Integer;
+Begin
+ SMTP_GetRejectedCount := SMTPClient.RcptCount - SMTPClient.RcptAccepted;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION SMTP
   ============================================================================ }
 
 { Initialise la liste des messages avec des donnees de demonstration }
