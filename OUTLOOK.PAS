@@ -515,6 +515,94 @@ Type
   HasData: Boolean;        { Contient des donnees }
  End;
 
+ { ============================================================================
+   TYPES ET STRUCTURES POUR LE CLIENT POP3 (RFC 1939)
+   ============================================================================ }
+
+ { Etat de la connexion POP3 }
+ TPOP3State = (
+  psDisconnected,    { Non connecte }
+  psAuthorization,   { Etat AUTHORIZATION - authentification requise }
+  psTransaction,     { Etat TRANSACTION - commandes disponibles }
+  psUpdate           { Etat UPDATE - deconnexion en cours }
+ );
+
+ { Type de reponse POP3 }
+ TPOP3ResponseType = (
+  prOK,              { +OK - Commande reussie }
+  prERR              { -ERR - Commande echouee }
+ );
+
+ { Type d'authentification POP3 }
+ TPOP3AuthMethod = (
+  pamUSERPASS,       { Authentification USER/PASS }
+  pamAPOP            { Authentification APOP (MD5) }
+ );
+
+ { Structure pour les statistiques de la boite POP3 }
+ TPOP3Stats = Record
+  MessageCount: LongInt;   { Nombre de messages }
+  TotalSize: LongInt;      { Taille totale en octets }
+ End;
+
+ { Structure pour un element de la liste POP3 }
+ TPOP3ListItem = Record
+  MsgNum: Integer;         { Numero du message }
+  Size: LongInt;           { Taille en octets }
+  UIDL: String[70];        { Identifiant unique (UIDL) }
+  Deleted: Boolean;        { Marque pour suppression }
+ End;
+
+ { Structure pour un message POP3 }
+ TPOP3Message = Record
+  MsgNum: Integer;         { Numero du message }
+  Size: LongInt;           { Taille en octets }
+  UIDL: String[70];        { Identifiant unique }
+  FromName: String[40];    { Nom de l'expediteur }
+  FromEmail: String[60];   { Email de l'expediteur }
+  ToEmail: String[60];     { Email du destinataire }
+  Subject: String[80];     { Objet }
+  MsgDate: String[30];     { Date du message }
+  HeadersOnly: Boolean;    { Seulement les en-tetes charges }
+  Deleted: Boolean;        { Marque pour suppression }
+ End;
+
+ { Client POP3 complet }
+ TPOP3Client = Record
+  { Configuration de connexion }
+  Host: String[80];        { Nom du serveur }
+  Port: Integer;           { Port (995 pour POP3S, 110 pour POP3) }
+  Username: String[60];    { Nom d'utilisateur }
+  Password: String[40];    { Mot de passe }
+  UseSSL: Boolean;         { Utiliser TLS/SSL }
+
+  { Etat de la connexion }
+  State: TPOP3State;       { Etat actuel }
+  LastError: String[80];   { Derniere erreur }
+  ServerGreeting: String[100]; { Message de bienvenue (contient timestamp APOP) }
+  APOPTimestamp: String[80];   { Timestamp pour APOP }
+
+  { Statistiques de la boite }
+  Stats: TPOP3Stats;
+
+  { Options }
+  LeaveOnServer: Boolean;  { Laisser les messages sur le serveur }
+  HeadersOnly: Boolean;    { Telecharger seulement les en-tetes }
+  DeleteAfterDays: Integer; { Supprimer apres X jours (0 = jamais) }
+
+  { Socket de connexion (simule pour cette implementation) }
+  Connected: Boolean;
+  SocketHandle: Integer;
+ End;
+
+ { Structure pour une reponse POP3 parsee }
+ TPOP3Response = Record
+  ResponseType: TPOP3ResponseType;
+  Text: String[200];       { Texte de la reponse }
+  Data: String[255];       { Donnees additionnelles }
+  HasMultiline: Boolean;   { Reponse multiligne }
+ End;
+
  { Structure pour une colonne de la liste des messages }
  TColumnHeader = Record
   ColType: TColumnType;     { Type de colonne }
@@ -638,6 +726,38 @@ Const
  IMAP_ERR_NETWORK = -8;
  IMAP_ERR_PROTOCOL = -9;
 
+ { ============================================================================
+   CONSTANTES POUR LE CLIENT POP3 (RFC 1939)
+   ============================================================================ }
+
+ { Ports POP3 standard }
+ POP3_PORT = 110;          { Port POP3 standard }
+ POP3S_PORT = 995;         { Port POP3 sur SSL/TLS }
+
+ { Tailles maximales }
+ POP3_MAX_RESPONSE_SIZE = 4096;   { Taille max d'une reponse }
+ POP3_MAX_MESSAGES = 500;         { Nombre max de messages a charger }
+ POP3_BUFFER_SIZE = 1024;         { Taille du buffer de lecture }
+ POP3_MAX_LINE_LENGTH = 998;      { Longueur max d'une ligne (RFC 1939) }
+
+ { Timeouts en millisecondes }
+ POP3_CONNECT_TIMEOUT = 30000;    { Timeout de connexion }
+ POP3_READ_TIMEOUT = 60000;       { Timeout de lecture }
+
+ { Codes de retour POP3 }
+ POP3_OK = 0;
+ POP3_ERR_CONNECT = -1;
+ POP3_ERR_AUTH = -2;
+ POP3_ERR_STAT = -3;
+ POP3_ERR_LIST = -4;
+ POP3_ERR_RETR = -5;
+ POP3_ERR_DELE = -6;
+ POP3_ERR_TOP = -7;
+ POP3_ERR_UIDL = -8;
+ POP3_ERR_TIMEOUT = -9;
+ POP3_ERR_NETWORK = -10;
+ POP3_ERR_PROTOCOL = -11;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -727,6 +847,14 @@ Var
  IMAPMessageCount: Integer;            { Nombre de messages charges }
  IMAPConnecting: Boolean;              { Connexion en cours }
  IMAPLastActivity: LongInt;            { Dernier timestamp d'activite }
+
+ { Variables globales pour le client POP3 }
+ POP3Client: TPOP3Client;              { Instance du client POP3 }
+ POP3Messages: Array[0..POP3_MAX_MESSAGES-1] of TPOP3Message; { Cache des messages }
+ POP3ListItems: Array[0..POP3_MAX_MESSAGES-1] of TPOP3ListItem; { Liste des messages }
+ POP3MessageCount: Integer;            { Nombre de messages sur le serveur }
+ POP3Connecting: Boolean;              { Connexion en cours }
+ POP3LastActivity: LongInt;            { Dernier timestamp d'activite }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -3038,6 +3166,636 @@ End;
 
 { ============================================================================
   FIN DE L'IMPLEMENTATION IMAP
+  ============================================================================ }
+
+{ ============================================================================
+  IMPLEMENTATION DU CLIENT POP3 (RFC 1939)
+  ============================================================================ }
+
+{ Initialise le client POP3 avec les parametres par defaut }
+Procedure POP3_InitClient;
+Begin
+ POP3Client.Host := '';
+ POP3Client.Port := POP3S_PORT;
+ POP3Client.Username := '';
+ POP3Client.Password := '';
+ POP3Client.UseSSL := True;
+
+ POP3Client.State := psDisconnected;
+ POP3Client.LastError := '';
+ POP3Client.ServerGreeting := '';
+ POP3Client.APOPTimestamp := '';
+
+ POP3Client.Stats.MessageCount := 0;
+ POP3Client.Stats.TotalSize := 0;
+
+ POP3Client.LeaveOnServer := True;
+ POP3Client.HeadersOnly := False;
+ POP3Client.DeleteAfterDays := 0;
+
+ POP3Client.Connected := False;
+ POP3Client.SocketHandle := -1;
+
+ POP3MessageCount := 0;
+ POP3Connecting := False;
+ POP3LastActivity := 0;
+End;
+
+{ Configure le client POP3 }
+Procedure POP3_Configure(Host: String; Port: Integer; User, Pass: String; UseSSL: Boolean);
+Begin
+ POP3Client.Host := Host;
+ POP3Client.Port := Port;
+ POP3Client.Username := User;
+ POP3Client.Password := Pass;
+ POP3Client.UseSSL := UseSSL;
+End;
+
+{ Configure les options du client POP3 }
+Procedure POP3_SetOptions(LeaveOnServer, HeadersOnly: Boolean; DeleteAfterDays: Integer);
+Begin
+ POP3Client.LeaveOnServer := LeaveOnServer;
+ POP3Client.HeadersOnly := HeadersOnly;
+ POP3Client.DeleteAfterDays := DeleteAfterDays;
+End;
+
+{ Extrait le timestamp APOP du message de bienvenue }
+Function POP3_ExtractAPOPTimestamp(Greeting: String): String;
+Var
+ StartPos, EndPos: Integer;
+Begin
+ POP3_ExtractAPOPTimestamp := '';
+ StartPos := Pos('<', Greeting);
+ If StartPos > 0 Then Begin
+  EndPos := Pos('>', Greeting);
+  If EndPos > StartPos Then
+   POP3_ExtractAPOPTimestamp := Copy(Greeting, StartPos, EndPos - StartPos + 1);
+ End;
+End;
+
+{ Calcule le hash MD5 pour l'authentification APOP }
+{ Note: Implementation simplifiee, retourne une chaine hexadecimale }
+Function POP3_MD5Hash(Input: String): String;
+Var
+ I: Integer;
+ Hash: LongInt;
+ HexStr: String;
+ HexChars: String;
+Begin
+ { Implementation simplifiee du hash MD5 }
+ { Dans une vraie implementation, on utiliserait une bibliotheque MD5 }
+ HexChars := '0123456789abcdef';
+ Hash := 0;
+ For I := 1 To Length(Input) Do
+  Hash := (Hash * 31 + Ord(Input[I])) Mod 2147483647;
+
+ HexStr := '';
+ For I := 1 To 32 Do Begin
+  HexStr := HexStr + HexChars[(Abs(Hash) Mod 16) + 1];
+  Hash := Hash Div 16;
+  If Hash = 0 Then Hash := I * 7919;
+ End;
+ POP3_MD5Hash := HexStr;
+End;
+
+{ Simule l'envoi d'une commande POP3 et la reception de la reponse }
+{ Note: Dans une implementation reelle, cela utiliserait des sockets }
+Function POP3_SendCommand(Command: String): TPOP3Response;
+Var
+ Response: TPOP3Response;
+ CmdUpper: String;
+ I: Integer;
+Begin
+ { Initialiser la reponse }
+ Response.HasMultiline := False;
+ Response.Data := '';
+ Response.Text := '';
+
+ { Convertir la commande en majuscules pour la comparaison }
+ CmdUpper := '';
+ For I := 1 To Length(Command) Do
+  If Command[I] In ['a'..'z'] Then
+   CmdUpper := CmdUpper + Chr(Ord(Command[I]) - 32)
+  Else
+   CmdUpper := CmdUpper + Command[I];
+
+ { Simuler le comportement du serveur selon la commande }
+ If Pos('USER', CmdUpper) = 1 Then Begin
+  { Commande USER }
+  Response.ResponseType := prOK;
+  Response.Text := 'User accepted';
+ End
+ Else If Pos('PASS', CmdUpper) = 1 Then Begin
+  { Commande PASS }
+  Response.ResponseType := prOK;
+  Response.Text := 'Authentication successful';
+  POP3Client.State := psTransaction;
+ End
+ Else If Pos('APOP', CmdUpper) = 1 Then Begin
+  { Authentification APOP }
+  Response.ResponseType := prOK;
+  Response.Text := 'APOP authentication successful';
+  POP3Client.State := psTransaction;
+ End
+ Else If Pos('STAT', CmdUpper) = 1 Then Begin
+  { Commande STAT - statistiques }
+  Response.ResponseType := prOK;
+  Response.Text := '8 45678';
+  POP3Client.Stats.MessageCount := 8;
+  POP3Client.Stats.TotalSize := 45678;
+ End
+ Else If Pos('LIST', CmdUpper) = 1 Then Begin
+  { Commande LIST }
+  If Length(CmdUpper) > 4 Then Begin
+   { LIST avec numero de message }
+   Response.ResponseType := prOK;
+   Response.Text := '1 2450';
+  End
+  Else Begin
+   { LIST sans parametre - liste complete }
+   Response.ResponseType := prOK;
+   Response.Text := '8 messages';
+   Response.HasMultiline := True;
+   Response.Data := '1 2450' + Chr(13) + Chr(10) +
+                    '2 1520' + Chr(13) + Chr(10) +
+                    '3 3200' + Chr(13) + Chr(10) +
+                    '4 980'  + Chr(13) + Chr(10) +
+                    '5 15400'+ Chr(13) + Chr(10) +
+                    '6 1100' + Chr(13) + Chr(10) +
+                    '7 890'  + Chr(13) + Chr(10) +
+                    '8 20138';
+  End;
+ End
+ Else If Pos('RETR', CmdUpper) = 1 Then Begin
+  { Commande RETR - recuperer message complet }
+  Response.ResponseType := prOK;
+  Response.Text := 'Message follows';
+  Response.HasMultiline := True;
+  Response.Data := 'From: test@example.com' + Chr(13) + Chr(10) +
+                   'To: user@example.com' + Chr(13) + Chr(10) +
+                   'Subject: Test message' + Chr(13) + Chr(10) +
+                   'Date: Sat, 11 Apr 2026 10:00:00 +0000' + Chr(13) + Chr(10) +
+                   Chr(13) + Chr(10) +
+                   'This is a test message body.';
+ End
+ Else If Pos('DELE', CmdUpper) = 1 Then Begin
+  { Commande DELE - marquer pour suppression }
+  Response.ResponseType := prOK;
+  Response.Text := 'Message marked for deletion';
+ End
+ Else If Pos('TOP', CmdUpper) = 1 Then Begin
+  { Commande TOP - en-tetes + N lignes du corps }
+  Response.ResponseType := prOK;
+  Response.Text := 'Headers follow';
+  Response.HasMultiline := True;
+  Response.Data := 'From: test@example.com' + Chr(13) + Chr(10) +
+                   'To: user@example.com' + Chr(13) + Chr(10) +
+                   'Subject: Test message' + Chr(13) + Chr(10) +
+                   'Date: Sat, 11 Apr 2026 10:00:00 +0000';
+ End
+ Else If Pos('UIDL', CmdUpper) = 1 Then Begin
+  { Commande UIDL - identifiants uniques }
+  If Length(CmdUpper) > 4 Then Begin
+   { UIDL avec numero de message }
+   Response.ResponseType := prOK;
+   Response.Text := '1 ABC123DEF456';
+  End
+  Else Begin
+   { UIDL sans parametre - liste complete }
+   Response.ResponseType := prOK;
+   Response.Text := 'Unique-ID listing follows';
+   Response.HasMultiline := True;
+   Response.Data := '1 ABC123DEF456' + Chr(13) + Chr(10) +
+                    '2 GHI789JKL012' + Chr(13) + Chr(10) +
+                    '3 MNO345PQR678' + Chr(13) + Chr(10) +
+                    '4 STU901VWX234' + Chr(13) + Chr(10) +
+                    '5 YZA567BCD890' + Chr(13) + Chr(10) +
+                    '6 EFG123HIJ456' + Chr(13) + Chr(10) +
+                    '7 KLM789NOP012' + Chr(13) + Chr(10) +
+                    '8 QRS345TUV678';
+  End;
+ End
+ Else If Pos('NOOP', CmdUpper) = 1 Then Begin
+  { Commande NOOP }
+  Response.ResponseType := prOK;
+  Response.Text := 'OK';
+ End
+ Else If Pos('RSET', CmdUpper) = 1 Then Begin
+  { Commande RSET - annuler les suppressions }
+  Response.ResponseType := prOK;
+  Response.Text := 'Reset OK';
+ End
+ Else If Pos('QUIT', CmdUpper) = 1 Then Begin
+  { Commande QUIT }
+  Response.ResponseType := prOK;
+  Response.Text := 'Goodbye';
+  POP3Client.State := psUpdate;
+ End
+ Else Begin
+  { Commande inconnue }
+  Response.ResponseType := prERR;
+  Response.Text := 'Unknown command';
+ End;
+
+ POP3_SendCommand := Response;
+End;
+
+{ Connecte au serveur POP3 }
+Function POP3_Connect: Integer;
+Begin
+ If POP3Client.Host = '' Then Begin
+  POP3Client.LastError := 'Serveur non configure';
+  POP3_Connect := POP3_ERR_CONNECT;
+  Exit;
+ End;
+
+ POP3Connecting := True;
+
+ { Simuler la connexion socket }
+ { Dans une vraie implementation, on utiliserait les sockets }
+ POP3Client.Connected := True;
+ POP3Client.SocketHandle := 2;
+ POP3Client.State := psAuthorization;
+
+ { Simuler le message de bienvenue avec timestamp APOP }
+ POP3Client.ServerGreeting := '+OK POP3 server ready <1234.5678@pop.example.com>';
+ POP3Client.APOPTimestamp := POP3_ExtractAPOPTimestamp(POP3Client.ServerGreeting);
+
+ POP3Connecting := False;
+ POP3_Connect := POP3_OK;
+End;
+
+{ Authentifie avec la methode USER/PASS }
+Function POP3_AuthUserPass: Integer;
+Var
+ Response: TPOP3Response;
+Begin
+ If POP3Client.State <> psAuthorization Then Begin
+  POP3Client.LastError := 'Pas en etat AUTHORIZATION';
+  POP3_AuthUserPass := POP3_ERR_AUTH;
+  Exit;
+ End;
+
+ { Envoyer USER }
+ Response := POP3_SendCommand('USER ' + POP3Client.Username);
+ If Response.ResponseType <> prOK Then Begin
+  POP3Client.LastError := 'USER echoue: ' + Response.Text;
+  POP3_AuthUserPass := POP3_ERR_AUTH;
+  Exit;
+ End;
+
+ { Envoyer PASS }
+ Response := POP3_SendCommand('PASS ' + POP3Client.Password);
+ If Response.ResponseType = prOK Then
+  POP3_AuthUserPass := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'PASS echoue: ' + Response.Text;
+  POP3_AuthUserPass := POP3_ERR_AUTH;
+ End;
+End;
+
+{ Authentifie avec la methode APOP }
+Function POP3_AuthAPOP: Integer;
+Var
+ Response: TPOP3Response;
+ DigestInput, Digest: String;
+Begin
+ If POP3Client.State <> psAuthorization Then Begin
+  POP3Client.LastError := 'Pas en etat AUTHORIZATION';
+  POP3_AuthAPOP := POP3_ERR_AUTH;
+  Exit;
+ End;
+
+ If POP3Client.APOPTimestamp = '' Then Begin
+  POP3Client.LastError := 'Serveur ne supporte pas APOP';
+  POP3_AuthAPOP := POP3_ERR_AUTH;
+  Exit;
+ End;
+
+ { Calculer le digest MD5(timestamp + password) }
+ DigestInput := POP3Client.APOPTimestamp + POP3Client.Password;
+ Digest := POP3_MD5Hash(DigestInput);
+
+ { Envoyer APOP }
+ Response := POP3_SendCommand('APOP ' + POP3Client.Username + ' ' + Digest);
+
+ If Response.ResponseType = prOK Then
+  POP3_AuthAPOP := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'APOP echoue: ' + Response.Text;
+  POP3_AuthAPOP := POP3_ERR_AUTH;
+ End;
+End;
+
+{ Obtient les statistiques de la boite (STAT) }
+Function POP3_Stat: Integer;
+Var
+ Response: TPOP3Response;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_Stat := POP3_ERR_STAT;
+  Exit;
+ End;
+
+ Response := POP3_SendCommand('STAT');
+
+ If Response.ResponseType = prOK Then
+  POP3_Stat := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'STAT echoue: ' + Response.Text;
+  POP3_Stat := POP3_ERR_STAT;
+ End;
+End;
+
+{ Liste les messages (LIST) }
+Function POP3_List(MsgNum: Integer): Integer;
+Var
+ Response: TPOP3Response;
+ NumStr: String;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_List := POP3_ERR_LIST;
+  Exit;
+ End;
+
+ If MsgNum > 0 Then Begin
+  Str(MsgNum, NumStr);
+  Response := POP3_SendCommand('LIST ' + NumStr);
+ End
+ Else
+  Response := POP3_SendCommand('LIST');
+
+ If Response.ResponseType = prOK Then
+  POP3_List := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'LIST echoue: ' + Response.Text;
+  POP3_List := POP3_ERR_LIST;
+ End;
+End;
+
+{ Recupere un message complet (RETR) }
+Function POP3_Retr(MsgNum: Integer): Integer;
+Var
+ Response: TPOP3Response;
+ NumStr: String;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_Retr := POP3_ERR_RETR;
+  Exit;
+ End;
+
+ Str(MsgNum, NumStr);
+ Response := POP3_SendCommand('RETR ' + NumStr);
+
+ If Response.ResponseType = prOK Then
+  POP3_Retr := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'RETR echoue: ' + Response.Text;
+  POP3_Retr := POP3_ERR_RETR;
+ End;
+End;
+
+{ Marque un message pour suppression (DELE) }
+Function POP3_Dele(MsgNum: Integer): Integer;
+Var
+ Response: TPOP3Response;
+ NumStr: String;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_Dele := POP3_ERR_DELE;
+  Exit;
+ End;
+
+ Str(MsgNum, NumStr);
+ Response := POP3_SendCommand('DELE ' + NumStr);
+
+ If Response.ResponseType = prOK Then Begin
+  { Marquer le message localement }
+  If (MsgNum > 0) And (MsgNum <= POP3MessageCount) Then
+   POP3ListItems[MsgNum - 1].Deleted := True;
+  POP3_Dele := POP3_OK;
+ End
+ Else Begin
+  POP3Client.LastError := 'DELE echoue: ' + Response.Text;
+  POP3_Dele := POP3_ERR_DELE;
+ End;
+End;
+
+{ Recupere les en-tetes + N lignes du corps (TOP) }
+Function POP3_Top(MsgNum, Lines: Integer): Integer;
+Var
+ Response: TPOP3Response;
+ NumStr, LineStr: String;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_Top := POP3_ERR_TOP;
+  Exit;
+ End;
+
+ Str(MsgNum, NumStr);
+ Str(Lines, LineStr);
+ Response := POP3_SendCommand('TOP ' + NumStr + ' ' + LineStr);
+
+ If Response.ResponseType = prOK Then
+  POP3_Top := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'TOP echoue: ' + Response.Text;
+  POP3_Top := POP3_ERR_TOP;
+ End;
+End;
+
+{ Obtient les identifiants uniques (UIDL) }
+Function POP3_UIDL(MsgNum: Integer): Integer;
+Var
+ Response: TPOP3Response;
+ NumStr: String;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_UIDL := POP3_ERR_UIDL;
+  Exit;
+ End;
+
+ If MsgNum > 0 Then Begin
+  Str(MsgNum, NumStr);
+  Response := POP3_SendCommand('UIDL ' + NumStr);
+ End
+ Else
+  Response := POP3_SendCommand('UIDL');
+
+ If Response.ResponseType = prOK Then
+  POP3_UIDL := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'UIDL echoue: ' + Response.Text;
+  POP3_UIDL := POP3_ERR_UIDL;
+ End;
+End;
+
+{ Envoie une commande NOOP pour maintenir la connexion }
+Function POP3_Noop: Integer;
+Var
+ Response: TPOP3Response;
+Begin
+ Response := POP3_SendCommand('NOOP');
+
+ If Response.ResponseType = prOK Then
+  POP3_Noop := POP3_OK
+ Else Begin
+  POP3Client.LastError := 'NOOP echoue: ' + Response.Text;
+  POP3_Noop := POP3_ERR_PROTOCOL;
+ End;
+End;
+
+{ Annule les suppressions marquees (RSET) }
+Function POP3_Rset: Integer;
+Var
+ Response: TPOP3Response;
+ I: Integer;
+Begin
+ If POP3Client.State <> psTransaction Then Begin
+  POP3Client.LastError := 'Pas en etat TRANSACTION';
+  POP3_Rset := POP3_ERR_PROTOCOL;
+  Exit;
+ End;
+
+ Response := POP3_SendCommand('RSET');
+
+ If Response.ResponseType = prOK Then Begin
+  { Annuler les marquages locaux }
+  For I := 0 To POP3MessageCount - 1 Do
+   POP3ListItems[I].Deleted := False;
+  POP3_Rset := POP3_OK;
+ End
+ Else Begin
+  POP3Client.LastError := 'RSET echoue: ' + Response.Text;
+  POP3_Rset := POP3_ERR_PROTOCOL;
+ End;
+End;
+
+{ Se deconnecte du serveur POP3 (QUIT) }
+Function POP3_Quit: Integer;
+Var
+ Response: TPOP3Response;
+Begin
+ If Not POP3Client.Connected Then Begin
+  POP3_Quit := POP3_OK;
+  Exit;
+ End;
+
+ Response := POP3_SendCommand('QUIT');
+
+ { Fermer la connexion }
+ POP3Client.Connected := False;
+ POP3Client.SocketHandle := -1;
+ POP3Client.State := psDisconnected;
+
+ POP3_Quit := POP3_OK;
+End;
+
+{ Synchronise la liste des messages avec le serveur }
+Procedure POP3_SyncMessages;
+Var
+ I: Integer;
+Begin
+ If POP3Client.State <> psTransaction Then Exit;
+
+ { Obtenir les statistiques }
+ POP3_Stat;
+
+ { Simuler le remplissage de la liste }
+ POP3MessageCount := POP3Client.Stats.MessageCount;
+ If POP3MessageCount > POP3_MAX_MESSAGES Then
+  POP3MessageCount := POP3_MAX_MESSAGES;
+
+ { Initialiser la liste des messages }
+ For I := 0 To POP3MessageCount - 1 Do Begin
+  POP3ListItems[I].MsgNum := I + 1;
+  POP3ListItems[I].Size := 1000 + (I * 500);
+  POP3ListItems[I].Deleted := False;
+  POP3ListItems[I].UIDL := '';
+ End;
+
+ { Obtenir les UIDLs }
+ POP3_UIDL(0);
+End;
+
+{ Telecharge les messages selon les options }
+Procedure POP3_DownloadMessages;
+Var
+ I: Integer;
+Begin
+ If POP3Client.State <> psTransaction Then Exit;
+
+ For I := 0 To POP3MessageCount - 1 Do Begin
+  If POP3Client.HeadersOnly Then
+   { Telecharger seulement les en-tetes }
+   POP3_Top(I + 1, 0)
+  Else
+   { Telecharger le message complet }
+   POP3_Retr(I + 1);
+
+  { Supprimer si option activee et pas "Laisser sur serveur" }
+  If Not POP3Client.LeaveOnServer Then
+   POP3_Dele(I + 1);
+ End;
+End;
+
+{ Retourne l'etat de connexion sous forme de chaine }
+Function POP3_GetStateString: String;
+Begin
+ Case POP3Client.State Of
+  psDisconnected: POP3_GetStateString := 'Deconnecte';
+  psAuthorization: POP3_GetStateString := 'Autorisation';
+  psTransaction: POP3_GetStateString := 'Transaction';
+  psUpdate: POP3_GetStateString := 'Mise a jour';
+ Else
+  POP3_GetStateString := 'Inconnu';
+ End;
+End;
+
+{ Retourne les informations de la boite }
+Function POP3_GetMailboxInfo: String;
+Var
+ S, NumStr: String;
+Begin
+ If POP3Client.State < psTransaction Then Begin
+  POP3_GetMailboxInfo := 'Non connecte';
+  Exit;
+ End;
+
+ Str(POP3Client.Stats.MessageCount, NumStr);
+ S := NumStr + ' messages, ';
+ Str(POP3Client.Stats.TotalSize Div 1024, NumStr);
+ S := S + NumStr + ' Ko';
+
+ POP3_GetMailboxInfo := S;
+End;
+
+{ Verifie si APOP est disponible }
+Function POP3_IsAPOPAvailable: Boolean;
+Begin
+ POP3_IsAPOPAvailable := POP3Client.APOPTimestamp <> '';
+End;
+
+{ Compte les messages marques pour suppression }
+Function POP3_GetDeletedCount: Integer;
+Var
+ I, Count: Integer;
+Begin
+ Count := 0;
+ For I := 0 To POP3MessageCount - 1 Do
+  If POP3ListItems[I].Deleted Then
+   Inc(Count);
+ POP3_GetDeletedCount := Count;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION POP3
   ============================================================================ }
 
 { Initialise la liste des messages avec des donnees de demonstration }
