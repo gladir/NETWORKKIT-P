@@ -70,7 +70,7 @@
       - Option: Laisser les messages sur le serveur
       - Téléchargement des en-têtes seulement ou messages complets
 
-  10. [ ] Client SMTP complet (RFC 5321)
+  10. [x] Client SMTP complet (RFC 5321)
       - Connexion sécurisée TLS/SSL sur le port 465/587
       - Authentification PLAIN, LOGIN et CRAM-MD5
       - Support STARTTLS pour les connexions non chiffrées
