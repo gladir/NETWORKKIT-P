@@ -5942,7 +5942,42 @@ Begin
  ShowMouse;
 End;
 
-{ Dessine la boite de dialogue des comptes (liste ou assistant) }
+{ ============================================================================
+  DrawAccountManagerDialog - Affiche la boite de dialogue de gestion des comptes
+
+  Cette procedure est le point d'entree principal pour l'affichage du
+  gestionnaire de comptes. Elle affiche soit:
+  - La liste des comptes (mode liste) quand AccountWizardMode = False
+  - L'assistant de configuration (mode assistant) quand AccountWizardMode = True
+
+  Disposition de la boite de dialogue (mode liste):
+  +-----------------------------------------------+
+  | Gestion des comptes                       [X] |
+  +-----------------------------------------------+
+  | Comptes de messagerie:         | [Ajouter  ] |
+  | +---------------------------+  | [Modifier ] |
+  | | Compte 1           (def)  |  | [Supprimer] |
+  | | Compte 2                  |  | [Par defaut]|
+  | +---------------------------+  | [Proprietes]|
+  |                                              |
+  |                               [Fermer]       |
+  +-----------------------------------------------+
+
+  Disposition de l'assistant (chaque etape):
+  +-----------------------------------------------+
+  | Assistant de compte - [Titre etape]       [X] |
+  +-----------------------------------------------+
+  |                                              |
+  | [Contenu variable selon l'etape]             |
+  |                                              |
+  | [Annuler]    [Precedent] [Suivant/Terminer] |
+  +-----------------------------------------------+
+
+  Coordonnees:
+  - Position: DIALOG_X, DIALOG_Y (centre de l'ecran)
+  - Dimensions: DIALOG_WIDTH x DIALOG_HEIGHT (500 x 350 pixels)
+  - Marge interieure: DIALOG_MARGIN (10 pixels)
+  ============================================================================ }
 Procedure DrawAccountManagerDialog;
 Begin
  If AccountWizardMode Then
