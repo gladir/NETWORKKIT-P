@@ -118,7 +118,7 @@
       - Gestion multipart/alternative (texte + HTML)
       - Gestion multipart/mixed (texte + pièces jointes)
 
-  16. [ ] Carnet d'adresses intégré
+  16. [x] Carnet d'adresses intégré
       - Fenêtre de gestion des contacts
       - Champs: Nom, Prénom, Courriel, Téléphone, Adresse
       - Recherche et filtrage des contacts
@@ -566,6 +566,74 @@ Type
   DataLength: LongInt;           { Taille des donnees }
   DecodedLength: LongInt;        { Taille une fois decode }
   PartCount: Integer;            { Nombre de sous-parties }
+ End;
+
+ { ============================================================================
+   TYPES POUR LE CARNET D'ADRESSES (TODO 16)
+   ============================================================================ }
+
+ { Structure pour un contact }
+ TContact = Record
+  ID: Integer;                   { Identifiant unique }
+  LastName: String[40];          { Nom de famille }
+  FirstName: String[40];         { Prenom }
+  DisplayName: String[60];       { Nom d'affichage }
+  Email: String[80];             { Adresse email principale }
+  Email2: String[80];            { Adresse email secondaire }
+  Phone: String[20];             { Telephone principal }
+  PhoneMobile: String[20];       { Telephone mobile }
+  PhoneWork: String[20];         { Telephone travail }
+  Address: String[80];           { Adresse ligne 1 }
+  Address2: String[80];          { Adresse ligne 2 }
+  City: String[40];              { Ville }
+  PostalCode: String[10];        { Code postal }
+  Country: String[30];           { Pays }
+  Company: String[60];           { Entreprise }
+  JobTitle: String[40];          { Titre/Fonction }
+  Notes: String[200];            { Notes }
+  Birthday: String[10];          { Date de naissance JJ/MM/AAAA }
+  CreatedDate: LongInt;          { Date de creation }
+  ModifiedDate: LongInt;         { Date de modification }
+  IsSelected: Boolean;           { Selection pour operations en lot }
+ End;
+
+ { Type de tri pour les contacts }
+ TContactSortField = (
+  csfLastName,                   { Tri par nom }
+  csfFirstName,                  { Tri par prenom }
+  csfEmail,                      { Tri par email }
+  csfCompany                     { Tri par entreprise }
+ );
+
+ { Etat de la fenetre carnet d'adresses }
+ TAddressBookState = (
+  absHidden,                     { Fenetre cachee }
+  absList,                       { Liste des contacts }
+  absEdit,                       { Edition d'un contact }
+  absNew,                        { Nouveau contact }
+  absSearch,                     { Recherche }
+  absImport,                     { Import }
+  absExport                      { Export }
+ );
+
+ { Format d'import/export }
+ TAddressBookFormat = (
+  abfVCard,                      { Format vCard (.vcf) }
+  abfCSV                         { Format CSV }
+ );
+
+ { Champ de l'auto-completion }
+ TAutoCompleteField = (
+  acfTo,                         { Champ A: }
+  acfCc,                         { Champ Cc: }
+  acfBcc                         { Champ Cci: }
+ );
+
+ { Structure pour l'auto-completion }
+ TAutoCompleteSuggestion = Record
+  DisplayName: String[60];
+  Email: String[80];
+  MatchScore: Integer;           { Score de correspondance }
  End;
 
  { Type de colonne pour la liste des messages }
@@ -1431,6 +1499,35 @@ Const
  { Table Base64 }
  BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+ { ============================================================================
+   CONSTANTES POUR LE CARNET D'ADRESSES (TODO 16)
+   ============================================================================ }
+
+ { Nombre maximum de contacts }
+ MAX_CONTACTS = 500;
+
+ { Nombre maximum de suggestions d'auto-completion }
+ MAX_AUTOCOMPLETE_SUGGESTIONS = 10;
+
+ { Dimensions de la fenetre carnet d'adresses }
+ ADDRESSBOOK_WIDTH = 500;
+ ADDRESSBOOK_HEIGHT = 380;
+ ADDRESSBOOK_MARGIN = 10;
+
+ { Hauteur d'une ligne de contact }
+ CONTACT_LINE_HEIGHT = 18;
+
+ { Nombre de contacts visibles }
+ CONTACTS_VISIBLE = 15;
+
+ { Largeur des colonnes }
+ CONTACT_COL_NAME = 150;
+ CONTACT_COL_EMAIL = 200;
+ CONTACT_COL_PHONE = 100;
+
+ { Fichier de sauvegarde }
+ ADDRESSBOOK_FILE = 'ADDRBOOK.DAT';
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1596,6 +1693,31 @@ Var
  MIMEHasText: Boolean;                  { Message contient du texte }
  MIMEHasHTML: Boolean;                  { Message contient du HTML }
  MIMEHasAttachments: Boolean;           { Message contient des pieces jointes }
+
+ { Variables globales pour le carnet d'adresses (TODO 16) }
+ Contacts: Array[0..MAX_CONTACTS-1] of TContact;  { Liste des contacts }
+ ContactCount: Integer;                 { Nombre de contacts }
+ ContactNextID: Integer;                { Prochain ID disponible }
+ ContactSortField: TContactSortField;   { Champ de tri }
+ ContactSortAsc: Boolean;               { Ordre ascendant }
+ ContactScrollOffset: Integer;          { Decalage de defilement }
+ ContactSelectedIndex: Integer;         { Contact selectionne }
+ AddressBookState: TAddressBookState;   { Etat de la fenetre }
+ AddressBookX, AddressBookY: Integer;   { Position de la fenetre }
+ AddressBookSearchText: String[40];     { Texte de recherche }
+ EditingContact: TContact;              { Contact en cours d'edition }
+ EditingContactIndex: Integer;          { Index du contact en edition (-1 si nouveau) }
+ EditingField: Integer;                 { Champ en cours d'edition (0-16) }
+ AddressBookVisible: Boolean;           { Visibilite du carnet }
+
+ { Variables pour l'auto-completion }
+ AutoCompleteSuggestions: Array[0..MAX_AUTOCOMPLETE_SUGGESTIONS-1] of TAutoCompleteSuggestion;
+ AutoCompleteSuggestionCount: Integer;  { Nombre de suggestions }
+ AutoCompleteVisible: Boolean;          { Suggestions visibles }
+ AutoCompleteSelectedIndex: Integer;    { Suggestion selectionnee }
+ AutoCompleteField: TAutoCompleteField; { Champ actif }
+ AutoCompleteX, AutoCompleteY: Integer; { Position du popup }
+ AutoCompleteText: String[40];          { Texte tape }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -9725,6 +9847,1143 @@ End;
   FIN DE L'IMPLEMENTATION DU DECODAGE MIME
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU CARNET D'ADRESSES (TODO 16)
+  ============================================================================ }
+
+{ Initialise un contact vide }
+Procedure AB_InitContact(Var Contact: TContact);
+Begin
+ Contact.ID := 0;
+ Contact.LastName := '';
+ Contact.FirstName := '';
+ Contact.DisplayName := '';
+ Contact.Email := '';
+ Contact.Email2 := '';
+ Contact.Phone := '';
+ Contact.PhoneMobile := '';
+ Contact.PhoneWork := '';
+ Contact.Address := '';
+ Contact.Address2 := '';
+ Contact.City := '';
+ Contact.PostalCode := '';
+ Contact.Country := '';
+ Contact.Company := '';
+ Contact.JobTitle := '';
+ Contact.Notes := '';
+ Contact.Birthday := '';
+ Contact.CreatedDate := 0;
+ Contact.ModifiedDate := 0;
+ Contact.IsSelected := False;
+End;
+
+{ Initialise le carnet d'adresses }
+Procedure AB_Init;
+Var
+ I: Integer;
+Begin
+ ContactCount := 0;
+ ContactNextID := 1;
+ ContactSortField := csfLastName;
+ ContactSortAsc := True;
+ ContactScrollOffset := 0;
+ ContactSelectedIndex := -1;
+ AddressBookState := absHidden;
+ AddressBookX := (640 - ADDRESSBOOK_WIDTH) Div 2;
+ AddressBookY := (480 - ADDRESSBOOK_HEIGHT) Div 2;
+ AddressBookSearchText := '';
+ EditingContactIndex := -1;
+ EditingField := 0;
+ AddressBookVisible := False;
+
+ { Initialiser tous les contacts }
+ For I := 0 To MAX_CONTACTS - 1 Do
+  AB_InitContact(Contacts[I]);
+
+ { Auto-completion }
+ AutoCompleteSuggestionCount := 0;
+ AutoCompleteVisible := False;
+ AutoCompleteSelectedIndex := -1;
+ AutoCompleteField := acfTo;
+ AutoCompleteText := '';
+End;
+
+{ Compare deux chaines sans casse }
+Function AB_CompareStr(S1, S2: String): Integer;
+Var
+ I, L1, L2, MinL: Integer;
+ C1, C2: Char;
+Begin
+ L1 := Length(S1);
+ L2 := Length(S2);
+ If L1 < L2 Then MinL := L1 Else MinL := L2;
+
+ For I := 1 To MinL Do Begin
+  C1 := S1[I];
+  C2 := S2[I];
+  { Convertir en majuscule }
+  If (C1 >= 'a') And (C1 <= 'z') Then C1 := Chr(Ord(C1) - 32);
+  If (C2 >= 'a') And (C2 <= 'z') Then C2 := Chr(Ord(C2) - 32);
+  If C1 < C2 Then Begin
+   AB_CompareStr := -1;
+   Exit;
+  End
+  Else If C1 > C2 Then Begin
+   AB_CompareStr := 1;
+   Exit;
+  End;
+ End;
+
+ If L1 < L2 Then AB_CompareStr := -1
+ Else If L1 > L2 Then AB_CompareStr := 1
+ Else AB_CompareStr := 0;
+End;
+
+{ Echange deux contacts }
+Procedure AB_SwapContacts(Var A, B: TContact);
+Var
+ Temp: TContact;
+Begin
+ Temp := A;
+ A := B;
+ B := Temp;
+End;
+
+{ Tri les contacts (tri a bulles pour simplicite) }
+Procedure AB_SortContacts;
+Var
+ I, J: Integer;
+ Swapped: Boolean;
+ Cmp: Integer;
+ S1, S2: String;
+Begin
+ If ContactCount < 2 Then Exit;
+
+ For I := 0 To ContactCount - 2 Do Begin
+  Swapped := False;
+  For J := 0 To ContactCount - 2 - I Do Begin
+   { Obtenir les valeurs a comparer }
+   Case ContactSortField Of
+    csfLastName: Begin
+     S1 := Contacts[J].LastName;
+     S2 := Contacts[J + 1].LastName;
+    End;
+    csfFirstName: Begin
+     S1 := Contacts[J].FirstName;
+     S2 := Contacts[J + 1].FirstName;
+    End;
+    csfEmail: Begin
+     S1 := Contacts[J].Email;
+     S2 := Contacts[J + 1].Email;
+    End;
+    csfCompany: Begin
+     S1 := Contacts[J].Company;
+     S2 := Contacts[J + 1].Company;
+    End;
+   End;
+
+   Cmp := AB_CompareStr(S1, S2);
+   If Not ContactSortAsc Then Cmp := -Cmp;
+
+   If Cmp > 0 Then Begin
+    AB_SwapContacts(Contacts[J], Contacts[J + 1]);
+    Swapped := True;
+   End;
+  End;
+  If Not Swapped Then Break;
+ End;
+End;
+
+{ Genere le nom d'affichage }
+Function AB_GenerateDisplayName(Const Contact: TContact): String;
+Begin
+ If Length(Contact.DisplayName) > 0 Then
+  AB_GenerateDisplayName := Contact.DisplayName
+ Else If (Length(Contact.FirstName) > 0) And (Length(Contact.LastName) > 0) Then
+  AB_GenerateDisplayName := Contact.FirstName + ' ' + Contact.LastName
+ Else If Length(Contact.LastName) > 0 Then
+  AB_GenerateDisplayName := Contact.LastName
+ Else If Length(Contact.FirstName) > 0 Then
+  AB_GenerateDisplayName := Contact.FirstName
+ Else If Length(Contact.Email) > 0 Then
+  AB_GenerateDisplayName := Contact.Email
+ Else
+  AB_GenerateDisplayName := '(Sans nom)';
+End;
+
+{ Ajoute un nouveau contact }
+Function AB_AddContact(Var NewContact: TContact): Integer;
+Begin
+ AB_AddContact := -1;
+ If ContactCount >= MAX_CONTACTS Then Exit;
+
+ NewContact.ID := ContactNextID;
+ Inc(ContactNextID);
+ NewContact.CreatedDate := 0; { TODO: obtenir date actuelle }
+ NewContact.ModifiedDate := NewContact.CreatedDate;
+
+ If Length(NewContact.DisplayName) = 0 Then
+  NewContact.DisplayName := AB_GenerateDisplayName(NewContact);
+
+ Contacts[ContactCount] := NewContact;
+ AB_AddContact := ContactCount;
+ Inc(ContactCount);
+
+ AB_SortContacts;
+End;
+
+{ Modifie un contact existant }
+Function AB_UpdateContact(Index: Integer; Const UpdatedContact: TContact): Boolean;
+Begin
+ AB_UpdateContact := False;
+ If (Index < 0) Or (Index >= ContactCount) Then Exit;
+
+ Contacts[Index] := UpdatedContact;
+ Contacts[Index].ModifiedDate := 0; { TODO: obtenir date actuelle }
+
+ If Length(Contacts[Index].DisplayName) = 0 Then
+  Contacts[Index].DisplayName := AB_GenerateDisplayName(Contacts[Index]);
+
+ AB_UpdateContact := True;
+ AB_SortContacts;
+End;
+
+{ Supprime un contact }
+Function AB_DeleteContact(Index: Integer): Boolean;
+Var
+ I: Integer;
+Begin
+ AB_DeleteContact := False;
+ If (Index < 0) Or (Index >= ContactCount) Then Exit;
+
+ For I := Index To ContactCount - 2 Do
+  Contacts[I] := Contacts[I + 1];
+
+ Dec(ContactCount);
+ AB_InitContact(Contacts[ContactCount]);
+
+ If ContactSelectedIndex >= ContactCount Then
+  ContactSelectedIndex := ContactCount - 1;
+
+ AB_DeleteContact := True;
+End;
+
+{ Recherche un contact par email }
+Function AB_FindByEmail(Email: String): Integer;
+Var
+ I: Integer;
+ LowerEmail, ContactEmail: String;
+Begin
+ AB_FindByEmail := -1;
+ LowerEmail := Email;
+ For I := 1 To Length(LowerEmail) Do
+  If (LowerEmail[I] >= 'A') And (LowerEmail[I] <= 'Z') Then
+   LowerEmail[I] := Chr(Ord(LowerEmail[I]) + 32);
+
+ For I := 0 To ContactCount - 1 Do Begin
+  ContactEmail := Contacts[I].Email;
+  { Convertir en minuscules }
+  { Pour simplifier, comparaison directe }
+  If AB_CompareStr(Contacts[I].Email, Email) = 0 Then Begin
+   AB_FindByEmail := I;
+   Exit;
+  End;
+ End;
+End;
+
+{ Recherche des contacts correspondant au texte }
+Function AB_Search(SearchText: String; Var Results: Array of Integer;
+                   MaxResults: Integer): Integer;
+Var
+ I, Count: Integer;
+ LowerSearch, LowerField: String;
+ J: Integer;
+Begin
+ Count := 0;
+ If Length(SearchText) = 0 Then Begin
+  { Retourner tous les contacts }
+  For I := 0 To ContactCount - 1 Do Begin
+   If Count >= MaxResults Then Break;
+   Results[Count] := I;
+   Inc(Count);
+  End;
+  AB_Search := Count;
+  Exit;
+ End;
+
+ { Convertir recherche en minuscules }
+ LowerSearch := SearchText;
+ For J := 1 To Length(LowerSearch) Do
+  If (LowerSearch[J] >= 'A') And (LowerSearch[J] <= 'Z') Then
+   LowerSearch[J] := Chr(Ord(LowerSearch[J]) + 32);
+
+ For I := 0 To ContactCount - 1 Do Begin
+  If Count >= MaxResults Then Break;
+
+  { Verifier chaque champ }
+  LowerField := Contacts[I].LastName;
+  For J := 1 To Length(LowerField) Do
+   If (LowerField[J] >= 'A') And (LowerField[J] <= 'Z') Then
+    LowerField[J] := Chr(Ord(LowerField[J]) + 32);
+  If Pos(LowerSearch, LowerField) > 0 Then Begin
+   Results[Count] := I;
+   Inc(Count);
+   Continue;
+  End;
+
+  LowerField := Contacts[I].FirstName;
+  For J := 1 To Length(LowerField) Do
+   If (LowerField[J] >= 'A') And (LowerField[J] <= 'Z') Then
+    LowerField[J] := Chr(Ord(LowerField[J]) + 32);
+  If Pos(LowerSearch, LowerField) > 0 Then Begin
+   Results[Count] := I;
+   Inc(Count);
+   Continue;
+  End;
+
+  LowerField := Contacts[I].Email;
+  For J := 1 To Length(LowerField) Do
+   If (LowerField[J] >= 'A') And (LowerField[J] <= 'Z') Then
+    LowerField[J] := Chr(Ord(LowerField[J]) + 32);
+  If Pos(LowerSearch, LowerField) > 0 Then Begin
+   Results[Count] := I;
+   Inc(Count);
+   Continue;
+  End;
+
+  LowerField := Contacts[I].Company;
+  For J := 1 To Length(LowerField) Do
+   If (LowerField[J] >= 'A') And (LowerField[J] <= 'Z') Then
+    LowerField[J] := Chr(Ord(LowerField[J]) + 32);
+  If Pos(LowerSearch, LowerField) > 0 Then Begin
+   Results[Count] := I;
+   Inc(Count);
+  End;
+ End;
+
+ AB_Search := Count;
+End;
+
+{ ============================================================================
+  IMPORT/EXPORT VCARD (RFC 2426)
+  ============================================================================ }
+
+{ Encode une valeur pour vCard }
+Function AB_VCardEncode(S: String): String;
+Var
+ I: Integer;
+ Output: String;
+Begin
+ Output := '';
+ For I := 1 To Length(S) Do Begin
+  Case S[I] Of
+   '\': Output := Output + '\\';
+   ';': Output := Output + '\;';
+   ',': Output := Output + '\,';
+   #13: Output := Output + '\n';
+   #10: ; { Ignorer LF }
+   Else Output := Output + S[I];
+  End;
+ End;
+ AB_VCardEncode := Output;
+End;
+
+{ Decode une valeur vCard }
+Function AB_VCardDecode(S: String): String;
+Var
+ I: Integer;
+ Output: String;
+Begin
+ Output := '';
+ I := 1;
+ While I <= Length(S) Do Begin
+  If (S[I] = '\') And (I < Length(S)) Then Begin
+   Case S[I + 1] Of
+    '\': Output := Output + '\';
+    ';': Output := Output + ';';
+    ',': Output := Output + ',';
+    'n', 'N': Output := Output + #13#10;
+    Else Output := Output + S[I + 1];
+   End;
+   Inc(I, 2);
+  End
+  Else Begin
+   Output := Output + S[I];
+   Inc(I);
+  End;
+ End;
+ AB_VCardDecode := Output;
+End;
+
+{ Exporte un contact en format vCard }
+Function AB_ExportContactToVCard(Const Contact: TContact): String;
+Var
+ VCard: String;
+Begin
+ VCard := 'BEGIN:VCARD' + #13#10;
+ VCard := VCard + 'VERSION:3.0' + #13#10;
+
+ { Nom structure: Nom;Prenom }
+ VCard := VCard + 'N:' + AB_VCardEncode(Contact.LastName) + ';' +
+          AB_VCardEncode(Contact.FirstName) + ';;;' + #13#10;
+
+ { Nom d'affichage }
+ VCard := VCard + 'FN:' + AB_VCardEncode(AB_GenerateDisplayName(Contact)) + #13#10;
+
+ { Email }
+ If Length(Contact.Email) > 0 Then
+  VCard := VCard + 'EMAIL;TYPE=INTERNET;TYPE=PREF:' + Contact.Email + #13#10;
+ If Length(Contact.Email2) > 0 Then
+  VCard := VCard + 'EMAIL;TYPE=INTERNET:' + Contact.Email2 + #13#10;
+
+ { Telephones }
+ If Length(Contact.Phone) > 0 Then
+  VCard := VCard + 'TEL;TYPE=HOME:' + Contact.Phone + #13#10;
+ If Length(Contact.PhoneMobile) > 0 Then
+  VCard := VCard + 'TEL;TYPE=CELL:' + Contact.PhoneMobile + #13#10;
+ If Length(Contact.PhoneWork) > 0 Then
+  VCard := VCard + 'TEL;TYPE=WORK:' + Contact.PhoneWork + #13#10;
+
+ { Adresse }
+ If (Length(Contact.Address) > 0) Or (Length(Contact.City) > 0) Then Begin
+  VCard := VCard + 'ADR;TYPE=HOME:;;' + AB_VCardEncode(Contact.Address);
+  If Length(Contact.Address2) > 0 Then
+   VCard := VCard + ' ' + AB_VCardEncode(Contact.Address2);
+  VCard := VCard + ';' + AB_VCardEncode(Contact.City) + ';;' +
+           AB_VCardEncode(Contact.PostalCode) + ';' +
+           AB_VCardEncode(Contact.Country) + #13#10;
+ End;
+
+ { Entreprise }
+ If Length(Contact.Company) > 0 Then
+  VCard := VCard + 'ORG:' + AB_VCardEncode(Contact.Company) + #13#10;
+
+ If Length(Contact.JobTitle) > 0 Then
+  VCard := VCard + 'TITLE:' + AB_VCardEncode(Contact.JobTitle) + #13#10;
+
+ { Date de naissance }
+ If Length(Contact.Birthday) > 0 Then
+  VCard := VCard + 'BDAY:' + Contact.Birthday + #13#10;
+
+ { Notes }
+ If Length(Contact.Notes) > 0 Then
+  VCard := VCard + 'NOTE:' + AB_VCardEncode(Contact.Notes) + #13#10;
+
+ VCard := VCard + 'END:VCARD' + #13#10;
+ AB_ExportContactToVCard := VCard;
+End;
+
+{ Extrait une propriete d'une ligne vCard }
+Procedure AB_ParseVCardLine(Line: String; Var PropName, PropValue: String);
+Var
+ I, ColonPos: Integer;
+Begin
+ PropName := '';
+ PropValue := '';
+
+ ColonPos := Pos(':', Line);
+ If ColonPos = 0 Then Exit;
+
+ PropName := Copy(Line, 1, ColonPos - 1);
+ PropValue := Copy(Line, ColonPos + 1, Length(Line) - ColonPos);
+
+ { Extraire le nom de propriete sans les parametres }
+ I := Pos(';', PropName);
+ If I > 0 Then
+  PropName := Copy(PropName, 1, I - 1);
+
+ { Convertir en majuscules }
+ For I := 1 To Length(PropName) Do
+  If (PropName[I] >= 'a') And (PropName[I] <= 'z') Then
+   PropName[I] := Chr(Ord(PropName[I]) - 32);
+End;
+
+{ Importe un contact depuis format vCard }
+Function AB_ImportContactFromVCard(VCard: String; Var Contact: TContact): Boolean;
+Var
+ I, LineStart, LineEnd: Integer;
+ Line, PropName, PropValue: String;
+ InVCard: Boolean;
+ NameParts: Array[0..4] of String;
+ PartCount, J, SemiPos: Integer;
+Begin
+ AB_ImportContactFromVCard := False;
+ AB_InitContact(Contact);
+ InVCard := False;
+
+ I := 1;
+ While I <= Length(VCard) Do Begin
+  { Lire une ligne }
+  LineStart := I;
+  While (I <= Length(VCard)) And (VCard[I] <> #13) And (VCard[I] <> #10) Do
+   Inc(I);
+  Line := Copy(VCard, LineStart, I - LineStart);
+  If (I <= Length(VCard)) And (VCard[I] = #13) Then Inc(I);
+  If (I <= Length(VCard)) And (VCard[I] = #10) Then Inc(I);
+
+  If Length(Line) = 0 Then Continue;
+
+  AB_ParseVCardLine(Line, PropName, PropValue);
+
+  If PropName = 'BEGIN' Then Begin
+   If PropValue = 'VCARD' Then InVCard := True;
+  End
+  Else If PropName = 'END' Then Begin
+   If PropValue = 'VCARD' Then Begin
+    InVCard := False;
+    AB_ImportContactFromVCard := True;
+    Exit;
+   End;
+  End
+  Else If InVCard Then Begin
+   PropValue := AB_VCardDecode(PropValue);
+
+   If PropName = 'N' Then Begin
+    { Parser Nom;Prenom;;; }
+    PartCount := 0;
+    For J := 0 To 4 Do NameParts[J] := '';
+    J := 1;
+    While (J <= Length(PropValue)) And (PartCount <= 4) Do Begin
+     If PropValue[J] = ';' Then
+      Inc(PartCount)
+     Else
+      NameParts[PartCount] := NameParts[PartCount] + PropValue[J];
+     Inc(J);
+    End;
+    Contact.LastName := NameParts[0];
+    Contact.FirstName := NameParts[1];
+   End
+   Else If PropName = 'FN' Then
+    Contact.DisplayName := PropValue
+   Else If PropName = 'EMAIL' Then Begin
+    If Length(Contact.Email) = 0 Then
+     Contact.Email := PropValue
+    Else If Length(Contact.Email2) = 0 Then
+     Contact.Email2 := PropValue;
+   End
+   Else If PropName = 'TEL' Then Begin
+    { Determiner le type par le contexte }
+    If Pos('CELL', Line) > 0 Then
+     Contact.PhoneMobile := PropValue
+    Else If Pos('WORK', Line) > 0 Then
+     Contact.PhoneWork := PropValue
+    Else If Length(Contact.Phone) = 0 Then
+     Contact.Phone := PropValue;
+   End
+   Else If PropName = 'ADR' Then Begin
+    { Parser ;;Adresse;Ville;;CodePostal;Pays }
+    PartCount := 0;
+    For J := 0 To 4 Do NameParts[J] := '';
+    J := 1;
+    While (J <= Length(PropValue)) And (PartCount <= 4) Do Begin
+     If PropValue[J] = ';' Then
+      Inc(PartCount)
+     Else If PartCount <= 4 Then
+      NameParts[PartCount] := NameParts[PartCount] + PropValue[J];
+     Inc(J);
+    End;
+    If Length(NameParts[2]) > 0 Then Contact.Address := NameParts[2];
+    If Length(NameParts[3]) > 0 Then Contact.City := NameParts[3];
+   End
+   Else If PropName = 'ORG' Then
+    Contact.Company := PropValue
+   Else If PropName = 'TITLE' Then
+    Contact.JobTitle := PropValue
+   Else If PropName = 'BDAY' Then
+    Contact.Birthday := PropValue
+   Else If PropName = 'NOTE' Then
+    Contact.Notes := PropValue;
+  End;
+ End;
+End;
+
+{ ============================================================================
+  IMPORT/EXPORT CSV
+  ============================================================================ }
+
+{ Echappe une valeur pour CSV }
+Function AB_CSVEscape(S: String): String;
+Var
+ NeedQuotes: Boolean;
+ I: Integer;
+ Output: String;
+Begin
+ NeedQuotes := False;
+ For I := 1 To Length(S) Do
+  If (S[I] = ',') Or (S[I] = '"') Or (S[I] = #13) Or (S[I] = #10) Then Begin
+   NeedQuotes := True;
+   Break;
+  End;
+
+ If NeedQuotes Then Begin
+  Output := '"';
+  For I := 1 To Length(S) Do Begin
+   If S[I] = '"' Then
+    Output := Output + '""'
+   Else
+    Output := Output + S[I];
+  End;
+  Output := Output + '"';
+  AB_CSVEscape := Output;
+ End
+ Else
+  AB_CSVEscape := S;
+End;
+
+{ Exporte l'en-tete CSV }
+Function AB_GetCSVHeader: String;
+Begin
+ AB_GetCSVHeader := 'LastName,FirstName,DisplayName,Email,Email2,Phone,' +
+                    'PhoneMobile,PhoneWork,Address,Address2,City,PostalCode,' +
+                    'Country,Company,JobTitle,Birthday,Notes';
+End;
+
+{ Exporte un contact en format CSV }
+Function AB_ExportContactToCSV(Const Contact: TContact): String;
+Begin
+ AB_ExportContactToCSV :=
+  AB_CSVEscape(Contact.LastName) + ',' +
+  AB_CSVEscape(Contact.FirstName) + ',' +
+  AB_CSVEscape(Contact.DisplayName) + ',' +
+  AB_CSVEscape(Contact.Email) + ',' +
+  AB_CSVEscape(Contact.Email2) + ',' +
+  AB_CSVEscape(Contact.Phone) + ',' +
+  AB_CSVEscape(Contact.PhoneMobile) + ',' +
+  AB_CSVEscape(Contact.PhoneWork) + ',' +
+  AB_CSVEscape(Contact.Address) + ',' +
+  AB_CSVEscape(Contact.Address2) + ',' +
+  AB_CSVEscape(Contact.City) + ',' +
+  AB_CSVEscape(Contact.PostalCode) + ',' +
+  AB_CSVEscape(Contact.Country) + ',' +
+  AB_CSVEscape(Contact.Company) + ',' +
+  AB_CSVEscape(Contact.JobTitle) + ',' +
+  AB_CSVEscape(Contact.Birthday) + ',' +
+  AB_CSVEscape(Contact.Notes);
+End;
+
+{ Parse une valeur CSV (gere les guillemets) }
+Function AB_CSVParseField(Line: String; Var Pos: Integer): String;
+Var
+ InQuotes: Boolean;
+ Output: String;
+Begin
+ Output := '';
+ InQuotes := False;
+
+ If Pos > Length(Line) Then Begin
+  AB_CSVParseField := '';
+  Exit;
+ End;
+
+ { Verifier si commence par guillemet }
+ If Line[Pos] = '"' Then Begin
+  InQuotes := True;
+  Inc(Pos);
+ End;
+
+ While Pos <= Length(Line) Do Begin
+  If InQuotes Then Begin
+   If Line[Pos] = '"' Then Begin
+    If (Pos < Length(Line)) And (Line[Pos + 1] = '"') Then Begin
+     { Double guillemet = guillemet simple }
+     Output := Output + '"';
+     Inc(Pos, 2);
+    End
+    Else Begin
+     { Fin du champ }
+     Inc(Pos);
+     { Sauter la virgule }
+     If (Pos <= Length(Line)) And (Line[Pos] = ',') Then Inc(Pos);
+     Break;
+    End;
+   End
+   Else Begin
+    Output := Output + Line[Pos];
+    Inc(Pos);
+   End;
+  End
+  Else Begin
+   If Line[Pos] = ',' Then Begin
+    Inc(Pos);
+    Break;
+   End
+   Else Begin
+    Output := Output + Line[Pos];
+    Inc(Pos);
+   End;
+  End;
+ End;
+
+ AB_CSVParseField := Output;
+End;
+
+{ Importe un contact depuis format CSV }
+Function AB_ImportContactFromCSV(Line: String; Var Contact: TContact): Boolean;
+Var
+ P: Integer;
+Begin
+ AB_ImportContactFromCSV := False;
+ AB_InitContact(Contact);
+ P := 1;
+
+ Contact.LastName := AB_CSVParseField(Line, P);
+ Contact.FirstName := AB_CSVParseField(Line, P);
+ Contact.DisplayName := AB_CSVParseField(Line, P);
+ Contact.Email := AB_CSVParseField(Line, P);
+ Contact.Email2 := AB_CSVParseField(Line, P);
+ Contact.Phone := AB_CSVParseField(Line, P);
+ Contact.PhoneMobile := AB_CSVParseField(Line, P);
+ Contact.PhoneWork := AB_CSVParseField(Line, P);
+ Contact.Address := AB_CSVParseField(Line, P);
+ Contact.Address2 := AB_CSVParseField(Line, P);
+ Contact.City := AB_CSVParseField(Line, P);
+ Contact.PostalCode := AB_CSVParseField(Line, P);
+ Contact.Country := AB_CSVParseField(Line, P);
+ Contact.Company := AB_CSVParseField(Line, P);
+ Contact.JobTitle := AB_CSVParseField(Line, P);
+ Contact.Birthday := AB_CSVParseField(Line, P);
+ Contact.Notes := AB_CSVParseField(Line, P);
+
+ { Verifier qu'on a au moins un nom ou email }
+ AB_ImportContactFromCSV := (Length(Contact.LastName) > 0) Or
+                            (Length(Contact.FirstName) > 0) Or
+                            (Length(Contact.Email) > 0);
+End;
+
+{ ============================================================================
+  AUTO-COMPLETION
+  ============================================================================ }
+
+{ Calcule un score de correspondance }
+Function AB_CalcMatchScore(SearchText, FieldValue: String): Integer;
+Var
+ I, J, Score: Integer;
+ LowerSearch, LowerField: String;
+Begin
+ Score := 0;
+ If Length(SearchText) = 0 Then Begin
+  AB_CalcMatchScore := 0;
+  Exit;
+ End;
+
+ { Convertir en minuscules }
+ LowerSearch := SearchText;
+ LowerField := FieldValue;
+ For I := 1 To Length(LowerSearch) Do
+  If (LowerSearch[I] >= 'A') And (LowerSearch[I] <= 'Z') Then
+   LowerSearch[I] := Chr(Ord(LowerSearch[I]) + 32);
+ For I := 1 To Length(LowerField) Do
+  If (LowerField[I] >= 'A') And (LowerField[I] <= 'Z') Then
+   LowerField[I] := Chr(Ord(LowerField[I]) + 32);
+
+ { Correspondance exacte au debut = score maximum }
+ If Copy(LowerField, 1, Length(LowerSearch)) = LowerSearch Then
+  Score := 100 - Length(FieldValue)
+ { Correspondance quelque part }
+ Else If Pos(LowerSearch, LowerField) > 0 Then
+  Score := 50 - Pos(LowerSearch, LowerField);
+
+ AB_CalcMatchScore := Score;
+End;
+
+{ Met a jour les suggestions d'auto-completion }
+Procedure AB_UpdateAutoComplete(SearchText: String);
+Var
+ I, J, Score, BestScore: Integer;
+ Temp: TAutoCompleteSuggestion;
+Begin
+ AutoCompleteSuggestionCount := 0;
+ AutoCompleteText := SearchText;
+
+ If Length(SearchText) < 2 Then Begin
+  AutoCompleteVisible := False;
+  Exit;
+ End;
+
+ For I := 0 To ContactCount - 1 Do Begin
+  If AutoCompleteSuggestionCount >= MAX_AUTOCOMPLETE_SUGGESTIONS Then Break;
+
+  { Calculer le score pour ce contact }
+  BestScore := AB_CalcMatchScore(SearchText, Contacts[I].DisplayName);
+  Score := AB_CalcMatchScore(SearchText, Contacts[I].Email);
+  If Score > BestScore Then BestScore := Score;
+  Score := AB_CalcMatchScore(SearchText, Contacts[I].FirstName);
+  If Score > BestScore Then BestScore := Score;
+  Score := AB_CalcMatchScore(SearchText, Contacts[I].LastName);
+  If Score > BestScore Then BestScore := Score;
+
+  If BestScore > 0 Then Begin
+   AutoCompleteSuggestions[AutoCompleteSuggestionCount].DisplayName :=
+    AB_GenerateDisplayName(Contacts[I]);
+   AutoCompleteSuggestions[AutoCompleteSuggestionCount].Email := Contacts[I].Email;
+   AutoCompleteSuggestions[AutoCompleteSuggestionCount].MatchScore := BestScore;
+   Inc(AutoCompleteSuggestionCount);
+  End;
+ End;
+
+ { Trier par score (tri a bulles) }
+ For I := 0 To AutoCompleteSuggestionCount - 2 Do
+  For J := 0 To AutoCompleteSuggestionCount - 2 - I Do
+   If AutoCompleteSuggestions[J].MatchScore <
+      AutoCompleteSuggestions[J + 1].MatchScore Then Begin
+    Temp := AutoCompleteSuggestions[J];
+    AutoCompleteSuggestions[J] := AutoCompleteSuggestions[J + 1];
+    AutoCompleteSuggestions[J + 1] := Temp;
+   End;
+
+ AutoCompleteVisible := AutoCompleteSuggestionCount > 0;
+ AutoCompleteSelectedIndex := 0;
+End;
+
+{ Retourne la suggestion selectionnee formatee }
+Function AB_GetSelectedSuggestion: String;
+Begin
+ If (AutoCompleteSelectedIndex >= 0) And
+    (AutoCompleteSelectedIndex < AutoCompleteSuggestionCount) Then Begin
+  If Length(AutoCompleteSuggestions[AutoCompleteSelectedIndex].DisplayName) > 0 Then
+   AB_GetSelectedSuggestion :=
+    '"' + AutoCompleteSuggestions[AutoCompleteSelectedIndex].DisplayName + '" <' +
+    AutoCompleteSuggestions[AutoCompleteSelectedIndex].Email + '>'
+  Else
+   AB_GetSelectedSuggestion := AutoCompleteSuggestions[AutoCompleteSelectedIndex].Email;
+ End
+ Else
+  AB_GetSelectedSuggestion := '';
+End;
+
+{ ============================================================================
+  AFFICHAGE DU CARNET D'ADRESSES
+  ============================================================================ }
+
+{ Dessine la fenetre du carnet d'adresses }
+Procedure AB_DrawWindow;
+Var
+ X, Y, W, H: Integer;
+ I, Y1: Integer;
+ DisplayStr: String;
+ SearchResults: Array[0..CONTACTS_VISIBLE-1] of Integer;
+ ResultCount: Integer;
+Begin
+ If Not AddressBookVisible Then Exit;
+
+ X := AddressBookX;
+ Y := AddressBookY;
+ W := ADDRESSBOOK_WIDTH;
+ H := ADDRESSBOOK_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X, Y, X + W, Y + H);
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + W, Y + H);
+ SetColor(White);
+ Line(X + 1, Y + 1, X + W - 1, Y + 1);
+ Line(X + 1, Y + 1, X + 1, Y + H - 1);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X + 2, Y + 2, X + W - 2, Y + 22);
+ SetColor(White);
+ OutTextXY(X + 10, Y + 7, 'Carnet d''adresses');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X + W - 20, Y + 4, X + W - 4, Y + 20);
+ SetColor(White);
+ OutTextXY(X + W - 16, Y + 7, 'X');
+
+ { Zone de recherche }
+ SetFillStyle(SolidFill, White);
+ Bar(X + 10, Y + 30, X + W - 100, Y + 48);
+ SetColor(Black);
+ Rectangle(X + 10, Y + 30, X + W - 100, Y + 48);
+ If Length(AddressBookSearchText) > 0 Then
+  OutTextXY(X + 14, Y + 35, AddressBookSearchText)
+ Else Begin
+  SetColor(DarkGray);
+  OutTextXY(X + 14, Y + 35, 'Rechercher...');
+ End;
+
+ { Boutons }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + W - 90, Y + 30, X + W - 10, Y + 48);
+ SetColor(Black);
+ Rectangle(X + W - 90, Y + 30, X + W - 10, Y + 48);
+ OutTextXY(X + W - 75, Y + 35, 'Nouveau');
+
+ { En-tetes de colonnes }
+ Y1 := Y + 55;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + W - 10, Y1 + 18);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + W - 10, Y1 + 18);
+ OutTextXY(X + 15, Y1 + 4, 'Nom');
+ OutTextXY(X + 15 + CONTACT_COL_NAME, Y1 + 4, 'Email');
+ OutTextXY(X + 15 + CONTACT_COL_NAME + CONTACT_COL_EMAIL, Y1 + 4, 'Telephone');
+
+ { Liste des contacts }
+ Y1 := Y + 75;
+ ResultCount := AB_Search(AddressBookSearchText, SearchResults, CONTACTS_VISIBLE);
+
+ For I := 0 To ResultCount - 1 Do Begin
+  If I + ContactScrollOffset >= ContactCount Then Break;
+
+  { Fond de la ligne }
+  If SearchResults[I] = ContactSelectedIndex Then
+   SetFillStyle(SolidFill, Blue)
+  Else If (I Mod 2) = 0 Then
+   SetFillStyle(SolidFill, White)
+  Else
+   SetFillStyle(SolidFill, LightGray);
+
+  Bar(X + 10, Y1 + I * CONTACT_LINE_HEIGHT,
+      X + W - 10, Y1 + (I + 1) * CONTACT_LINE_HEIGHT - 1);
+
+  If SearchResults[I] = ContactSelectedIndex Then
+   SetColor(White)
+  Else
+   SetColor(Black);
+
+  { Nom }
+  DisplayStr := AB_GenerateDisplayName(Contacts[SearchResults[I]]);
+  If Length(DisplayStr) > 20 Then
+   DisplayStr := Copy(DisplayStr, 1, 18) + '..';
+  OutTextXY(X + 15, Y1 + I * CONTACT_LINE_HEIGHT + 4, DisplayStr);
+
+  { Email }
+  DisplayStr := Contacts[SearchResults[I]].Email;
+  If Length(DisplayStr) > 25 Then
+   DisplayStr := Copy(DisplayStr, 1, 23) + '..';
+  OutTextXY(X + 15 + CONTACT_COL_NAME, Y1 + I * CONTACT_LINE_HEIGHT + 4, DisplayStr);
+
+  { Telephone }
+  DisplayStr := Contacts[SearchResults[I]].Phone;
+  If Length(DisplayStr) > 12 Then
+   DisplayStr := Copy(DisplayStr, 1, 10) + '..';
+  OutTextXY(X + 15 + CONTACT_COL_NAME + CONTACT_COL_EMAIL,
+            Y1 + I * CONTACT_LINE_HEIGHT + 4, DisplayStr);
+ End;
+
+ { Boutons du bas }
+ Y1 := Y + H - 35;
+
+ { Bouton Modifier }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + 80, Y1 + 25);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + 80, Y1 + 25);
+ OutTextXY(X + 18, Y1 + 8, 'Modifier');
+
+ { Bouton Supprimer }
+ Bar(X + 90, Y1, X + 170, Y1 + 25);
+ Rectangle(X + 90, Y1, X + 170, Y1 + 25);
+ OutTextXY(X + 96, Y1 + 8, 'Supprimer');
+
+ { Bouton Import }
+ Bar(X + W - 170, Y1, X + W - 90, Y1 + 25);
+ Rectangle(X + W - 170, Y1, X + W - 90, Y1 + 25);
+ OutTextXY(X + W - 162, Y1 + 8, 'Importer');
+
+ { Bouton Export }
+ Bar(X + W - 80, Y1, X + W - 10, Y1 + 25);
+ Rectangle(X + W - 80, Y1, X + W - 10, Y1 + 25);
+ OutTextXY(X + W - 72, Y1 + 8, 'Exporter');
+
+ { Compteur }
+ SetColor(DarkGray);
+ DisplayStr := '';
+ Str(ContactCount, DisplayStr);
+ DisplayStr := DisplayStr + ' contact(s)';
+ OutTextXY(X + W Div 2 - 30, Y1 + 8, DisplayStr);
+End;
+
+{ Dessine le popup d'auto-completion }
+Procedure AB_DrawAutoComplete;
+Var
+ I, X, Y, W, H: Integer;
+ DisplayStr: String;
+Begin
+ If Not AutoCompleteVisible Then Exit;
+ If AutoCompleteSuggestionCount = 0 Then Exit;
+
+ X := AutoCompleteX;
+ Y := AutoCompleteY;
+ W := 300;
+ H := AutoCompleteSuggestionCount * 20 + 4;
+
+ { Ombre }
+ SetFillStyle(SolidFill, DarkGray);
+ Bar(X + 2, Y + 2, X + W + 2, Y + H + 2);
+
+ { Fond }
+ SetFillStyle(SolidFill, White);
+ Bar(X, Y, X + W, Y + H);
+
+ { Bordure }
+ SetColor(Black);
+ Rectangle(X, Y, X + W, Y + H);
+
+ { Suggestions }
+ For I := 0 To AutoCompleteSuggestionCount - 1 Do Begin
+  If I = AutoCompleteSelectedIndex Then Begin
+   SetFillStyle(SolidFill, Blue);
+   Bar(X + 1, Y + 2 + I * 20, X + W - 1, Y + 2 + (I + 1) * 20 - 1);
+   SetColor(White);
+  End
+  Else
+   SetColor(Black);
+
+  DisplayStr := AutoCompleteSuggestions[I].DisplayName;
+  If Length(DisplayStr) > 25 Then
+   DisplayStr := Copy(DisplayStr, 1, 23) + '..';
+  OutTextXY(X + 5, Y + 5 + I * 20, DisplayStr);
+
+  If I <> AutoCompleteSelectedIndex Then SetColor(DarkGray);
+  DisplayStr := '<' + AutoCompleteSuggestions[I].Email + '>';
+  If Length(DisplayStr) > 30 Then
+   DisplayStr := Copy(DisplayStr, 1, 28) + '..';
+  OutTextXY(X + 150, Y + 5 + I * 20, DisplayStr);
+ End;
+End;
+
+{ Affiche le carnet d'adresses }
+Procedure AB_Show;
+Begin
+ AddressBookVisible := True;
+ AddressBookState := absList;
+ ContactSelectedIndex := -1;
+ AddressBookSearchText := '';
+ ContactScrollOffset := 0;
+End;
+
+{ Cache le carnet d'adresses }
+Procedure AB_Hide;
+Begin
+ AddressBookVisible := False;
+ AddressBookState := absHidden;
+End;
+
+{ Gere un clic dans le carnet d'adresses }
+Function AB_HandleClick(MX, MY: Integer): Boolean;
+Var
+ X, Y, W, H: Integer;
+ I, Y1: Integer;
+ SearchResults: Array[0..CONTACTS_VISIBLE-1] of Integer;
+ ResultCount: Integer;
+Begin
+ AB_HandleClick := False;
+ If Not AddressBookVisible Then Exit;
+
+ X := AddressBookX;
+ Y := AddressBookY;
+ W := ADDRESSBOOK_WIDTH;
+ H := ADDRESSBOOK_HEIGHT;
+
+ { Verifier si clic dans la fenetre }
+ If (MX < X) Or (MX > X + W) Or (MY < Y) Or (MY > Y + H) Then Exit;
+
+ AB_HandleClick := True;
+
+ { Bouton fermer }
+ If (MX >= X + W - 20) And (MX <= X + W - 4) And (MY >= Y + 4) And (MY <= Y + 20) Then Begin
+  AB_Hide;
+  Exit;
+ End;
+
+ { Bouton Nouveau }
+ If (MX >= X + W - 90) And (MX <= X + W - 10) And (MY >= Y + 30) And (MY <= Y + 48) Then Begin
+  { Creer nouveau contact }
+  AB_InitContact(EditingContact);
+  EditingContactIndex := -1;
+  AddressBookState := absNew;
+  Exit;
+ End;
+
+ { Zone de recherche }
+ If (MX >= X + 10) And (MX <= X + W - 100) And (MY >= Y + 30) And (MY <= Y + 48) Then Begin
+  AddressBookState := absSearch;
+  Exit;
+ End;
+
+ { Liste des contacts }
+ Y1 := Y + 75;
+ ResultCount := AB_Search(AddressBookSearchText, SearchResults, CONTACTS_VISIBLE);
+
+ For I := 0 To ResultCount - 1 Do Begin
+  If (MY >= Y1 + I * CONTACT_LINE_HEIGHT) And
+     (MY < Y1 + (I + 1) * CONTACT_LINE_HEIGHT) Then Begin
+   ContactSelectedIndex := SearchResults[I];
+   Exit;
+  End;
+ End;
+
+ { Boutons du bas }
+ Y1 := Y + H - 35;
+
+ { Bouton Modifier }
+ If (MX >= X + 10) And (MX <= X + 80) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  If ContactSelectedIndex >= 0 Then Begin
+   EditingContact := Contacts[ContactSelectedIndex];
+   EditingContactIndex := ContactSelectedIndex;
+   AddressBookState := absEdit;
+  End;
+  Exit;
+ End;
+
+ { Bouton Supprimer }
+ If (MX >= X + 90) And (MX <= X + 170) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  If ContactSelectedIndex >= 0 Then Begin
+   AB_DeleteContact(ContactSelectedIndex);
+  End;
+  Exit;
+ End;
+End;
+
+{ Ajoute des contacts de demonstration }
+Procedure AB_AddDemoContacts;
+Var
+ C: TContact;
+Begin
+ AB_InitContact(C);
+ C.FirstName := 'Jean';
+ C.LastName := 'Dupont';
+ C.Email := 'jean.dupont@example.com';
+ C.Phone := '514-555-1234';
+ C.Company := 'Acme Inc.';
+ AB_AddContact(C);
+
+ AB_InitContact(C);
+ C.FirstName := 'Marie';
+ C.LastName := 'Tremblay';
+ C.Email := 'marie.tremblay@exemple.ca';
+ C.Phone := '418-555-5678';
+ C.PhoneMobile := '418-555-9012';
+ AB_AddContact(C);
+
+ AB_InitContact(C);
+ C.FirstName := 'Pierre';
+ C.LastName := 'Martin';
+ C.Email := 'p.martin@courriel.net';
+ C.Company := 'Tech Solutions';
+ C.JobTitle := 'Developpeur';
+ AB_AddContact(C);
+
+ AB_InitContact(C);
+ C.FirstName := 'Sophie';
+ C.LastName := 'Gagnon';
+ C.Email := 'sophie.g@mail.com';
+ C.Phone := '450-555-3456';
+ C.City := 'Montreal';
+ C.Country := 'Canada';
+ AB_AddContact(C);
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU CARNET D'ADRESSES
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -11504,6 +12763,10 @@ BEGIN
 
  { Initialisation du decodeur MIME (TODO 15) }
  MIME_Init;
+
+ { Initialisation du carnet d'adresses (TODO 16) }
+ AB_Init;
+ AB_AddDemoContacts;
 
  { Affichage de l'interface }
  ShowMouse;
