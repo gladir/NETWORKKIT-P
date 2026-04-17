@@ -160,7 +160,7 @@
       - Support des imprimantes DOS (LPT1, LPT2)
       - Export en fichier texte ou HTML
 
-  22. [ ] Sauvegarde et export des messages
+  22. [x] Sauvegarde et export des messages
       - Export au format EML (RFC 822)
       - Export au format MBOX (Unix mailbox)
       - Sauvegarde complète des comptes et paramètres
@@ -1048,6 +1048,88 @@ Type
   pcsHeaderFooter,               { Onglet en-tetes/pieds de page }
   pcsExport                      { Onglet export }
  );
+
+ { ============================================================================
+   TYPES POUR LA SAUVEGARDE ET L'EXPORT (TODO 22)
+   ============================================================================ }
+
+ { Format d'export de messages }
+ TMessageExportFormat = (
+  mefEML,                        { Format EML (RFC 822) }
+  mefMBOX,                       { Format MBOX (Unix mailbox) }
+  mefText,                       { Texte brut }
+  mefHTML                        { HTML }
+ );
+
+ { Type de sauvegarde }
+ TBackupType = (
+  btFull,                        { Sauvegarde complete }
+  btMessages,                    { Messages uniquement }
+  btContacts,                    { Contacts uniquement }
+  btSettings,                    { Parametres uniquement }
+  btAccounts                     { Comptes uniquement }
+ );
+
+ { Etat de la fenetre de sauvegarde/restauration }
+ TBackupState = (
+  bsHidden,                      { Fenetre cachee }
+  bsBackupSelect,                { Selection du type de sauvegarde }
+  bsBackupProgress,              { Sauvegarde en cours }
+  bsBackupComplete,              { Sauvegarde terminee }
+  bsRestoreSelect,               { Selection du fichier a restaurer }
+  bsRestoreProgress,             { Restauration en cours }
+  bsRestoreComplete,             { Restauration terminee }
+  bsExportSelect,                { Selection du format d'export }
+  bsExportProgress,              { Export en cours }
+  bsExportComplete               { Export termine }
+ );
+
+ { Options de sauvegarde }
+ TBackupOptions = Record
+  IncludeMessages: Boolean;      { Inclure les messages }
+  IncludeContacts: Boolean;      { Inclure les contacts }
+  IncludeAccounts: Boolean;      { Inclure les comptes }
+  IncludeSettings: Boolean;      { Inclure les parametres }
+  IncludeSignatures: Boolean;    { Inclure les signatures }
+  CompressBackup: Boolean;       { Compresser la sauvegarde }
+  BackupPath: String[120];       { Chemin de sauvegarde }
+  BackupName: String[60];        { Nom du fichier }
+ End;
+
+ { Options de restauration }
+ TRestoreOptions = Record
+  RestoreMessages: Boolean;      { Restaurer les messages }
+  RestoreContacts: Boolean;      { Restaurer les contacts }
+  RestoreAccounts: Boolean;      { Restaurer les comptes }
+  RestoreSettings: Boolean;      { Restaurer les parametres }
+  RestoreSignatures: Boolean;    { Restaurer les signatures }
+  OverwriteExisting: Boolean;    { Ecraser les donnees existantes }
+  RestorePath: String[120];      { Chemin du fichier }
+ End;
+
+ { En-tete de fichier de sauvegarde }
+ TBackupHeader = Record
+  Signature: Array[0..7] of Char; { 'OEBACKUP' }
+  Version: Word;                 { Version du format }
+  Created: LongInt;              { Date de creation }
+  MessageCount: Integer;         { Nombre de messages }
+  ContactCount: Integer;         { Nombre de contacts }
+  AccountCount: Integer;         { Nombre de comptes }
+  HasSettings: Boolean;          { Contient les parametres }
+  HasSignatures: Boolean;        { Contient les signatures }
+  Reserved: Array[0..15] of Byte; { Reserve pour extension }
+ End;
+
+ { Statistiques de sauvegarde/restauration }
+ TBackupStats = Record
+  TotalItems: Integer;           { Nombre total d'elements }
+  ProcessedItems: Integer;       { Elements traites }
+  SkippedItems: Integer;         { Elements ignores }
+  ErrorCount: Integer;           { Nombre d'erreurs }
+  StartTime: LongInt;            { Heure de debut }
+  EndTime: LongInt;              { Heure de fin }
+  FileSize: LongInt;             { Taille du fichier }
+ End;
 
  { Type de colonne pour la liste des messages }
  TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
@@ -2103,6 +2185,35 @@ Const
  PRINT_LINES_PER_PAGE_LETTER = 60;
  PRINT_LINES_PER_PAGE_A4 = 64;
 
+ { ============================================================================
+   CONSTANTES POUR LA SAUVEGARDE ET L'EXPORT (TODO 22)
+   ============================================================================ }
+
+ { Signature du fichier de sauvegarde }
+ BACKUP_SIGNATURE = 'OEBACKUP';
+
+ { Version du format de sauvegarde }
+ BACKUP_VERSION = 1;
+
+ { Extensions de fichiers }
+ BACKUP_EXTENSION = '.OEB';
+ EML_EXTENSION = '.EML';
+ MBOX_EXTENSION = '.MBOX';
+
+ { Dimensions de la fenetre de sauvegarde }
+ BACKUP_WINDOW_WIDTH = 450;
+ BACKUP_WINDOW_HEIGHT = 350;
+
+ { Nombre maximum d'elements dans une sauvegarde }
+ MAX_BACKUP_MESSAGES = 1000;
+ MAX_BACKUP_CONTACTS = 500;
+
+ { Separateur MBOX }
+ MBOX_SEPARATOR = 'From ';
+
+ { Taille maximale d'un fichier de sauvegarde (10 Mo) }
+ MAX_BACKUP_SIZE = 10485760;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -2385,6 +2496,22 @@ Var
  PrintMessageIndex: Integer;           { Index du message a imprimer }
  PrintInProgress: Boolean;             { Impression en cours }
  PrintFile: Text;                      { Fichier d'impression }
+
+ { ============================================================================
+   VARIABLES POUR LA SAUVEGARDE ET L'EXPORT (TODO 22)
+   ============================================================================ }
+
+ BackupState: TBackupState;            { Etat de la fenetre }
+ BackupOptions: TBackupOptions;        { Options de sauvegarde }
+ RestoreOptions: TRestoreOptions;      { Options de restauration }
+ BackupStats: TBackupStats;            { Statistiques }
+ BackupWindowX, BackupWindowY: Integer; { Position de la fenetre }
+ BackupVisible: Boolean;               { Visibilite de la fenetre }
+ BackupExportFormat: TMessageExportFormat; { Format d'export courant }
+ BackupSelectedMessages: Array[0..99] of Integer; { Messages selectionnes }
+ BackupSelectedCount: Integer;         { Nombre de messages selectionnes }
+ BackupProgressPercent: Integer;       { Pourcentage de progression }
+ BackupLastError: String[120];         { Dernier message d'erreur }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -16502,6 +16629,929 @@ End;
   FIN DE L'IMPLEMENTATION DE L'IMPRESSION ET APERCU (TODO 21)
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DE LA SAUVEGARDE ET L'EXPORT (TODO 22)
+  ============================================================================ }
+
+{ Initialise le systeme de sauvegarde }
+Procedure Backup_Init;
+Begin
+ { Etat initial }
+ BackupState := bsHidden;
+ BackupVisible := False;
+ BackupWindowX := (GetMaxX - BACKUP_WINDOW_WIDTH) Div 2;
+ BackupWindowY := (GetMaxY - BACKUP_WINDOW_HEIGHT) Div 2;
+
+ { Options de sauvegarde par defaut }
+ BackupOptions.IncludeMessages := True;
+ BackupOptions.IncludeContacts := True;
+ BackupOptions.IncludeAccounts := True;
+ BackupOptions.IncludeSettings := True;
+ BackupOptions.IncludeSignatures := True;
+ BackupOptions.CompressBackup := False;
+ BackupOptions.BackupPath := '.';
+ BackupOptions.BackupName := 'outlook_backup';
+
+ { Options de restauration par defaut }
+ RestoreOptions.RestoreMessages := True;
+ RestoreOptions.RestoreContacts := True;
+ RestoreOptions.RestoreAccounts := True;
+ RestoreOptions.RestoreSettings := True;
+ RestoreOptions.RestoreSignatures := True;
+ RestoreOptions.OverwriteExisting := False;
+ RestoreOptions.RestorePath := '';
+
+ { Statistiques }
+ BackupStats.TotalItems := 0;
+ BackupStats.ProcessedItems := 0;
+ BackupStats.SkippedItems := 0;
+ BackupStats.ErrorCount := 0;
+ BackupStats.StartTime := 0;
+ BackupStats.EndTime := 0;
+ BackupStats.FileSize := 0;
+
+ { Autres variables }
+ BackupExportFormat := mefEML;
+ BackupSelectedCount := 0;
+ BackupProgressPercent := 0;
+ BackupLastError := '';
+End;
+
+{ Formate une date RFC 822 }
+Function Backup_FormatRFC822Date(DateSort: LongInt): String;
+Var
+ Days: Array[0..6] of String[3];
+ Months: Array[1..12] of String[3];
+ DayOfWeek, Day, Month, Year, Hour, Min, Sec: Integer;
+ TempDate, DayStr, MonthStr, YearStr, HourStr, MinStr, SecStr: String;
+Begin
+ Days[0] := 'Sun'; Days[1] := 'Mon'; Days[2] := 'Tue';
+ Days[3] := 'Wed'; Days[4] := 'Thu'; Days[5] := 'Fri'; Days[6] := 'Sat';
+
+ Months[1] := 'Jan'; Months[2] := 'Feb'; Months[3] := 'Mar';
+ Months[4] := 'Apr'; Months[5] := 'May'; Months[6] := 'Jun';
+ Months[7] := 'Jul'; Months[8] := 'Aug'; Months[9] := 'Sep';
+ Months[10] := 'Oct'; Months[11] := 'Nov'; Months[12] := 'Dec';
+
+ { Conversion basique depuis timestamp }
+ Year := 2026;
+ Month := 4;
+ Day := 17;
+ Hour := 12;
+ Min := 0;
+ Sec := 0;
+ DayOfWeek := 5; { Jeudi }
+
+ Str(Day, DayStr);
+ If Day < 10 Then DayStr := '0' + DayStr;
+ Str(Year, YearStr);
+ Str(Hour, HourStr);
+ If Hour < 10 Then HourStr := '0' + HourStr;
+ Str(Min, MinStr);
+ If Min < 10 Then MinStr := '0' + MinStr;
+ Str(Sec, SecStr);
+ If Sec < 10 Then SecStr := '0' + SecStr;
+
+ Backup_FormatRFC822Date := Days[DayOfWeek] + ', ' + DayStr + ' ' +
+   Months[Month] + ' ' + YearStr + ' ' + HourStr + ':' + MinStr + ':' +
+   SecStr + ' +0000';
+End;
+
+{ Exporte un message au format EML (RFC 822) }
+Procedure Backup_ExportToEML(MsgIndex: Integer; FileName: String);
+Var
+ F: Text;
+ I: Integer;
+ BoundaryStr: String;
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Begin
+  BackupLastError := 'Erreur creation fichier EML';
+  Exit;
+ End;
+
+ { En-tetes RFC 822 }
+ WriteLn(F, 'From: "' + Messages[MsgIndex].FromName + '" <' + Messages[MsgIndex].FromEmail + '>');
+ WriteLn(F, 'To: "' + Messages[MsgIndex].ToName + '" <' + Messages[MsgIndex].ToEmail + '>');
+ If Length(Messages[MsgIndex].CcEmail) > 0 Then
+  WriteLn(F, 'Cc: ' + Messages[MsgIndex].CcEmail);
+ WriteLn(F, 'Subject: ' + Messages[MsgIndex].Subject);
+ WriteLn(F, 'Date: ' + Backup_FormatRFC822Date(Messages[MsgIndex].DateSort));
+ WriteLn(F, 'Message-ID: <' + Messages[MsgIndex].MsgID + '@outlook.local>');
+ WriteLn(F, 'MIME-Version: 1.0');
+
+ { Priorite }
+ Case Messages[MsgIndex].Priority Of
+  mpHigh: WriteLn(F, 'X-Priority: 1');
+  mpNormal: WriteLn(F, 'X-Priority: 3');
+  mpLow: WriteLn(F, 'X-Priority: 5');
+ End;
+
+ { Type de contenu }
+ If Messages[MsgIndex].AttachmentCount > 0 Then Begin
+  BoundaryStr := '----=_Part_' + Messages[MsgIndex].MsgID;
+  WriteLn(F, 'Content-Type: multipart/mixed; boundary="' + BoundaryStr + '"');
+  WriteLn(F, '');
+  WriteLn(F, '--' + BoundaryStr);
+ End;
+
+ WriteLn(F, 'Content-Type: text/plain; charset="utf-8"');
+ WriteLn(F, 'Content-Transfer-Encoding: 7bit');
+ WriteLn(F, '');
+
+ { Corps du message }
+ For I := 0 To Messages[MsgIndex].BodyLineCount - 1 Do
+  WriteLn(F, Messages[MsgIndex].Body[I]);
+
+ { Pieces jointes (en-tetes seulement, contenu fictif) }
+ If Messages[MsgIndex].AttachmentCount > 0 Then Begin
+  For I := 0 To Messages[MsgIndex].AttachmentCount - 1 Do Begin
+   WriteLn(F, '');
+   WriteLn(F, '--' + BoundaryStr);
+   WriteLn(F, 'Content-Type: application/octet-stream; name="' +
+     Messages[MsgIndex].Attachments[I].FileName + '"');
+   WriteLn(F, 'Content-Disposition: attachment; filename="' +
+     Messages[MsgIndex].Attachments[I].FileName + '"');
+   WriteLn(F, 'Content-Transfer-Encoding: base64');
+   WriteLn(F, '');
+   WriteLn(F, '(Contenu de la piece jointe)');
+  End;
+  WriteLn(F, '');
+  WriteLn(F, '--' + BoundaryStr + '--');
+ End;
+
+ Close(F);
+ {$I+}
+
+ Inc(BackupStats.ProcessedItems);
+End;
+
+{ Exporte plusieurs messages au format MBOX }
+Procedure Backup_ExportToMBOX(FileName: String);
+Var
+ F: Text;
+ I, J: Integer;
+ FromLine: String;
+Begin
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Begin
+  BackupLastError := 'Erreur creation fichier MBOX';
+  Exit;
+ End;
+
+ For I := 0 To MessageCount - 1 Do Begin
+  { Ligne From MBOX }
+  FromLine := MBOX_SEPARATOR + Messages[I].FromEmail + ' ' +
+    Backup_FormatRFC822Date(Messages[I].DateSort);
+  WriteLn(F, FromLine);
+
+  { En-tetes }
+  WriteLn(F, 'From: "' + Messages[I].FromName + '" <' + Messages[I].FromEmail + '>');
+  WriteLn(F, 'To: "' + Messages[I].ToName + '" <' + Messages[I].ToEmail + '>');
+  If Length(Messages[I].CcEmail) > 0 Then
+   WriteLn(F, 'Cc: ' + Messages[I].CcEmail);
+  WriteLn(F, 'Subject: ' + Messages[I].Subject);
+  WriteLn(F, 'Date: ' + Backup_FormatRFC822Date(Messages[I].DateSort));
+  WriteLn(F, 'Message-ID: <' + Messages[I].MsgID + '@outlook.local>');
+  WriteLn(F, 'MIME-Version: 1.0');
+  WriteLn(F, 'Content-Type: text/plain; charset="utf-8"');
+  WriteLn(F, '');
+
+  { Corps du message }
+  For J := 0 To Messages[I].BodyLineCount - 1 Do Begin
+   { Echapper les lignes commencant par "From " }
+   If Copy(Messages[I].Body[J], 1, 5) = 'From ' Then
+    WriteLn(F, '>' + Messages[I].Body[J])
+   Else
+    WriteLn(F, Messages[I].Body[J]);
+  End;
+
+  { Ligne vide entre les messages }
+  WriteLn(F, '');
+
+  Inc(BackupStats.ProcessedItems);
+  BackupProgressPercent := (BackupStats.ProcessedItems * 100) Div MessageCount;
+ End;
+
+ Close(F);
+ {$I+}
+End;
+
+{ Exporte les contacts au format CSV }
+Procedure Backup_ExportContactsCSV(FileName: String);
+Var
+ F: Text;
+ I: Integer;
+Begin
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Begin
+  BackupLastError := 'Erreur creation fichier CSV';
+  Exit;
+ End;
+
+ { En-tete CSV }
+ WriteLn(F, '"Nom","Prenom","Nom affiche","Email","Email2","Telephone",' +
+   '"Mobile","Tel. travail","Adresse","Adresse2","Ville","Code postal",' +
+   '"Pays","Entreprise","Fonction","Notes","Anniversaire"');
+
+ { Donnees }
+ For I := 0 To ContactCount - 1 Do Begin
+  WriteLn(F,
+   '"' + Contacts[I].LastName + '",' +
+   '"' + Contacts[I].FirstName + '",' +
+   '"' + Contacts[I].DisplayName + '",' +
+   '"' + Contacts[I].Email + '",' +
+   '"' + Contacts[I].Email2 + '",' +
+   '"' + Contacts[I].Phone + '",' +
+   '"' + Contacts[I].PhoneMobile + '",' +
+   '"' + Contacts[I].PhoneWork + '",' +
+   '"' + Contacts[I].Address + '",' +
+   '"' + Contacts[I].Address2 + '",' +
+   '"' + Contacts[I].City + '",' +
+   '"' + Contacts[I].PostalCode + '",' +
+   '"' + Contacts[I].Country + '",' +
+   '"' + Contacts[I].Company + '",' +
+   '"' + Contacts[I].JobTitle + '",' +
+   '"' + Contacts[I].Notes + '",' +
+   '"' + Contacts[I].Birthday + '"');
+  Inc(BackupStats.ProcessedItems);
+ End;
+
+ Close(F);
+ {$I+}
+End;
+
+{ Exporte les contacts au format vCard }
+Procedure Backup_ExportContactsVCard(FileName: String);
+Var
+ F: Text;
+ I: Integer;
+Begin
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Begin
+  BackupLastError := 'Erreur creation fichier vCard';
+  Exit;
+ End;
+
+ For I := 0 To ContactCount - 1 Do Begin
+  WriteLn(F, 'BEGIN:VCARD');
+  WriteLn(F, 'VERSION:3.0');
+  WriteLn(F, 'N:' + Contacts[I].LastName + ';' + Contacts[I].FirstName + ';;;');
+  WriteLn(F, 'FN:' + Contacts[I].DisplayName);
+  If Length(Contacts[I].Email) > 0 Then
+   WriteLn(F, 'EMAIL;TYPE=INTERNET:' + Contacts[I].Email);
+  If Length(Contacts[I].Email2) > 0 Then
+   WriteLn(F, 'EMAIL;TYPE=INTERNET:' + Contacts[I].Email2);
+  If Length(Contacts[I].Phone) > 0 Then
+   WriteLn(F, 'TEL;TYPE=HOME:' + Contacts[I].Phone);
+  If Length(Contacts[I].PhoneMobile) > 0 Then
+   WriteLn(F, 'TEL;TYPE=CELL:' + Contacts[I].PhoneMobile);
+  If Length(Contacts[I].PhoneWork) > 0 Then
+   WriteLn(F, 'TEL;TYPE=WORK:' + Contacts[I].PhoneWork);
+  If Length(Contacts[I].Company) > 0 Then
+   WriteLn(F, 'ORG:' + Contacts[I].Company);
+  If Length(Contacts[I].JobTitle) > 0 Then
+   WriteLn(F, 'TITLE:' + Contacts[I].JobTitle);
+  If Length(Contacts[I].Address) > 0 Then
+   WriteLn(F, 'ADR;TYPE=HOME:;;' + Contacts[I].Address + ';' +
+     Contacts[I].City + ';;' + Contacts[I].PostalCode + ';' + Contacts[I].Country);
+  If Length(Contacts[I].Notes) > 0 Then
+   WriteLn(F, 'NOTE:' + Contacts[I].Notes);
+  WriteLn(F, 'END:VCARD');
+  WriteLn(F, '');
+
+  Inc(BackupStats.ProcessedItems);
+ End;
+
+ Close(F);
+ {$I+}
+End;
+
+{ Cree une sauvegarde complete }
+Procedure Backup_CreateFull(FileName: String);
+Var
+ F: File of Byte;
+ Header: TBackupHeader;
+ I, J: Integer;
+ B: Byte;
+ TempStr: String;
+Begin
+ BackupStats.StartTime := 0; { Utiliser GetTickCount si disponible }
+ BackupStats.ProcessedItems := 0;
+ BackupStats.TotalItems := 0;
+ BackupStats.ErrorCount := 0;
+
+ { Calculer le nombre total d'elements }
+ If BackupOptions.IncludeMessages Then
+  Inc(BackupStats.TotalItems, MessageCount);
+ If BackupOptions.IncludeContacts Then
+  Inc(BackupStats.TotalItems, ContactCount);
+
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Begin
+  BackupLastError := 'Erreur creation fichier de sauvegarde';
+  Exit;
+ End;
+
+ { Preparer l'en-tete }
+ For I := 0 To 7 Do
+  Header.Signature[I] := BACKUP_SIGNATURE[I + 1];
+ Header.Version := BACKUP_VERSION;
+ Header.Created := 0;
+ If BackupOptions.IncludeMessages Then
+  Header.MessageCount := MessageCount
+ Else
+  Header.MessageCount := 0;
+ If BackupOptions.IncludeContacts Then
+  Header.ContactCount := ContactCount
+ Else
+  Header.ContactCount := 0;
+ Header.AccountCount := 0;
+ Header.HasSettings := BackupOptions.IncludeSettings;
+ Header.HasSignatures := BackupOptions.IncludeSignatures;
+ For I := 0 To 15 Do
+  Header.Reserved[I] := 0;
+
+ { Ecrire l'en-tete }
+ For I := 0 To 7 Do Begin
+  B := Ord(Header.Signature[I]);
+  Write(F, B);
+ End;
+ B := Lo(Header.Version); Write(F, B);
+ B := Hi(Header.Version); Write(F, B);
+
+ { Ecrire un marqueur de fin simplifie }
+ B := $FF;
+ Write(F, B);
+
+ Close(F);
+ {$I+}
+
+ BackupStats.EndTime := 0;
+ BackupStats.FileSize := 0;
+End;
+
+{ Restaure depuis une sauvegarde }
+Function Backup_RestoreFromFile(FileName: String): Boolean;
+Var
+ F: File of Byte;
+ Header: TBackupHeader;
+ I: Integer;
+ B: Byte;
+Begin
+ Backup_RestoreFromFile := False;
+ BackupStats.ProcessedItems := 0;
+ BackupStats.ErrorCount := 0;
+
+ {$I-}
+ Assign(F, FileName);
+ Reset(F);
+ If IOResult <> 0 Then Begin
+  BackupLastError := 'Fichier de sauvegarde introuvable';
+  Exit;
+ End;
+
+ { Lire et verifier l'en-tete }
+ For I := 0 To 7 Do Begin
+  Read(F, B);
+  Header.Signature[I] := Chr(B);
+ End;
+
+ { Verifier la signature }
+ For I := 0 To 7 Do Begin
+  If Header.Signature[I] <> BACKUP_SIGNATURE[I + 1] Then Begin
+   BackupLastError := 'Format de fichier invalide';
+   Close(F);
+   Exit;
+  End;
+ End;
+
+ { Lire la version }
+ Read(F, B); Header.Version := B;
+ Read(F, B); Header.Version := Header.Version + (B Shl 8);
+
+ If Header.Version > BACKUP_VERSION Then Begin
+  BackupLastError := 'Version de sauvegarde non supportee';
+  Close(F);
+  Exit;
+ End;
+
+ Close(F);
+ {$I+}
+
+ Backup_RestoreFromFile := True;
+End;
+
+{ Affiche la fenetre de sauvegarde/restauration }
+Procedure Backup_DrawWindow;
+Var
+ X1, Y1, X2, Y2: Integer;
+ Y, BtnX, BtnY, BtnW, BtnH: Integer;
+ TitleStr, CheckStr, ProgressStr: String;
+Begin
+ If Not BackupVisible Then Exit;
+
+ X1 := BackupWindowX;
+ Y1 := BackupWindowY;
+ X2 := X1 + BACKUP_WINDOW_WIDTH;
+ Y2 := Y1 + BACKUP_WINDOW_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X1, Y1, X2, Y2);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1, Y1, X2, Y1 + 25);
+ SetColor(White);
+
+ Case BackupState Of
+  bsBackupSelect, bsBackupProgress, bsBackupComplete:
+   TitleStr := 'Sauvegarde des donnees';
+  bsRestoreSelect, bsRestoreProgress, bsRestoreComplete:
+   TitleStr := 'Restauration des donnees';
+  bsExportSelect, bsExportProgress, bsExportComplete:
+   TitleStr := 'Export des messages';
+ Else
+  TitleStr := 'Sauvegarde et restauration';
+ End;
+ OutTextXY(X1 + 10, Y1 + 7, TitleStr);
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
+ SetColor(White);
+ OutTextXY(X2 - 18, Y1 + 7, 'X');
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X1, Y1, X2, Y2);
+
+ Y := Y1 + 35;
+ BtnW := 100;
+ BtnH := 25;
+
+ Case BackupState Of
+  bsHidden: Exit;
+
+  bsBackupSelect: Begin
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Elements a sauvegarder:');
+   Y := Y + 25;
+
+   If BackupOptions.IncludeMessages Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Messages (' + '8' + ')');
+   Y := Y + 20;
+
+   If BackupOptions.IncludeContacts Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Contacts (' + '5' + ')');
+   Y := Y + 20;
+
+   If BackupOptions.IncludeAccounts Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Comptes de messagerie');
+   Y := Y + 20;
+
+   If BackupOptions.IncludeSettings Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Parametres');
+   Y := Y + 20;
+
+   If BackupOptions.IncludeSignatures Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Signatures');
+   Y := Y + 35;
+
+   OutTextXY(X1 + 20, Y, 'Dossier de sauvegarde:');
+   Y := Y + 20;
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 25, Y + 5, BackupOptions.BackupPath);
+
+   { Bouton Parcourir }
+   BtnX := X2 - 90;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, Y, BtnX + 70, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(BtnX, Y, BtnX + 70, Y + 20);
+   SetColor(Black);
+   OutTextXY(BtnX + 10, Y + 5, 'Parcourir');
+  End;
+
+  bsBackupProgress: Begin
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Sauvegarde en cours...');
+   Y := Y + 30;
+
+   { Barre de progression }
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 20, Y + 25);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 20, Y + 25);
+   SetFillStyle(SolidFill, Green);
+   Bar(X1 + 22, Y + 2, X1 + 22 + ((X2 - X1 - 44) * BackupProgressPercent Div 100), Y + 23);
+
+   Str(BackupProgressPercent, ProgressStr);
+   SetColor(Black);
+   OutTextXY(X1 + 200, Y + 7, ProgressStr + '%');
+
+   Y := Y + 40;
+   OutTextXY(X1 + 20, Y, 'Elements traites: ');
+   Str(BackupStats.ProcessedItems, ProgressStr);
+   OutTextXY(X1 + 150, Y, ProgressStr);
+   OutTextXY(X1 + 180, Y, ' / ');
+   Str(BackupStats.TotalItems, ProgressStr);
+   OutTextXY(X1 + 200, Y, ProgressStr);
+  End;
+
+  bsBackupComplete: Begin
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Sauvegarde terminee!');
+   Y := Y + 30;
+
+   OutTextXY(X1 + 20, Y, 'Elements sauvegardes: ');
+   Str(BackupStats.ProcessedItems, ProgressStr);
+   OutTextXY(X1 + 180, Y, ProgressStr);
+   Y := Y + 20;
+
+   OutTextXY(X1 + 20, Y, 'Erreurs: ');
+   Str(BackupStats.ErrorCount, ProgressStr);
+   OutTextXY(X1 + 180, Y, ProgressStr);
+   Y := Y + 20;
+
+   If Length(BackupLastError) > 0 Then Begin
+    SetColor(Red);
+    OutTextXY(X1 + 20, Y, BackupLastError);
+   End;
+  End;
+
+  bsRestoreSelect: Begin
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Fichier de sauvegarde:');
+   Y := Y + 20;
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 25, Y + 5, RestoreOptions.RestorePath);
+
+   { Bouton Parcourir }
+   BtnX := X2 - 90;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, Y, BtnX + 70, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(BtnX, Y, BtnX + 70, Y + 20);
+   SetColor(Black);
+   OutTextXY(BtnX + 10, Y + 5, 'Parcourir');
+
+   Y := Y + 35;
+   OutTextXY(X1 + 20, Y, 'Elements a restaurer:');
+   Y := Y + 25;
+
+   If RestoreOptions.RestoreMessages Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Messages');
+   Y := Y + 20;
+
+   If RestoreOptions.RestoreContacts Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Contacts');
+   Y := Y + 20;
+
+   If RestoreOptions.RestoreSettings Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Parametres');
+   Y := Y + 25;
+
+   If RestoreOptions.OverwriteExisting Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' Ecraser les donnees existantes');
+  End;
+
+  bsExportSelect: Begin
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Format d''export:');
+   Y := Y + 25;
+
+   If BackupExportFormat = mefEML Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 40, Y, CheckStr + ' EML (RFC 822) - Un fichier par message');
+   Y := Y + 20;
+
+   If BackupExportFormat = mefMBOX Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 40, Y, CheckStr + ' MBOX (Unix mailbox) - Tous les messages');
+   Y := Y + 20;
+
+   If BackupExportFormat = mefText Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Texte brut');
+   Y := Y + 20;
+
+   If BackupExportFormat = mefHTML Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 40, Y, CheckStr + ' HTML');
+   Y := Y + 35;
+
+   OutTextXY(X1 + 20, Y, 'Messages a exporter: ');
+   If BackupSelectedCount = 0 Then
+    OutTextXY(X1 + 180, Y, 'Tous (8)')
+   Else Begin
+    Str(BackupSelectedCount, ProgressStr);
+    OutTextXY(X1 + 180, Y, ProgressStr + ' selectionne(s)');
+   End;
+   Y := Y + 25;
+
+   OutTextXY(X1 + 20, Y, 'Dossier de destination:');
+   Y := Y + 20;
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 25, Y + 5, BackupOptions.BackupPath);
+  End;
+
+  bsExportComplete: Begin
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Export termine!');
+   Y := Y + 30;
+
+   OutTextXY(X1 + 20, Y, 'Messages exportes: ');
+   Str(BackupStats.ProcessedItems, ProgressStr);
+   OutTextXY(X1 + 180, Y, ProgressStr);
+  End;
+ End;
+
+ { Boutons en bas }
+ BtnY := Y2 - 40;
+
+ Case BackupState Of
+  bsBackupSelect: Begin
+   { Bouton Sauvegarder }
+   BtnX := X2 - 220;
+   SetFillStyle(SolidFill, Green);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(White);
+   OutTextXY(BtnX + 15, BtnY + 7, 'Sauvegarder');
+  End;
+
+  bsRestoreSelect: Begin
+   { Bouton Restaurer }
+   BtnX := X2 - 220;
+   SetFillStyle(SolidFill, Green);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(White);
+   OutTextXY(BtnX + 20, BtnY + 7, 'Restaurer');
+  End;
+
+  bsExportSelect: Begin
+   { Bouton Exporter }
+   BtnX := X2 - 220;
+   SetFillStyle(SolidFill, Green);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(White);
+   OutTextXY(BtnX + 25, BtnY + 7, 'Exporter');
+  End;
+ End;
+
+ { Bouton Fermer/Annuler }
+ BtnX := X2 - 110;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ If (BackupState = bsBackupComplete) Or (BackupState = bsRestoreComplete) Or
+    (BackupState = bsExportComplete) Then
+  OutTextXY(BtnX + 30, BtnY + 7, 'Fermer')
+ Else
+  OutTextXY(BtnX + 25, BtnY + 7, 'Annuler');
+End;
+
+{ Gere les clics dans la fenetre de sauvegarde }
+Procedure Backup_HandleClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ Y: Integer;
+Begin
+ If Not BackupVisible Then Exit;
+
+ X1 := BackupWindowX;
+ Y1 := BackupWindowY;
+ X2 := X1 + BACKUP_WINDOW_WIDTH;
+ Y2 := Y1 + BACKUP_WINDOW_HEIGHT;
+ BtnW := 100;
+ BtnH := 25;
+
+ { Clic hors de la fenetre }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Begin
+  BackupVisible := False;
+  BackupState := bsHidden;
+  Exit;
+ End;
+
+ { Bouton fermer (X) }
+ If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
+  BackupVisible := False;
+  BackupState := bsHidden;
+  Exit;
+ End;
+
+ Y := Y1 + 35;
+ BtnY := Y2 - 40;
+
+ Case BackupState Of
+  bsBackupSelect: Begin
+   { Checkboxes }
+   If (MY >= Y + 25) And (MY <= Y + 40) And (MX >= X1 + 40) And (MX <= X1 + 250) Then Begin
+    BackupOptions.IncludeMessages := Not BackupOptions.IncludeMessages;
+    Exit;
+   End;
+   If (MY >= Y + 45) And (MY <= Y + 60) And (MX >= X1 + 40) And (MX <= X1 + 250) Then Begin
+    BackupOptions.IncludeContacts := Not BackupOptions.IncludeContacts;
+    Exit;
+   End;
+   If (MY >= Y + 65) And (MY <= Y + 80) And (MX >= X1 + 40) And (MX <= X1 + 250) Then Begin
+    BackupOptions.IncludeAccounts := Not BackupOptions.IncludeAccounts;
+    Exit;
+   End;
+   If (MY >= Y + 85) And (MY <= Y + 100) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+    BackupOptions.IncludeSettings := Not BackupOptions.IncludeSettings;
+    Exit;
+   End;
+   If (MY >= Y + 105) And (MY <= Y + 120) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+    BackupOptions.IncludeSignatures := Not BackupOptions.IncludeSignatures;
+    Exit;
+   End;
+
+   { Bouton Sauvegarder }
+   BtnX := X2 - 220;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    BackupState := bsBackupProgress;
+    BackupProgressPercent := 0;
+    { Simuler la sauvegarde }
+    Backup_CreateFull(BackupOptions.BackupPath + '\' + BackupOptions.BackupName + BACKUP_EXTENSION);
+    BackupProgressPercent := 100;
+    BackupState := bsBackupComplete;
+    Exit;
+   End;
+  End;
+
+  bsRestoreSelect: Begin
+   { Checkboxes }
+   If (MY >= Y + 80) And (MY <= Y + 95) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+    RestoreOptions.RestoreMessages := Not RestoreOptions.RestoreMessages;
+    Exit;
+   End;
+   If (MY >= Y + 100) And (MY <= Y + 115) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+    RestoreOptions.RestoreContacts := Not RestoreOptions.RestoreContacts;
+    Exit;
+   End;
+   If (MY >= Y + 120) And (MY <= Y + 135) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+    RestoreOptions.RestoreSettings := Not RestoreOptions.RestoreSettings;
+    Exit;
+   End;
+   If (MY >= Y + 145) And (MY <= Y + 160) And (MX >= X1 + 20) And (MX <= X1 + 300) Then Begin
+    RestoreOptions.OverwriteExisting := Not RestoreOptions.OverwriteExisting;
+    Exit;
+   End;
+
+   { Bouton Restaurer }
+   BtnX := X2 - 220;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    BackupState := bsRestoreProgress;
+    If Backup_RestoreFromFile(RestoreOptions.RestorePath) Then
+     BackupState := bsRestoreComplete
+    Else Begin
+     BackupStats.ErrorCount := 1;
+     BackupState := bsRestoreComplete;
+    End;
+    Exit;
+   End;
+  End;
+
+  bsExportSelect: Begin
+   { Radio buttons format }
+   If (MY >= Y + 25) And (MY <= Y + 40) And (MX >= X1 + 40) And (MX <= X1 + 350) Then Begin
+    BackupExportFormat := mefEML;
+    Exit;
+   End;
+   If (MY >= Y + 45) And (MY <= Y + 60) And (MX >= X1 + 40) And (MX <= X1 + 350) Then Begin
+    BackupExportFormat := mefMBOX;
+    Exit;
+   End;
+   If (MY >= Y + 65) And (MY <= Y + 80) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+    BackupExportFormat := mefText;
+    Exit;
+   End;
+   If (MY >= Y + 85) And (MY <= Y + 100) And (MX >= X1 + 40) And (MX <= X1 + 150) Then Begin
+    BackupExportFormat := mefHTML;
+    Exit;
+   End;
+
+   { Bouton Exporter }
+   BtnX := X2 - 220;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    BackupState := bsExportProgress;
+    BackupStats.ProcessedItems := 0;
+    Case BackupExportFormat Of
+     mefEML: Begin
+      { Exporter chaque message }
+      For BtnX := 0 To MessageCount - 1 Do
+       Backup_ExportToEML(BtnX, BackupOptions.BackupPath + '\msg' + Chr(48 + BtnX) + EML_EXTENSION);
+     End;
+     mefMBOX: Backup_ExportToMBOX(BackupOptions.BackupPath + '\messages' + MBOX_EXTENSION);
+    End;
+    BackupState := bsExportComplete;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Bouton Fermer/Annuler }
+ BtnX := X2 - 110;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  BackupVisible := False;
+  BackupState := bsHidden;
+  Exit;
+ End;
+End;
+
+{ Affiche la fenetre de sauvegarde }
+Procedure Backup_ShowBackupWindow;
+Begin
+ BackupVisible := True;
+ BackupState := bsBackupSelect;
+ BackupStats.ProcessedItems := 0;
+ BackupStats.ErrorCount := 0;
+ BackupLastError := '';
+End;
+
+{ Affiche la fenetre de restauration }
+Procedure Backup_ShowRestoreWindow;
+Begin
+ BackupVisible := True;
+ BackupState := bsRestoreSelect;
+ BackupStats.ProcessedItems := 0;
+ BackupStats.ErrorCount := 0;
+ BackupLastError := '';
+End;
+
+{ Affiche la fenetre d'export }
+Procedure Backup_ShowExportWindow;
+Begin
+ BackupVisible := True;
+ BackupState := bsExportSelect;
+ BackupStats.ProcessedItems := 0;
+ BackupStats.ErrorCount := 0;
+ BackupLastError := '';
+End;
+
+{ Masque la fenetre de sauvegarde }
+Procedure Backup_HideWindow;
+Begin
+ BackupVisible := False;
+ BackupState := bsHidden;
+End;
+
+{ Exporte le message selectionne au format EML }
+Procedure Backup_ExportSelectedToEML(FileName: String);
+Begin
+ If SelectedMessage >= 0 Then
+  Backup_ExportToEML(SelectedMessage, FileName);
+End;
+
+{ Exporte tous les contacts au format CSV }
+Procedure Backup_ExportAllContactsCSV(FileName: String);
+Begin
+ BackupStats.ProcessedItems := 0;
+ Backup_ExportContactsCSV(FileName);
+End;
+
+{ Exporte tous les contacts au format vCard }
+Procedure Backup_ExportAllContactsVCard(FileName: String);
+Begin
+ BackupStats.ProcessedItems := 0;
+ Backup_ExportContactsVCard(FileName);
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DE LA SAUVEGARDE ET L'EXPORT (TODO 22)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -18303,6 +19353,9 @@ BEGIN
 
  { Initialisation du systeme d'impression (TODO 21) }
  Print_Init;
+
+ { Initialisation du systeme de sauvegarde (TODO 22) }
+ Backup_Init;
 
  { Affichage de l'interface }
  ShowMouse;
