@@ -2575,7 +2575,7 @@ Const
    ============================================================================ }
 
  { Nombre maximum de chaines traduisibles }
- MAX_STRING_IDS = 70;
+ MAX_STRING_IDS = 73;
 
  { Codes de langue ISO }
  LANG_CODES: Array[TLanguage] of String[5] = (
@@ -9550,7 +9550,7 @@ Begin
  End;
 
  { Verifier la taille totale }
- If AttachTotalSize + FileSize(F) > MAX_ATTACHMENT_SIZE Then Begin
+ If AttachTotalSize + System.FileSize(F) > MAX_ATTACHMENT_SIZE Then Begin
   Close(F);
   HideMouse;
   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
@@ -9564,10 +9564,9 @@ Begin
 
  { Ajouter la piece jointe }
  With Composer.Attachments[Composer.AttachmentCount] Do Begin
-  FileName := FileName;
   Composer.Attachments[Composer.AttachmentCount].FileName := FileName;
   Composer.Attachments[Composer.AttachmentCount].FilePath := FilePath;
-  Composer.Attachments[Composer.AttachmentCount].FileSize := FileSize(F);
+  Composer.Attachments[Composer.AttachmentCount].FileSize := System.FileSize(F);
   Composer.Attachments[Composer.AttachmentCount].FileType := GetAttachmentType(FileName);
   Composer.Attachments[Composer.AttachmentCount].IsEmbedded := False;
   Composer.Attachments[Composer.AttachmentCount].ContentID := '';
@@ -9577,7 +9576,7 @@ Begin
   Composer.Attachments[Composer.AttachmentCount].IsDangerous := IsDangerousExtension(Ext);
  End;
 
- AttachTotalSize := AttachTotalSize + FileSize(F);
+ AttachTotalSize := AttachTotalSize + System.FileSize(F);
  Close(F);
 
  Inc(Composer.AttachmentCount);
