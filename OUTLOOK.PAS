@@ -22308,6 +22308,9 @@ BEGIN
  Layout.FolderPaneWidth := 160;
  Layout.PreviewPaneHeight := 150;
 
+ { Calcul initial de la disposition }
+ CalculateLayout;
+
  { Initialisation des menus déroulants }
  InitializeMenus;
 
