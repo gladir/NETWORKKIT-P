@@ -77,7 +77,7 @@
       - Commandes: EHLO, MAIL FROM, RCPT TO, DATA, QUIT
       - Gestion des erreurs et codes de retour SMTP
 
-  11. [ ] Gestionnaire de comptes de messagerie
+  11. [x] Gestionnaire de comptes de messagerie
       - Assistant de configuration de nouveau compte
       - Paramètres serveur entrant: IMAP/POP3, hôte, port, SSL/TLS
       - Paramètres serveur sortant: SMTP, hôte, port, authentification
@@ -720,6 +720,103 @@ Type
   Sortable: Boolean;        { Triable ou non }
  End;
 
+ { ============================================================================
+   TYPES ET STRUCTURES POUR LE GESTIONNAIRE DE COMPTES (TODO 11)
+   ============================================================================ }
+
+ { Type de serveur entrant }
+ TIncomingServerType = (istIMAP, istPOP3);
+
+ { Type de securite de connexion }
+ TConnectionSecurity = (csNone, csSSL, csSTARTTLS);
+
+ { Etape de l'assistant de configuration de compte }
+ TAccountWizardStep = (
+  awsWelcome,          { Page d'accueil }
+  awsAccountInfo,      { Informations du compte (nom, email) }
+  awsIncomingServer,   { Serveur entrant (IMAP/POP3) }
+  awsOutgoingServer,   { Serveur sortant (SMTP) }
+  awsTestConnection,   { Test de connexion }
+  awsComplete          { Configuration terminee }
+ );
+
+ { Resultat du test de connexion }
+ TConnectionTestResult = (
+  ctrNotTested,        { Pas encore teste }
+  ctrTesting,          { Test en cours }
+  ctrSuccess,          { Connexion reussie }
+  ctrFailedIncoming,   { Echec serveur entrant }
+  ctrFailedOutgoing,   { Echec serveur sortant }
+  ctrFailedAuth,       { Echec authentification }
+  ctrFailedNetwork     { Echec reseau }
+ );
+
+ { Structure complete d'un compte de messagerie }
+ TEmailAccount = Record
+  { Informations generales }
+  AccountName: String[40];     { Nom du compte affiche dans l'interface }
+  DisplayName: String[40];     { Nom affiche dans les messages envoyes }
+  EmailAddress: String[60];    { Adresse email }
+  Organization: String[40];    { Organisation (optionnel) }
+  ReplyToAddress: String[60];  { Adresse de reponse (optionnel) }
+
+  { Serveur entrant }
+  IncomingType: TIncomingServerType;  { IMAP ou POP3 }
+  IncomingHost: String[80];    { Nom du serveur entrant }
+  IncomingPort: Integer;       { Port du serveur entrant }
+  IncomingSecurity: TConnectionSecurity; { Type de securite }
+  IncomingUsername: String[60]; { Nom d'utilisateur }
+  IncomingPassword: String[40]; { Mot de passe (chiffre en XOR) }
+  IncomingAuthMethod: Byte;    { Methode d'authentification (0=AUTO) }
+
+  { Options POP3 specifiques }
+  POP3LeaveOnServer: Boolean;  { Laisser les messages sur le serveur }
+  POP3DeleteAfterDays: Integer; { Supprimer apres X jours (0=jamais) }
+  POP3HeadersOnly: Boolean;    { Telecharger seulement les en-tetes }
+
+  { Serveur sortant (SMTP) }
+  OutgoingHost: String[80];    { Nom du serveur SMTP }
+  OutgoingPort: Integer;       { Port du serveur SMTP }
+  OutgoingSecurity: TConnectionSecurity; { Type de securite }
+  OutgoingUsername: String[60]; { Nom d'utilisateur SMTP }
+  OutgoingPassword: String[40]; { Mot de passe SMTP (chiffre en XOR) }
+  OutgoingAuthRequired: Boolean; { Authentification requise }
+  OutgoingUseSameAuth: Boolean;  { Utiliser les memes identifiants que entrant }
+
+  { Etat du compte }
+  IsActive: Boolean;           { Compte actif }
+  IsDefault: Boolean;          { Compte par defaut }
+  LastConnectionTest: TConnectionTestResult; { Resultat du dernier test }
+  CheckIntervalMins: Integer;  { Intervalle de verification (minutes) }
+ End;
+
+ { Structure pour un champ de saisie dans une boite de dialogue }
+ TInputField = Record
+  X, Y: Integer;               { Position }
+  Width: Integer;              { Largeur en pixels }
+  MaxLen: Integer;             { Longueur maximale du texte }
+  Value: String[80];           { Valeur actuelle }
+  IsPassword: Boolean;         { Masquer le texte }
+  IsFocused: Boolean;          { Champ actif }
+  CursorPos: Integer;          { Position du curseur }
+  Label_: String[30];          { Etiquette du champ }
+ End;
+
+ { Structure pour un bouton radio dans une boite de dialogue }
+ TRadioButton = Record
+  X, Y: Integer;               { Position }
+  Label_: String[30];          { Etiquette }
+  Checked: Boolean;            { Selectionne }
+  GroupID: Integer;            { ID du groupe de boutons radio }
+ End;
+
+ { Structure pour une case a cocher }
+ TCheckBox = Record
+  X, Y: Integer;               { Position }
+  Label_: String[40];          { Etiquette }
+  Checked: Boolean;            { Cochee }
+ End;
+
 Const
  { Identifiants des commandes de menu }
  CMD_FILE_NEW      = 101;
@@ -928,6 +1025,39 @@ Const
  SMTP_ERR_NO_RECIPIENTS = -13;
  SMTP_ERR_TLS = -14;
 
+ { ============================================================================
+   CONSTANTES POUR LE GESTIONNAIRE DE COMPTES (TODO 11)
+   ============================================================================ }
+
+ { Nombre maximum de comptes de messagerie }
+ MAX_EMAIL_ACCOUNTS = 10;
+
+ { Dimensions de la boite de dialogue de gestion des comptes }
+ DIALOG_WIDTH = 500;
+ DIALOG_HEIGHT = 350;
+ DIALOG_X = (SCREEN_WIDTH - DIALOG_WIDTH) Div 2;
+ DIALOG_Y = (SCREEN_HEIGHT - DIALOG_HEIGHT) Div 2;
+
+ { Dimensions des elements de dialogue }
+ DIALOG_BUTTON_WIDTH = 80;
+ DIALOG_BUTTON_HEIGHT = 22;
+ DIALOG_INPUT_HEIGHT = 18;
+ DIALOG_LABEL_HEIGHT = 14;
+ DIALOG_MARGIN = 10;
+ DIALOG_SPACING = 6;
+
+ { Cle de chiffrement XOR pour les mots de passe }
+ PASSWORD_XOR_KEY = $A5;
+
+ { Ports par defaut selon le type de serveur }
+ DEFAULT_IMAP_PORT = 143;
+ DEFAULT_IMAPS_PORT = 993;
+ DEFAULT_POP3_PORT = 110;
+ DEFAULT_POP3S_PORT = 995;
+ DEFAULT_SMTP_PORT = 25;
+ DEFAULT_SMTP_SUBMISSION_PORT = 587;
+ DEFAULT_SMTPS_PORT = 465;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1032,6 +1162,23 @@ Var
  SMTPCurrentMessage: TSMTPMessage;     { Message en cours de preparation }
  SMTPSending: Boolean;                 { Envoi en cours }
  SMTPLastActivity: LongInt;            { Dernier timestamp d'activite }
+
+ { Variables globales pour le gestionnaire de comptes (TODO 11) }
+ EmailAccounts: Array[0..MAX_EMAIL_ACCOUNTS-1] of TEmailAccount; { Liste des comptes }
+ EmailAccountCount: Integer;           { Nombre de comptes configures }
+ CurrentAccountIndex: Integer;         { Index du compte en cours d'edition }
+ AccountDialogVisible: Boolean;        { Boite de dialogue visible }
+ AccountWizardStep: TAccountWizardStep; { Etape de l'assistant }
+ AccountWizardMode: Boolean;           { True = assistant, False = edition }
+ TempAccount: TEmailAccount;           { Compte temporaire pour edition }
+ AccountListScrollOffset: Integer;     { Defilement de la liste des comptes }
+ SelectedAccountInList: Integer;       { Compte selectionne dans la liste }
+ AccountDialogInputFields: Array[0..9] of TInputField; { Champs de saisie }
+ AccountDialogRadioButtons: Array[0..5] of TRadioButton; { Boutons radio }
+ AccountDialogCheckBoxes: Array[0..5] of TCheckBox; { Cases a cocher }
+ FocusedInputField: Integer;           { Index du champ de saisie actif }
+ ConnectionTestInProgress: Boolean;    { Test de connexion en cours }
+ ConnectionTestResult: TConnectionTestResult; { Resultat du test }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -1987,6 +2134,11 @@ Begin
     OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
               'Orientation: Verticale             ');
    ShowMouse;
+  End;
+
+  CMD_TOOLS_ACCOUNTS: Begin
+   { Ouvrir la boite de dialogue de gestion des comptes (TODO 11) }
+   ShowAccountManagerDialog;
   End;
 
   CMD_TOOLS_OPTIONS: Begin
@@ -4835,6 +4987,1351 @@ End;
   FIN DE L'IMPLEMENTATION SMTP
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU GESTIONNAIRE DE COMPTES (TODO 11)
+  ============================================================================ }
+
+{ Chiffre/dechiffre un mot de passe avec XOR }
+Function XORPassword(Password: String): String;
+Var
+ I: Integer;
+ Result: String;
+Begin
+ Result := '';
+ For I := 1 To Length(Password) Do
+  Result := Result + Chr(Ord(Password[I]) Xor PASSWORD_XOR_KEY);
+ XORPassword := Result;
+End;
+
+{ Initialise le gestionnaire de comptes }
+Procedure InitializeAccountManager;
+Var
+ I: Integer;
+Begin
+ EmailAccountCount := 0;
+ CurrentAccountIndex := -1;
+ AccountDialogVisible := False;
+ AccountWizardStep := awsWelcome;
+ AccountWizardMode := False;
+ AccountListScrollOffset := 0;
+ SelectedAccountInList := -1;
+ FocusedInputField := -1;
+ ConnectionTestInProgress := False;
+ ConnectionTestResult := ctrNotTested;
+
+ { Initialiser tous les comptes a zero }
+ For I := 0 To MAX_EMAIL_ACCOUNTS - 1 Do Begin
+  EmailAccounts[I].AccountName := '';
+  EmailAccounts[I].EmailAddress := '';
+  EmailAccounts[I].IsActive := False;
+ End;
+
+ { Creer un compte de demonstration }
+ EmailAccounts[0].AccountName := 'Compte principal';
+ EmailAccounts[0].DisplayName := 'Utilisateur';
+ EmailAccounts[0].EmailAddress := 'user@example.com';
+ EmailAccounts[0].IncomingType := istIMAP;
+ EmailAccounts[0].IncomingHost := 'imap.example.com';
+ EmailAccounts[0].IncomingPort := DEFAULT_IMAPS_PORT;
+ EmailAccounts[0].IncomingSecurity := csSSL;
+ EmailAccounts[0].IncomingUsername := 'user@example.com';
+ EmailAccounts[0].IncomingPassword := XORPassword('password');
+ EmailAccounts[0].OutgoingHost := 'smtp.example.com';
+ EmailAccounts[0].OutgoingPort := DEFAULT_SMTP_SUBMISSION_PORT;
+ EmailAccounts[0].OutgoingSecurity := csSTARTTLS;
+ EmailAccounts[0].OutgoingAuthRequired := True;
+ EmailAccounts[0].OutgoingUseSameAuth := True;
+ EmailAccounts[0].IsActive := True;
+ EmailAccounts[0].IsDefault := True;
+ EmailAccounts[0].LastConnectionTest := ctrNotTested;
+ EmailAccounts[0].CheckIntervalMins := 5;
+ EmailAccountCount := 1;
+End;
+
+{ Initialise un compte vide }
+Procedure InitializeEmptyAccount(Var Account: TEmailAccount);
+Begin
+ Account.AccountName := '';
+ Account.DisplayName := '';
+ Account.EmailAddress := '';
+ Account.Organization := '';
+ Account.ReplyToAddress := '';
+ Account.IncomingType := istIMAP;
+ Account.IncomingHost := '';
+ Account.IncomingPort := DEFAULT_IMAPS_PORT;
+ Account.IncomingSecurity := csSSL;
+ Account.IncomingUsername := '';
+ Account.IncomingPassword := '';
+ Account.IncomingAuthMethod := 0;
+ Account.POP3LeaveOnServer := True;
+ Account.POP3DeleteAfterDays := 0;
+ Account.POP3HeadersOnly := False;
+ Account.OutgoingHost := '';
+ Account.OutgoingPort := DEFAULT_SMTP_SUBMISSION_PORT;
+ Account.OutgoingSecurity := csSTARTTLS;
+ Account.OutgoingUsername := '';
+ Account.OutgoingPassword := '';
+ Account.OutgoingAuthRequired := True;
+ Account.OutgoingUseSameAuth := True;
+ Account.IsActive := True;
+ Account.IsDefault := False;
+ Account.LastConnectionTest := ctrNotTested;
+ Account.CheckIntervalMins := 5;
+End;
+
+{ Dessine une boite de dialogue modale }
+Procedure DrawDialogBox(X, Y, W, H: Integer; Title: String);
+Begin
+ { Ombre de la boite de dialogue }
+ SetFillStyle(SolidFill, COLOR_BUTTON_DARK);
+ Bar(X + 3, Y + 3, X + W + 3, Y + H + 3);
+
+ { Fond de la boite de dialogue }
+ SetFillStyle(SolidFill, COLOR_WINDOW_BG);
+ Bar(X, Y, X + W, Y + H);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, COLOR_TITLEBAR);
+ Bar(X + 2, Y + 2, X + W - 2, Y + 20);
+
+ { Titre }
+ SetColor(COLOR_TITLEBAR_TEXT);
+ OutTextXY(X + 8, Y + 6, Title);
+
+ { Bordure 3D }
+ Draw3DRect(X, Y, X + W, Y + H, True);
+ Draw3DRect(X + 2, Y + 22, X + W - 2, Y + H - 2, False);
+End;
+
+{ Dessine un bouton de dialogue }
+Procedure DrawDialogButton(X, Y, W, H: Integer; Caption: String; Pressed, Enabled: Boolean);
+Var
+ TextX, TextY: Integer;
+Begin
+ { Fond du bouton }
+ If Enabled Then
+  SetFillStyle(SolidFill, COLOR_BUTTON_FACE)
+ Else
+  SetFillStyle(SolidFill, COLOR_BUTTON_DARK);
+ Bar(X, Y, X + W, Y + H);
+
+ { Relief 3D }
+ Draw3DRect(X, Y, X + W, Y + H, Not Pressed);
+
+ { Texte centre }
+ If Enabled Then
+  SetColor(COLOR_MENU_TEXT)
+ Else
+  SetColor(COLOR_BUTTON_DARK);
+ TextX := X + (W - TextWidth(Caption)) Div 2;
+ TextY := Y + (H - TextHeight(Caption)) Div 2;
+ If Pressed Then Begin
+  Inc(TextX);
+  Inc(TextY);
+ End;
+ OutTextXY(TextX, TextY, Caption);
+End;
+
+{ Dessine un champ de saisie }
+Procedure DrawInputField(Var Field: TInputField);
+Var
+ DisplayText: String;
+ I: Integer;
+Begin
+ { Etiquette }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Field.X, Field.Y - 14, Field.Label_);
+
+ { Fond du champ }
+ If Field.IsFocused Then
+  SetFillStyle(SolidFill, COLOR_LIST_BG)
+ Else
+  SetFillStyle(SolidFill, COLOR_WINDOW_BG);
+ Bar(Field.X, Field.Y, Field.X + Field.Width, Field.Y + DIALOG_INPUT_HEIGHT);
+
+ { Bordure 3D inversee }
+ Draw3DRect(Field.X, Field.Y, Field.X + Field.Width, Field.Y + DIALOG_INPUT_HEIGHT, False);
+
+ { Texte ou asterisques }
+ If Field.IsPassword Then Begin
+  DisplayText := '';
+  For I := 1 To Length(Field.Value) Do
+   DisplayText := DisplayText + '*';
+ End
+ Else
+  DisplayText := Field.Value;
+
+ { Tronquer si trop long }
+ While TextWidth(DisplayText) > Field.Width - 8 Do
+  Delete(DisplayText, 1, 1);
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Field.X + 4, Field.Y + 4, DisplayText);
+
+ { Curseur si actif }
+ If Field.IsFocused Then Begin
+  SetColor(COLOR_MENU_TEXT);
+  Line(Field.X + 4 + TextWidth(DisplayText), Field.Y + 3,
+       Field.X + 4 + TextWidth(DisplayText), Field.Y + DIALOG_INPUT_HEIGHT - 3);
+ End;
+End;
+
+{ Dessine un bouton radio }
+Procedure DrawRadioButton(Var Radio: TRadioButton);
+Begin
+ { Cercle exterieur }
+ SetColor(COLOR_BUTTON_DARK);
+ Circle(Radio.X + 6, Radio.Y + 6, 6);
+
+ { Cercle interieur si selectionne }
+ If Radio.Checked Then Begin
+  SetFillStyle(SolidFill, COLOR_MENU_TEXT);
+  FillEllipse(Radio.X + 6, Radio.Y + 6, 3, 3);
+ End
+ Else Begin
+  SetFillStyle(SolidFill, COLOR_LIST_BG);
+  FillEllipse(Radio.X + 6, Radio.Y + 6, 4, 4);
+ End;
+
+ { Etiquette }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Radio.X + 16, Radio.Y + 2, Radio.Label_);
+End;
+
+{ Dessine une case a cocher }
+Procedure DrawCheckBox(Var Check: TCheckBox);
+Begin
+ { Cadre }
+ SetFillStyle(SolidFill, COLOR_LIST_BG);
+ Bar(Check.X, Check.Y, Check.X + 12, Check.Y + 12);
+ Draw3DRect(Check.X, Check.Y, Check.X + 12, Check.Y + 12, False);
+
+ { Coche si selectionnee }
+ If Check.Checked Then Begin
+  SetColor(COLOR_MENU_TEXT);
+  Line(Check.X + 2, Check.Y + 6, Check.X + 5, Check.Y + 9);
+  Line(Check.X + 5, Check.Y + 9, Check.X + 10, Check.Y + 3);
+  Line(Check.X + 3, Check.Y + 6, Check.X + 5, Check.Y + 10);
+  Line(Check.X + 5, Check.Y + 10, Check.X + 10, Check.Y + 4);
+ End;
+
+ { Etiquette }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Check.X + 18, Check.Y + 2, Check.Label_);
+End;
+
+{ Initialise les champs pour la page d'information du compte }
+Procedure InitAccountInfoFields;
+Var
+ BaseX, BaseY: Integer;
+Begin
+ BaseX := DIALOG_X + DIALOG_MARGIN + 20;
+ BaseY := DIALOG_Y + 50;
+
+ { Nom du compte }
+ AccountDialogInputFields[0].X := BaseX;
+ AccountDialogInputFields[0].Y := BaseY;
+ AccountDialogInputFields[0].Width := 250;
+ AccountDialogInputFields[0].MaxLen := 40;
+ AccountDialogInputFields[0].Value := TempAccount.AccountName;
+ AccountDialogInputFields[0].IsPassword := False;
+ AccountDialogInputFields[0].IsFocused := True;
+ AccountDialogInputFields[0].CursorPos := Length(TempAccount.AccountName);
+ AccountDialogInputFields[0].Label_ := 'Nom du compte:';
+
+ { Nom d'affichage }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[1].X := BaseX;
+ AccountDialogInputFields[1].Y := BaseY;
+ AccountDialogInputFields[1].Width := 250;
+ AccountDialogInputFields[1].MaxLen := 40;
+ AccountDialogInputFields[1].Value := TempAccount.DisplayName;
+ AccountDialogInputFields[1].IsPassword := False;
+ AccountDialogInputFields[1].IsFocused := False;
+ AccountDialogInputFields[1].CursorPos := Length(TempAccount.DisplayName);
+ AccountDialogInputFields[1].Label_ := 'Votre nom:';
+
+ { Adresse email }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[2].X := BaseX;
+ AccountDialogInputFields[2].Y := BaseY;
+ AccountDialogInputFields[2].Width := 300;
+ AccountDialogInputFields[2].MaxLen := 60;
+ AccountDialogInputFields[2].Value := TempAccount.EmailAddress;
+ AccountDialogInputFields[2].IsPassword := False;
+ AccountDialogInputFields[2].IsFocused := False;
+ AccountDialogInputFields[2].CursorPos := Length(TempAccount.EmailAddress);
+ AccountDialogInputFields[2].Label_ := 'Adresse de courrier electronique:';
+
+ { Organisation (optionnel) }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[3].X := BaseX;
+ AccountDialogInputFields[3].Y := BaseY;
+ AccountDialogInputFields[3].Width := 250;
+ AccountDialogInputFields[3].MaxLen := 40;
+ AccountDialogInputFields[3].Value := TempAccount.Organization;
+ AccountDialogInputFields[3].IsPassword := False;
+ AccountDialogInputFields[3].IsFocused := False;
+ AccountDialogInputFields[3].CursorPos := Length(TempAccount.Organization);
+ AccountDialogInputFields[3].Label_ := 'Organisation (optionnel):';
+
+ FocusedInputField := 0;
+End;
+
+{ Initialise les champs pour la page du serveur entrant }
+Procedure InitIncomingServerFields;
+Var
+ BaseX, BaseY: Integer;
+Begin
+ BaseX := DIALOG_X + DIALOG_MARGIN + 20;
+ BaseY := DIALOG_Y + 50;
+
+ { Boutons radio pour le type de serveur }
+ AccountDialogRadioButtons[0].X := BaseX;
+ AccountDialogRadioButtons[0].Y := BaseY;
+ AccountDialogRadioButtons[0].Label_ := 'IMAP';
+ AccountDialogRadioButtons[0].Checked := TempAccount.IncomingType = istIMAP;
+ AccountDialogRadioButtons[0].GroupID := 1;
+
+ AccountDialogRadioButtons[1].X := BaseX + 80;
+ AccountDialogRadioButtons[1].Y := BaseY;
+ AccountDialogRadioButtons[1].Label_ := 'POP3';
+ AccountDialogRadioButtons[1].Checked := TempAccount.IncomingType = istPOP3;
+ AccountDialogRadioButtons[1].GroupID := 1;
+
+ { Serveur entrant }
+ BaseY := BaseY + 35;
+ AccountDialogInputFields[0].X := BaseX;
+ AccountDialogInputFields[0].Y := BaseY;
+ AccountDialogInputFields[0].Width := 280;
+ AccountDialogInputFields[0].MaxLen := 80;
+ AccountDialogInputFields[0].Value := TempAccount.IncomingHost;
+ AccountDialogInputFields[0].IsPassword := False;
+ AccountDialogInputFields[0].IsFocused := True;
+ AccountDialogInputFields[0].CursorPos := Length(TempAccount.IncomingHost);
+ AccountDialogInputFields[0].Label_ := 'Serveur de courrier entrant:';
+
+ { Port }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[1].X := BaseX;
+ AccountDialogInputFields[1].Y := BaseY;
+ AccountDialogInputFields[1].Width := 60;
+ AccountDialogInputFields[1].MaxLen := 5;
+ If TempAccount.IncomingPort > 0 Then Begin
+  Str(TempAccount.IncomingPort, AccountDialogInputFields[1].Value);
+ End Else
+  AccountDialogInputFields[1].Value := '';
+ AccountDialogInputFields[1].IsPassword := False;
+ AccountDialogInputFields[1].IsFocused := False;
+ AccountDialogInputFields[1].CursorPos := 0;
+ AccountDialogInputFields[1].Label_ := 'Port:';
+
+ { Boutons radio pour la securite }
+ BaseY := BaseY + 35;
+ AccountDialogRadioButtons[2].X := BaseX;
+ AccountDialogRadioButtons[2].Y := BaseY;
+ AccountDialogRadioButtons[2].Label_ := 'Aucune';
+ AccountDialogRadioButtons[2].Checked := TempAccount.IncomingSecurity = csNone;
+ AccountDialogRadioButtons[2].GroupID := 2;
+
+ AccountDialogRadioButtons[3].X := BaseX + 80;
+ AccountDialogRadioButtons[3].Y := BaseY;
+ AccountDialogRadioButtons[3].Label_ := 'SSL/TLS';
+ AccountDialogRadioButtons[3].Checked := TempAccount.IncomingSecurity = csSSL;
+ AccountDialogRadioButtons[3].GroupID := 2;
+
+ AccountDialogRadioButtons[4].X := BaseX + 170;
+ AccountDialogRadioButtons[4].Y := BaseY;
+ AccountDialogRadioButtons[4].Label_ := 'STARTTLS';
+ AccountDialogRadioButtons[4].Checked := TempAccount.IncomingSecurity = csSTARTTLS;
+ AccountDialogRadioButtons[4].GroupID := 2;
+
+ { Nom d'utilisateur }
+ BaseY := BaseY + 35;
+ AccountDialogInputFields[2].X := BaseX;
+ AccountDialogInputFields[2].Y := BaseY;
+ AccountDialogInputFields[2].Width := 280;
+ AccountDialogInputFields[2].MaxLen := 60;
+ AccountDialogInputFields[2].Value := TempAccount.IncomingUsername;
+ AccountDialogInputFields[2].IsPassword := False;
+ AccountDialogInputFields[2].IsFocused := False;
+ AccountDialogInputFields[2].CursorPos := Length(TempAccount.IncomingUsername);
+ AccountDialogInputFields[2].Label_ := 'Nom d''utilisateur:';
+
+ { Mot de passe }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[3].X := BaseX;
+ AccountDialogInputFields[3].Y := BaseY;
+ AccountDialogInputFields[3].Width := 200;
+ AccountDialogInputFields[3].MaxLen := 40;
+ AccountDialogInputFields[3].Value := XORPassword(TempAccount.IncomingPassword);
+ AccountDialogInputFields[3].IsPassword := True;
+ AccountDialogInputFields[3].IsFocused := False;
+ AccountDialogInputFields[3].CursorPos := 0;
+ AccountDialogInputFields[3].Label_ := 'Mot de passe:';
+
+ FocusedInputField := 0;
+End;
+
+{ Initialise les champs pour la page du serveur sortant }
+Procedure InitOutgoingServerFields;
+Var
+ BaseX, BaseY: Integer;
+Begin
+ BaseX := DIALOG_X + DIALOG_MARGIN + 20;
+ BaseY := DIALOG_Y + 50;
+
+ { Serveur sortant }
+ AccountDialogInputFields[0].X := BaseX;
+ AccountDialogInputFields[0].Y := BaseY;
+ AccountDialogInputFields[0].Width := 280;
+ AccountDialogInputFields[0].MaxLen := 80;
+ AccountDialogInputFields[0].Value := TempAccount.OutgoingHost;
+ AccountDialogInputFields[0].IsPassword := False;
+ AccountDialogInputFields[0].IsFocused := True;
+ AccountDialogInputFields[0].CursorPos := Length(TempAccount.OutgoingHost);
+ AccountDialogInputFields[0].Label_ := 'Serveur de courrier sortant (SMTP):';
+
+ { Port }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[1].X := BaseX;
+ AccountDialogInputFields[1].Y := BaseY;
+ AccountDialogInputFields[1].Width := 60;
+ AccountDialogInputFields[1].MaxLen := 5;
+ If TempAccount.OutgoingPort > 0 Then Begin
+  Str(TempAccount.OutgoingPort, AccountDialogInputFields[1].Value);
+ End Else
+  AccountDialogInputFields[1].Value := '';
+ AccountDialogInputFields[1].IsPassword := False;
+ AccountDialogInputFields[1].IsFocused := False;
+ AccountDialogInputFields[1].CursorPos := 0;
+ AccountDialogInputFields[1].Label_ := 'Port:';
+
+ { Boutons radio pour la securite }
+ BaseY := BaseY + 35;
+ AccountDialogRadioButtons[0].X := BaseX;
+ AccountDialogRadioButtons[0].Y := BaseY;
+ AccountDialogRadioButtons[0].Label_ := 'Aucune';
+ AccountDialogRadioButtons[0].Checked := TempAccount.OutgoingSecurity = csNone;
+ AccountDialogRadioButtons[0].GroupID := 3;
+
+ AccountDialogRadioButtons[1].X := BaseX + 80;
+ AccountDialogRadioButtons[1].Y := BaseY;
+ AccountDialogRadioButtons[1].Label_ := 'SSL/TLS';
+ AccountDialogRadioButtons[1].Checked := TempAccount.OutgoingSecurity = csSSL;
+ AccountDialogRadioButtons[1].GroupID := 3;
+
+ AccountDialogRadioButtons[2].X := BaseX + 170;
+ AccountDialogRadioButtons[2].Y := BaseY;
+ AccountDialogRadioButtons[2].Label_ := 'STARTTLS';
+ AccountDialogRadioButtons[2].Checked := TempAccount.OutgoingSecurity = csSTARTTLS;
+ AccountDialogRadioButtons[2].GroupID := 3;
+
+ { Case a cocher - Authentification requise }
+ BaseY := BaseY + 30;
+ AccountDialogCheckBoxes[0].X := BaseX;
+ AccountDialogCheckBoxes[0].Y := BaseY;
+ AccountDialogCheckBoxes[0].Label_ := 'Authentification requise';
+ AccountDialogCheckBoxes[0].Checked := TempAccount.OutgoingAuthRequired;
+
+ { Case a cocher - Utiliser memes identifiants }
+ BaseY := BaseY + 25;
+ AccountDialogCheckBoxes[1].X := BaseX + 20;
+ AccountDialogCheckBoxes[1].Y := BaseY;
+ AccountDialogCheckBoxes[1].Label_ := 'Memes identifiants que serveur entrant';
+ AccountDialogCheckBoxes[1].Checked := TempAccount.OutgoingUseSameAuth;
+
+ { Nom d'utilisateur SMTP (si different) }
+ BaseY := BaseY + 30;
+ AccountDialogInputFields[2].X := BaseX + 20;
+ AccountDialogInputFields[2].Y := BaseY;
+ AccountDialogInputFields[2].Width := 260;
+ AccountDialogInputFields[2].MaxLen := 60;
+ AccountDialogInputFields[2].Value := TempAccount.OutgoingUsername;
+ AccountDialogInputFields[2].IsPassword := False;
+ AccountDialogInputFields[2].IsFocused := False;
+ AccountDialogInputFields[2].CursorPos := Length(TempAccount.OutgoingUsername);
+ AccountDialogInputFields[2].Label_ := 'Nom d''utilisateur SMTP:';
+
+ { Mot de passe SMTP }
+ BaseY := BaseY + 45;
+ AccountDialogInputFields[3].X := BaseX + 20;
+ AccountDialogInputFields[3].Y := BaseY;
+ AccountDialogInputFields[3].Width := 200;
+ AccountDialogInputFields[3].MaxLen := 40;
+ AccountDialogInputFields[3].Value := XORPassword(TempAccount.OutgoingPassword);
+ AccountDialogInputFields[3].IsPassword := True;
+ AccountDialogInputFields[3].IsFocused := False;
+ AccountDialogInputFields[3].CursorPos := 0;
+ AccountDialogInputFields[3].Label_ := 'Mot de passe SMTP:';
+
+ FocusedInputField := 0;
+End;
+
+{ Sauvegarde les valeurs des champs de la page info compte }
+Procedure SaveAccountInfoFields;
+Begin
+ TempAccount.AccountName := AccountDialogInputFields[0].Value;
+ TempAccount.DisplayName := AccountDialogInputFields[1].Value;
+ TempAccount.EmailAddress := AccountDialogInputFields[2].Value;
+ TempAccount.Organization := AccountDialogInputFields[3].Value;
+
+ { Auto-remplir le nom d'utilisateur avec l'email si vide }
+ If TempAccount.IncomingUsername = '' Then
+  TempAccount.IncomingUsername := TempAccount.EmailAddress;
+End;
+
+{ Sauvegarde les valeurs des champs du serveur entrant }
+Procedure SaveIncomingServerFields;
+Var
+ PortCode: Integer;
+Begin
+ { Type de serveur }
+ If AccountDialogRadioButtons[0].Checked Then
+  TempAccount.IncomingType := istIMAP
+ Else
+  TempAccount.IncomingType := istPOP3;
+
+ TempAccount.IncomingHost := AccountDialogInputFields[0].Value;
+
+ { Port }
+ Val(AccountDialogInputFields[1].Value, TempAccount.IncomingPort, PortCode);
+ If PortCode <> 0 Then Begin
+  If TempAccount.IncomingType = istIMAP Then
+   TempAccount.IncomingPort := DEFAULT_IMAPS_PORT
+  Else
+   TempAccount.IncomingPort := DEFAULT_POP3S_PORT;
+ End;
+
+ { Securite }
+ If AccountDialogRadioButtons[2].Checked Then
+  TempAccount.IncomingSecurity := csNone
+ Else If AccountDialogRadioButtons[3].Checked Then
+  TempAccount.IncomingSecurity := csSSL
+ Else
+  TempAccount.IncomingSecurity := csSTARTTLS;
+
+ TempAccount.IncomingUsername := AccountDialogInputFields[2].Value;
+ TempAccount.IncomingPassword := XORPassword(AccountDialogInputFields[3].Value);
+End;
+
+{ Sauvegarde les valeurs des champs du serveur sortant }
+Procedure SaveOutgoingServerFields;
+Var
+ PortCode: Integer;
+Begin
+ TempAccount.OutgoingHost := AccountDialogInputFields[0].Value;
+
+ { Port }
+ Val(AccountDialogInputFields[1].Value, TempAccount.OutgoingPort, PortCode);
+ If PortCode <> 0 Then
+  TempAccount.OutgoingPort := DEFAULT_SMTP_SUBMISSION_PORT;
+
+ { Securite }
+ If AccountDialogRadioButtons[0].Checked Then
+  TempAccount.OutgoingSecurity := csNone
+ Else If AccountDialogRadioButtons[1].Checked Then
+  TempAccount.OutgoingSecurity := csSSL
+ Else
+  TempAccount.OutgoingSecurity := csSTARTTLS;
+
+ TempAccount.OutgoingAuthRequired := AccountDialogCheckBoxes[0].Checked;
+ TempAccount.OutgoingUseSameAuth := AccountDialogCheckBoxes[1].Checked;
+
+ If Not TempAccount.OutgoingUseSameAuth Then Begin
+  TempAccount.OutgoingUsername := AccountDialogInputFields[2].Value;
+  TempAccount.OutgoingPassword := XORPassword(AccountDialogInputFields[3].Value);
+ End
+ Else Begin
+  TempAccount.OutgoingUsername := TempAccount.IncomingUsername;
+  TempAccount.OutgoingPassword := TempAccount.IncomingPassword;
+ End;
+End;
+
+{ Teste la connexion au serveur entrant }
+Function TestIncomingConnection: TConnectionTestResult;
+Begin
+ { Simulation du test de connexion }
+ { Dans une implementation reelle, on utiliserait les clients IMAP/POP3 }
+ If (TempAccount.IncomingHost = '') Or (TempAccount.IncomingUsername = '') Then Begin
+  TestIncomingConnection := ctrFailedIncoming;
+  Exit;
+ End;
+
+ { Simuler un delai de test }
+ Delay(500);
+
+ { Test simule reussi si les champs sont remplis }
+ TestIncomingConnection := ctrSuccess;
+End;
+
+{ Teste la connexion au serveur sortant }
+Function TestOutgoingConnection: TConnectionTestResult;
+Begin
+ { Simulation du test de connexion SMTP }
+ If TempAccount.OutgoingHost = '' Then Begin
+  TestOutgoingConnection := ctrFailedOutgoing;
+  Exit;
+ End;
+
+ { Simuler un delai de test }
+ Delay(500);
+
+ { Test simule reussi si les champs sont remplis }
+ TestOutgoingConnection := ctrSuccess;
+End;
+
+{ Execute le test de connexion complet }
+Procedure RunConnectionTest;
+Var
+ Result: TConnectionTestResult;
+Begin
+ ConnectionTestInProgress := True;
+ ConnectionTestResult := ctrTesting;
+
+ { Tester le serveur entrant }
+ Result := TestIncomingConnection;
+ If Result <> ctrSuccess Then Begin
+  ConnectionTestResult := Result;
+  ConnectionTestInProgress := False;
+  Exit;
+ End;
+
+ { Tester le serveur sortant }
+ Result := TestOutgoingConnection;
+ If Result <> ctrSuccess Then Begin
+  ConnectionTestResult := Result;
+  ConnectionTestInProgress := False;
+  Exit;
+ End;
+
+ ConnectionTestResult := ctrSuccess;
+ TempAccount.LastConnectionTest := ctrSuccess;
+ ConnectionTestInProgress := False;
+End;
+
+{ Retourne le texte du resultat du test }
+Function GetConnectionTestResultText(Result: TConnectionTestResult): String;
+Begin
+ Case Result Of
+  ctrNotTested: GetConnectionTestResultText := 'Non teste';
+  ctrTesting: GetConnectionTestResultText := 'Test en cours...';
+  ctrSuccess: GetConnectionTestResultText := 'Connexion reussie!';
+  ctrFailedIncoming: GetConnectionTestResultText := 'Echec serveur entrant';
+  ctrFailedOutgoing: GetConnectionTestResultText := 'Echec serveur sortant';
+  ctrFailedAuth: GetConnectionTestResultText := 'Echec authentification';
+  ctrFailedNetwork: GetConnectionTestResultText := 'Erreur reseau';
+  Else GetConnectionTestResultText := 'Erreur inconnue';
+ End;
+End;
+
+{ Dessine la page de bienvenue de l'assistant }
+Procedure DrawWizardWelcomePage;
+Var
+ Y: Integer;
+Begin
+ Y := DIALOG_Y + 40;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Bienvenue dans l''assistant de configuration');
+ Y := Y + 25;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'de compte de messagerie.');
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Cet assistant vous guidera pour configurer');
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'un nouveau compte de messagerie.');
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Vous aurez besoin des informations suivantes:');
+ Y := Y + 25;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, '- Votre adresse de courrier electronique');
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, '- Le nom du serveur de courrier entrant');
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, '- Le nom du serveur de courrier sortant');
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, '- Votre nom d''utilisateur et mot de passe');
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Cliquez sur Suivant pour continuer.');
+End;
+
+{ Dessine la page d'information du compte }
+Procedure DrawAccountInfoPage;
+Var
+ Y, I: Integer;
+Begin
+ Y := DIALOG_Y + 30;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Informations du compte');
+
+ { Dessiner les champs de saisie }
+ For I := 0 To 3 Do
+  DrawInputField(AccountDialogInputFields[I]);
+End;
+
+{ Dessine la page du serveur entrant }
+Procedure DrawIncomingServerPage;
+Var
+ Y, I: Integer;
+Begin
+ Y := DIALOG_Y + 30;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Serveur de courrier entrant');
+
+ { Type de serveur }
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, DIALOG_Y + 38, 'Type de serveur:');
+
+ { Dessiner les boutons radio type serveur }
+ DrawRadioButton(AccountDialogRadioButtons[0]);
+ DrawRadioButton(AccountDialogRadioButtons[1]);
+
+ { Dessiner les champs de saisie }
+ For I := 0 To 3 Do
+  DrawInputField(AccountDialogInputFields[I]);
+
+ { Dessiner les boutons radio securite }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, AccountDialogRadioButtons[2].Y - 15, 'Securite:');
+ DrawRadioButton(AccountDialogRadioButtons[2]);
+ DrawRadioButton(AccountDialogRadioButtons[3]);
+ DrawRadioButton(AccountDialogRadioButtons[4]);
+End;
+
+{ Dessine la page du serveur sortant }
+Procedure DrawOutgoingServerPage;
+Var
+ Y, I: Integer;
+Begin
+ Y := DIALOG_Y + 30;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Serveur de courrier sortant (SMTP)');
+
+ { Dessiner les champs de saisie }
+ DrawInputField(AccountDialogInputFields[0]);
+ DrawInputField(AccountDialogInputFields[1]);
+
+ { Dessiner les boutons radio securite }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, AccountDialogRadioButtons[0].Y - 15, 'Securite:');
+ For I := 0 To 2 Do
+  DrawRadioButton(AccountDialogRadioButtons[I]);
+
+ { Dessiner les cases a cocher }
+ DrawCheckBox(AccountDialogCheckBoxes[0]);
+ DrawCheckBox(AccountDialogCheckBoxes[1]);
+
+ { Dessiner les champs SMTP si auth requise et pas memes identifiants }
+ If AccountDialogCheckBoxes[0].Checked And Not AccountDialogCheckBoxes[1].Checked Then Begin
+  DrawInputField(AccountDialogInputFields[2]);
+  DrawInputField(AccountDialogInputFields[3]);
+ End;
+End;
+
+{ Dessine la page de test de connexion }
+Procedure DrawTestConnectionPage;
+Var
+ Y: Integer;
+ ResultColor: Word;
+Begin
+ Y := DIALOG_Y + 40;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Test de connexion');
+
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Configuration actuelle:');
+
+ Y := Y + 25;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Serveur entrant: ' + TempAccount.IncomingHost);
+ Y := Y + 18;
+ If TempAccount.IncomingType = istIMAP Then
+  OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Type: IMAP')
+ Else
+  OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Type: POP3');
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Serveur sortant: ' + TempAccount.OutgoingHost);
+
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Resultat du test:');
+
+ Y := Y + 20;
+ { Couleur selon le resultat }
+ Case ConnectionTestResult Of
+  ctrSuccess: ResultColor := LightGreen;
+  ctrTesting: ResultColor := Yellow;
+  Else ResultColor := LightRed;
+ End;
+ SetColor(ResultColor);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, GetConnectionTestResultText(ConnectionTestResult));
+
+ Y := Y + 40;
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Cliquez sur "Tester" pour verifier la connexion.');
+
+ { Bouton Tester }
+ DrawDialogButton(DIALOG_X + DIALOG_MARGIN, Y + 25, 80, DIALOG_BUTTON_HEIGHT,
+                  'Tester', False, Not ConnectionTestInProgress);
+End;
+
+{ Dessine la page de completion }
+Procedure DrawCompletePage;
+Var
+ Y: Integer;
+Begin
+ Y := DIALOG_Y + 40;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Configuration terminee!');
+
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Votre compte a ete configure avec succes.');
+
+ Y := Y + 35;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Resume:');
+ Y := Y + 25;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Compte: ' + TempAccount.AccountName);
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Email: ' + TempAccount.EmailAddress);
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Serveur entrant: ' + TempAccount.IncomingHost);
+ Y := Y + 18;
+ OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, 'Serveur sortant: ' + TempAccount.OutgoingHost);
+
+ If ConnectionTestResult = ctrSuccess Then Begin
+  Y := Y + 35;
+  SetColor(LightGreen);
+  OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Test de connexion reussi!');
+ End;
+
+ Y := Y + 35;
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Cliquez sur Terminer pour sauvegarder.');
+End;
+
+{ Dessine le contenu de l'assistant selon l'etape }
+Procedure DrawWizardContent;
+Begin
+ Case AccountWizardStep Of
+  awsWelcome: DrawWizardWelcomePage;
+  awsAccountInfo: DrawAccountInfoPage;
+  awsIncomingServer: DrawIncomingServerPage;
+  awsOutgoingServer: DrawOutgoingServerPage;
+  awsTestConnection: DrawTestConnectionPage;
+  awsComplete: DrawCompletePage;
+ End;
+End;
+
+{ Dessine la boite de dialogue de l'assistant }
+Procedure DrawAccountWizardDialog;
+Var
+ Title: String;
+ BtnX, BtnY: Integer;
+Begin
+ { Titre selon l'etape }
+ Case AccountWizardStep Of
+  awsWelcome: Title := 'Assistant de compte - Bienvenue';
+  awsAccountInfo: Title := 'Assistant de compte - Informations';
+  awsIncomingServer: Title := 'Assistant de compte - Serveur entrant';
+  awsOutgoingServer: Title := 'Assistant de compte - Serveur sortant';
+  awsTestConnection: Title := 'Assistant de compte - Test';
+  awsComplete: Title := 'Assistant de compte - Termine';
+  Else Title := 'Assistant de compte';
+ End;
+
+ HideMouse;
+
+ { Dessiner la boite de dialogue }
+ DrawDialogBox(DIALOG_X, DIALOG_Y, DIALOG_WIDTH, DIALOG_HEIGHT, Title);
+
+ { Dessiner le contenu selon l'etape }
+ DrawWizardContent;
+
+ { Boutons de navigation }
+ BtnY := DIALOG_Y + DIALOG_HEIGHT - DIALOG_BUTTON_HEIGHT - DIALOG_MARGIN;
+
+ { Bouton Annuler }
+ BtnX := DIALOG_X + DIALOG_MARGIN;
+ DrawDialogButton(BtnX, BtnY, DIALOG_BUTTON_WIDTH, DIALOG_BUTTON_HEIGHT,
+                  'Annuler', False, True);
+
+ { Bouton Precedent }
+ BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH * 3 - DIALOG_MARGIN * 2 - 10;
+ DrawDialogButton(BtnX, BtnY, DIALOG_BUTTON_WIDTH, DIALOG_BUTTON_HEIGHT,
+                  'Precedent', False, AccountWizardStep > awsWelcome);
+
+ { Bouton Suivant/Terminer }
+ BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH * 2 - DIALOG_MARGIN - 5;
+ If AccountWizardStep = awsComplete Then
+  DrawDialogButton(BtnX, BtnY, DIALOG_BUTTON_WIDTH, DIALOG_BUTTON_HEIGHT,
+                   'Terminer', False, True)
+ Else
+  DrawDialogButton(BtnX, BtnY, DIALOG_BUTTON_WIDTH, DIALOG_BUTTON_HEIGHT,
+                   'Suivant', False, True);
+
+ ShowMouse;
+End;
+
+{ Dessine la liste des comptes }
+Procedure DrawAccountListDialog;
+Var
+ Y, I: Integer;
+ BtnX, BtnY: Integer;
+ BgColor: Word;
+Begin
+ HideMouse;
+
+ { Dessiner la boite de dialogue }
+ DrawDialogBox(DIALOG_X, DIALOG_Y, DIALOG_WIDTH, DIALOG_HEIGHT, 'Gestion des comptes');
+
+ { Liste des comptes }
+ Y := DIALOG_Y + 30;
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(DIALOG_X + DIALOG_MARGIN, Y, 'Comptes de messagerie:');
+
+ Y := Y + 20;
+
+ { Zone de liste }
+ SetFillStyle(SolidFill, COLOR_LIST_BG);
+ Bar(DIALOG_X + DIALOG_MARGIN, Y, DIALOG_X + DIALOG_WIDTH - 120, Y + 180);
+ Draw3DRect(DIALOG_X + DIALOG_MARGIN, Y, DIALOG_X + DIALOG_WIDTH - 120, Y + 180, False);
+
+ { Afficher les comptes }
+ For I := 0 To EmailAccountCount - 1 Do Begin
+  If (I - AccountListScrollOffset >= 0) And (I - AccountListScrollOffset < 10) Then Begin
+   { Fond de selection }
+   If I = SelectedAccountInList Then Begin
+    BgColor := COLOR_LIST_SELECTED;
+    SetFillStyle(SolidFill, BgColor);
+    Bar(DIALOG_X + DIALOG_MARGIN + 2, Y + (I - AccountListScrollOffset) * 18,
+        DIALOG_X + DIALOG_WIDTH - 122, Y + (I - AccountListScrollOffset) * 18 + 16);
+    SetColor(COLOR_LIST_SELECTED_TEXT);
+   End
+   Else
+    SetColor(COLOR_MENU_TEXT);
+
+   OutTextXY(DIALOG_X + DIALOG_MARGIN + 5, Y + (I - AccountListScrollOffset) * 18 + 3,
+             EmailAccounts[I].AccountName);
+
+   { Indicateur par defaut }
+   If EmailAccounts[I].IsDefault Then
+    OutTextXY(DIALOG_X + DIALOG_WIDTH - 200, Y + (I - AccountListScrollOffset) * 18 + 3, '(defaut)');
+  End;
+ End;
+
+ { Boutons d'action }
+ BtnX := DIALOG_X + DIALOG_WIDTH - 110;
+ BtnY := DIALOG_Y + 50;
+
+ DrawDialogButton(BtnX, BtnY, 95, DIALOG_BUTTON_HEIGHT, 'Ajouter', False, True);
+ BtnY := BtnY + 30;
+ DrawDialogButton(BtnX, BtnY, 95, DIALOG_BUTTON_HEIGHT, 'Modifier', False, SelectedAccountInList >= 0);
+ BtnY := BtnY + 30;
+ DrawDialogButton(BtnX, BtnY, 95, DIALOG_BUTTON_HEIGHT, 'Supprimer', False, SelectedAccountInList >= 0);
+ BtnY := BtnY + 30;
+ DrawDialogButton(BtnX, BtnY, 95, DIALOG_BUTTON_HEIGHT, 'Par defaut', False, SelectedAccountInList >= 0);
+ BtnY := BtnY + 30;
+ DrawDialogButton(BtnX, BtnY, 95, DIALOG_BUTTON_HEIGHT, 'Proprietes', False, SelectedAccountInList >= 0);
+
+ { Boutons de fermeture }
+ BtnY := DIALOG_Y + DIALOG_HEIGHT - DIALOG_BUTTON_HEIGHT - DIALOG_MARGIN;
+ BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH - DIALOG_MARGIN;
+ DrawDialogButton(BtnX, BtnY, DIALOG_BUTTON_WIDTH, DIALOG_BUTTON_HEIGHT, 'Fermer', False, True);
+
+ ShowMouse;
+End;
+
+{ Dessine la boite de dialogue des comptes (liste ou assistant) }
+Procedure DrawAccountManagerDialog;
+Begin
+ If AccountWizardMode Then
+  DrawAccountWizardDialog
+ Else
+  DrawAccountListDialog;
+End;
+
+{ Passe a l'etape suivante de l'assistant }
+Procedure WizardNextStep;
+Begin
+ Case AccountWizardStep Of
+  awsWelcome: Begin
+   AccountWizardStep := awsAccountInfo;
+   InitAccountInfoFields;
+  End;
+  awsAccountInfo: Begin
+   SaveAccountInfoFields;
+   AccountWizardStep := awsIncomingServer;
+   InitIncomingServerFields;
+  End;
+  awsIncomingServer: Begin
+   SaveIncomingServerFields;
+   AccountWizardStep := awsOutgoingServer;
+   InitOutgoingServerFields;
+  End;
+  awsOutgoingServer: Begin
+   SaveOutgoingServerFields;
+   AccountWizardStep := awsTestConnection;
+   ConnectionTestResult := ctrNotTested;
+  End;
+  awsTestConnection: Begin
+   AccountWizardStep := awsComplete;
+  End;
+  awsComplete: Begin
+   { Sauvegarder le compte }
+   If CurrentAccountIndex < 0 Then Begin
+    If EmailAccountCount < MAX_EMAIL_ACCOUNTS Then Begin
+     EmailAccounts[EmailAccountCount] := TempAccount;
+     { Premier compte = defaut }
+     If EmailAccountCount = 0 Then
+      EmailAccounts[EmailAccountCount].IsDefault := True;
+     Inc(EmailAccountCount);
+    End;
+   End
+   Else Begin
+    EmailAccounts[CurrentAccountIndex] := TempAccount;
+   End;
+   AccountWizardMode := False;
+   AccountDialogVisible := True;
+  End;
+ End;
+ DrawAccountManagerDialog;
+End;
+
+{ Retourne a l'etape precedente de l'assistant }
+Procedure WizardPreviousStep;
+Begin
+ Case AccountWizardStep Of
+  awsAccountInfo: AccountWizardStep := awsWelcome;
+  awsIncomingServer: Begin
+   AccountWizardStep := awsAccountInfo;
+   InitAccountInfoFields;
+  End;
+  awsOutgoingServer: Begin
+   AccountWizardStep := awsIncomingServer;
+   InitIncomingServerFields;
+  End;
+  awsTestConnection: Begin
+   AccountWizardStep := awsOutgoingServer;
+   InitOutgoingServerFields;
+  End;
+  awsComplete: AccountWizardStep := awsTestConnection;
+ End;
+ DrawAccountManagerDialog;
+End;
+
+{ Annule l'assistant }
+Procedure WizardCancel;
+Begin
+ AccountWizardMode := False;
+ AccountDialogVisible := True;
+ DrawAccountManagerDialog;
+End;
+
+{ Ouvre la boite de dialogue de gestion des comptes }
+Procedure ShowAccountManagerDialog;
+Begin
+ AccountDialogVisible := True;
+ AccountWizardMode := False;
+ SelectedAccountInList := -1;
+ If EmailAccountCount > 0 Then
+  SelectedAccountInList := 0;
+ DrawAccountManagerDialog;
+End;
+
+{ Ferme la boite de dialogue de gestion des comptes }
+Procedure HideAccountManagerDialog;
+Begin
+ AccountDialogVisible := False;
+ AccountWizardMode := False;
+ DrawInterface;
+End;
+
+{ Ouvre l'assistant pour un nouveau compte }
+Procedure StartNewAccountWizard;
+Begin
+ InitializeEmptyAccount(TempAccount);
+ CurrentAccountIndex := -1;
+ AccountWizardMode := True;
+ AccountWizardStep := awsWelcome;
+ ConnectionTestResult := ctrNotTested;
+ DrawAccountManagerDialog;
+End;
+
+{ Ouvre l'assistant pour modifier un compte existant }
+Procedure EditExistingAccount(Index: Integer);
+Begin
+ If (Index < 0) Or (Index >= EmailAccountCount) Then Exit;
+ TempAccount := EmailAccounts[Index];
+ CurrentAccountIndex := Index;
+ AccountWizardMode := True;
+ AccountWizardStep := awsAccountInfo;
+ InitAccountInfoFields;
+ DrawAccountManagerDialog;
+End;
+
+{ Supprime un compte }
+Procedure DeleteAccount(Index: Integer);
+Var
+ I: Integer;
+Begin
+ If (Index < 0) Or (Index >= EmailAccountCount) Then Exit;
+
+ { Decaler les comptes }
+ For I := Index To EmailAccountCount - 2 Do
+  EmailAccounts[I] := EmailAccounts[I + 1];
+
+ Dec(EmailAccountCount);
+
+ { Ajuster la selection }
+ If SelectedAccountInList >= EmailAccountCount Then
+  SelectedAccountInList := EmailAccountCount - 1;
+
+ DrawAccountManagerDialog;
+End;
+
+{ Definit un compte comme compte par defaut }
+Procedure SetDefaultAccount(Index: Integer);
+Var
+ I: Integer;
+Begin
+ If (Index < 0) Or (Index >= EmailAccountCount) Then Exit;
+
+ For I := 0 To EmailAccountCount - 1 Do
+  EmailAccounts[I].IsDefault := (I = Index);
+
+ DrawAccountManagerDialog;
+End;
+
+{ Gere les clics dans la boite de dialogue }
+Procedure HandleAccountDialogClick(X, Y: Integer);
+Var
+ BtnX, BtnY, ListY, I: Integer;
+Begin
+ If Not AccountDialogVisible Then Exit;
+
+ { Verifier si clic dans la boite de dialogue }
+ If (X < DIALOG_X) Or (X > DIALOG_X + DIALOG_WIDTH) Or
+    (Y < DIALOG_Y) Or (Y > DIALOG_Y + DIALOG_HEIGHT) Then Begin
+  HideAccountManagerDialog;
+  Exit;
+ End;
+
+ If AccountWizardMode Then Begin
+  { Mode assistant }
+  BtnY := DIALOG_Y + DIALOG_HEIGHT - DIALOG_BUTTON_HEIGHT - DIALOG_MARGIN;
+
+  { Bouton Annuler }
+  BtnX := DIALOG_X + DIALOG_MARGIN;
+  If (X >= BtnX) And (X <= BtnX + DIALOG_BUTTON_WIDTH) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) Then Begin
+   WizardCancel;
+   Exit;
+  End;
+
+  { Bouton Precedent }
+  BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH * 3 - DIALOG_MARGIN * 2 - 10;
+  If (X >= BtnX) And (X <= BtnX + DIALOG_BUTTON_WIDTH) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) And
+     (AccountWizardStep > awsWelcome) Then Begin
+   WizardPreviousStep;
+   Exit;
+  End;
+
+  { Bouton Suivant/Terminer }
+  BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH * 2 - DIALOG_MARGIN - 5;
+  If (X >= BtnX) And (X <= BtnX + DIALOG_BUTTON_WIDTH) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) Then Begin
+   WizardNextStep;
+   Exit;
+  End;
+
+  { Bouton Tester (page test) }
+  If AccountWizardStep = awsTestConnection Then Begin
+   BtnY := DIALOG_Y + 225;
+   If (X >= DIALOG_X + DIALOG_MARGIN) And (X <= DIALOG_X + DIALOG_MARGIN + 80) And
+      (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) And
+      Not ConnectionTestInProgress Then Begin
+    RunConnectionTest;
+    DrawAccountManagerDialog;
+    Exit;
+   End;
+  End;
+
+  { Gerer les clics sur les champs de saisie }
+  For I := 0 To 3 Do Begin
+   If (X >= AccountDialogInputFields[I].X) And
+      (X <= AccountDialogInputFields[I].X + AccountDialogInputFields[I].Width) And
+      (Y >= AccountDialogInputFields[I].Y) And
+      (Y <= AccountDialogInputFields[I].Y + DIALOG_INPUT_HEIGHT) Then Begin
+    { Deselectionner tous les champs }
+    AccountDialogInputFields[0].IsFocused := False;
+    AccountDialogInputFields[1].IsFocused := False;
+    AccountDialogInputFields[2].IsFocused := False;
+    AccountDialogInputFields[3].IsFocused := False;
+    { Selectionner ce champ }
+    AccountDialogInputFields[I].IsFocused := True;
+    FocusedInputField := I;
+    DrawAccountManagerDialog;
+    Exit;
+   End;
+  End;
+
+  { Gerer les clics sur les boutons radio }
+  For I := 0 To 4 Do Begin
+   If (X >= AccountDialogRadioButtons[I].X) And
+      (X <= AccountDialogRadioButtons[I].X + 100) And
+      (Y >= AccountDialogRadioButtons[I].Y) And
+      (Y <= AccountDialogRadioButtons[I].Y + 14) Then Begin
+    { Deselectionner tous les boutons du meme groupe }
+    Case AccountDialogRadioButtons[I].GroupID Of
+     1: Begin { Type serveur }
+      AccountDialogRadioButtons[0].Checked := False;
+      AccountDialogRadioButtons[1].Checked := False;
+     End;
+     2: Begin { Securite entrante }
+      AccountDialogRadioButtons[2].Checked := False;
+      AccountDialogRadioButtons[3].Checked := False;
+      AccountDialogRadioButtons[4].Checked := False;
+     End;
+     3: Begin { Securite sortante }
+      AccountDialogRadioButtons[0].Checked := False;
+      AccountDialogRadioButtons[1].Checked := False;
+      AccountDialogRadioButtons[2].Checked := False;
+     End;
+    End;
+    AccountDialogRadioButtons[I].Checked := True;
+    DrawAccountManagerDialog;
+    Exit;
+   End;
+  End;
+
+  { Gerer les clics sur les cases a cocher }
+  For I := 0 To 1 Do Begin
+   If (X >= AccountDialogCheckBoxes[I].X) And
+      (X <= AccountDialogCheckBoxes[I].X + 150) And
+      (Y >= AccountDialogCheckBoxes[I].Y) And
+      (Y <= AccountDialogCheckBoxes[I].Y + 14) Then Begin
+    AccountDialogCheckBoxes[I].Checked := Not AccountDialogCheckBoxes[I].Checked;
+    DrawAccountManagerDialog;
+    Exit;
+   End;
+  End;
+ End
+ Else Begin
+  { Mode liste des comptes }
+  BtnX := DIALOG_X + DIALOG_WIDTH - 110;
+
+  { Bouton Ajouter }
+  BtnY := DIALOG_Y + 50;
+  If (X >= BtnX) And (X <= BtnX + 95) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) Then Begin
+   StartNewAccountWizard;
+   Exit;
+  End;
+
+  { Bouton Modifier }
+  BtnY := BtnY + 30;
+  If (X >= BtnX) And (X <= BtnX + 95) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) And
+     (SelectedAccountInList >= 0) Then Begin
+   EditExistingAccount(SelectedAccountInList);
+   Exit;
+  End;
+
+  { Bouton Supprimer }
+  BtnY := BtnY + 30;
+  If (X >= BtnX) And (X <= BtnX + 95) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) And
+     (SelectedAccountInList >= 0) Then Begin
+   DeleteAccount(SelectedAccountInList);
+   Exit;
+  End;
+
+  { Bouton Par defaut }
+  BtnY := BtnY + 30;
+  If (X >= BtnX) And (X <= BtnX + 95) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) And
+     (SelectedAccountInList >= 0) Then Begin
+   SetDefaultAccount(SelectedAccountInList);
+   Exit;
+  End;
+
+  { Bouton Proprietes }
+  BtnY := BtnY + 30;
+  If (X >= BtnX) And (X <= BtnX + 95) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) And
+     (SelectedAccountInList >= 0) Then Begin
+   EditExistingAccount(SelectedAccountInList);
+   Exit;
+  End;
+
+  { Bouton Fermer }
+  BtnY := DIALOG_Y + DIALOG_HEIGHT - DIALOG_BUTTON_HEIGHT - DIALOG_MARGIN;
+  BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH - DIALOG_MARGIN;
+  If (X >= BtnX) And (X <= BtnX + DIALOG_BUTTON_WIDTH) And
+     (Y >= BtnY) And (Y <= BtnY + DIALOG_BUTTON_HEIGHT) Then Begin
+   HideAccountManagerDialog;
+   Exit;
+  End;
+
+  { Clic dans la liste des comptes }
+  ListY := DIALOG_Y + 50;
+  If (X >= DIALOG_X + DIALOG_MARGIN) And (X <= DIALOG_X + DIALOG_WIDTH - 120) And
+     (Y >= ListY) And (Y <= ListY + 180) Then Begin
+   I := (Y - ListY) Div 18 + AccountListScrollOffset;
+   If (I >= 0) And (I < EmailAccountCount) Then Begin
+    SelectedAccountInList := I;
+    DrawAccountManagerDialog;
+   End;
+  End;
+ End;
+End;
+
+{ Gere les touches clavier dans la boite de dialogue }
+Procedure HandleAccountDialogKeyPress(Key: Char);
+Var
+ FieldValue: String;
+Begin
+ If Not AccountDialogVisible Then Exit;
+ If Not AccountWizardMode Then Exit;
+ If FocusedInputField < 0 Then Exit;
+
+ FieldValue := AccountDialogInputFields[FocusedInputField].Value;
+
+ If Key = #8 Then Begin { Backspace }
+  If Length(FieldValue) > 0 Then Begin
+   Delete(FieldValue, Length(FieldValue), 1);
+   AccountDialogInputFields[FocusedInputField].Value := FieldValue;
+   DrawAccountManagerDialog;
+  End;
+ End
+ Else If Key = #9 Then Begin { Tab }
+  AccountDialogInputFields[FocusedInputField].IsFocused := False;
+  Inc(FocusedInputField);
+  If FocusedInputField > 3 Then FocusedInputField := 0;
+  AccountDialogInputFields[FocusedInputField].IsFocused := True;
+  DrawAccountManagerDialog;
+ End
+ Else If Key = #13 Then Begin { Enter }
+  WizardNextStep;
+ End
+ Else If Key = #27 Then Begin { Escape }
+  WizardCancel;
+ End
+ Else If (Key >= ' ') And (Key <= '~') Then Begin { Caracteres imprimables }
+  If Length(FieldValue) < AccountDialogInputFields[FocusedInputField].MaxLen Then Begin
+   FieldValue := FieldValue + Key;
+   AccountDialogInputFields[FocusedInputField].Value := FieldValue;
+   DrawAccountManagerDialog;
+  End;
+ End;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU GESTIONNAIRE DE COMPTES
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -6450,8 +7947,12 @@ Begin
 
   { Détection du clic gauche (bouton enfoncé) }
   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+   { Gerer les clics dans la boite de dialogue des comptes }
+   If AccountDialogVisible Then Begin
+    HandleAccountDialogClick(MouseX, MouseY);
+   End
    { Fermer le menu contextuel si clic ailleurs }
-   If ContextMenuVisible Then Begin
+   Else If ContextMenuVisible Then Begin
     ClickedMsg := GetContextMenuItemAtPoint(MouseX, MouseY);
     If ClickedMsg >= 0 Then Begin
      { Executer la commande du menu }
@@ -6510,7 +8011,11 @@ Begin
   { Vérification des touches du clavier }
   If KeyPressed Then Begin
    Key := ReadKey;
-   If Key = #27 Then Begin
+   { Gerer les touches dans la boite de dialogue des comptes }
+   If AccountDialogVisible Then Begin
+    HandleAccountDialogKeyPress(Key);
+   End
+   Else If Key = #27 Then Begin
     If TooltipVisible Then
      HideTooltip
     Else If ActiveMenu >= 0 Then
@@ -6557,6 +8062,9 @@ BEGIN
 
  { Initialisation de la liste des messages }
  InitializeMessageList;
+
+ { Initialisation du gestionnaire de comptes (TODO 11) }
+ InitializeAccountManager;
 
  { Affichage de l'interface }
  ShowMouse;
