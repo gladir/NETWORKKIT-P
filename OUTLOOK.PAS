@@ -84,7 +84,7 @@
       - Test de connexion automatique
       - Stockage sécurisé des mots de passe
 
-  12. [ ] Compositeur de messages graphique
+  12. [x] Compositeur de messages graphique
       - Fenêtre de rédaction avec champs À, Cc, Cci, Objet
       - Zone d'édition de texte avec curseur clignotant
       - Formatage de base: gras, italique, souligné, couleur
@@ -817,6 +817,61 @@ Type
   Checked: Boolean;            { Cochee }
  End;
 
+ { ============================================================================
+   TYPES ET STRUCTURES POUR LE COMPOSITEUR DE MESSAGES (TODO 12)
+   ============================================================================ }
+
+ { Options de formatage du texte }
+ TTextFormat = Record
+  Bold: Boolean;               { Texte en gras }
+  Italic: Boolean;             { Texte en italique }
+  Underline: Boolean;          { Texte souligne }
+  FontColor: Word;             { Couleur du texte }
+ End;
+
+ { Structure pour une ligne de texte dans l'editeur }
+ TEditorLine = Record
+  Text: String[250];           { Contenu de la ligne }
+  Format: TTextFormat;         { Formatage de la ligne }
+ End;
+
+ { Etat du compositeur de messages }
+ TComposerState = (
+  csNew,                       { Nouveau message }
+  csReply,                     { Reponse }
+  csReplyAll,                  { Reponse a tous }
+  csForward,                   { Transfert }
+  csDraft                      { Brouillon }
+ );
+
+ { Structure complete du compositeur de messages }
+ TMessageComposer = Record
+  { Champs d'en-tete }
+  ToField: String[250];        { Destinataires }
+  CcField: String[250];        { Copie carbone }
+  BccField: String[250];       { Copie carbone invisible }
+  SubjectField: String[80];    { Objet }
+
+  { Corps du message }
+  Lines: Array[0..499] of TEditorLine; { Lignes de texte (max 500) }
+  LineCount: Integer;          { Nombre de lignes }
+  CursorX: Integer;            { Position X du curseur (caractere) }
+  CursorY: Integer;            { Position Y du curseur (ligne) }
+  ScrollX: Integer;            { Defilement horizontal }
+  ScrollY: Integer;            { Defilement vertical }
+  SelectStartX, SelectStartY: Integer; { Debut de selection }
+  SelectEndX, SelectEndY: Integer;     { Fin de selection }
+  HasSelection: Boolean;       { Selection active }
+
+  { Formatage actuel }
+  CurrentFormat: TTextFormat;  { Format applique aux nouvelles saisies }
+
+  { Etat }
+  State: TComposerState;       { Etat du compositeur }
+  Modified: Boolean;           { Message modifie }
+  OriginalMsgID: String[20];   { ID du message original (reponse/transfert) }
+ End;
+
 Const
  { Identifiants des commandes de menu }
  CMD_FILE_NEW      = 101;
@@ -1058,6 +1113,43 @@ Const
  DEFAULT_SMTP_SUBMISSION_PORT = 587;
  DEFAULT_SMTPS_PORT = 465;
 
+ { ============================================================================
+   CONSTANTES POUR LE COMPOSITEUR DE MESSAGES (TODO 12)
+   ============================================================================ }
+
+ { Dimensions de la fenetre du compositeur }
+ COMPOSER_WIDTH = 550;
+ COMPOSER_HEIGHT = 400;
+ COMPOSER_X = (SCREEN_WIDTH - COMPOSER_WIDTH) Div 2;
+ COMPOSER_Y = (SCREEN_HEIGHT - COMPOSER_HEIGHT) Div 2;
+
+ { Zones de la fenetre du compositeur }
+ COMPOSER_HEADER_HEIGHT = 120;    { Zone des champs d'en-tete }
+ COMPOSER_TOOLBAR_HEIGHT = 28;    { Barre d'outils de formatage }
+ COMPOSER_FIELD_HEIGHT = 20;      { Hauteur d'un champ de saisie }
+ COMPOSER_FIELD_SPACING = 26;     { Espacement entre champs }
+ COMPOSER_LABEL_WIDTH = 50;       { Largeur des etiquettes }
+
+ { Identifiants des champs du compositeur }
+ COMP_FIELD_TO = 0;
+ COMP_FIELD_CC = 1;
+ COMP_FIELD_BCC = 2;
+ COMP_FIELD_SUBJECT = 3;
+ COMP_FIELD_BODY = 4;
+
+ { Nombre max de lignes dans l'editeur }
+ COMPOSER_MAX_LINES = 500;
+
+ { Largeur max visible dans l'editeur }
+ COMPOSER_EDITOR_VISIBLE_COLS = 70;
+ COMPOSER_EDITOR_VISIBLE_ROWS = 12;
+
+ { Couleurs de formatage disponibles }
+ FORMAT_COLOR_BLACK = 0;
+ FORMAT_COLOR_RED = 4;
+ FORMAT_COLOR_GREEN = 2;
+ FORMAT_COLOR_BLUE = 1;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1179,6 +1271,17 @@ Var
  FocusedInputField: Integer;           { Index du champ de saisie actif }
  ConnectionTestInProgress: Boolean;    { Test de connexion en cours }
  ConnectionTestResult: TConnectionTestResult; { Resultat du test }
+
+ { Variables globales pour le compositeur de messages (TODO 12) }
+ Composer: TMessageComposer;            { Instance du compositeur }
+ ComposerVisible: Boolean;              { Fenetre du compositeur visible }
+ ComposerFocusedField: Integer;         { Champ actif (0-4) }
+ ComposerCursorVisible: Boolean;        { Curseur visible (clignotement) }
+ ComposerCursorTimer: LongInt;          { Timer pour le clignotement }
+ ComposerInputFields: Array[0..3] of TInputField; { Champs d'en-tete }
+ ComposerFormatBold: Boolean;           { Bouton gras actif }
+ ComposerFormatItalic: Boolean;         { Bouton italique actif }
+ ComposerFormatUnderline: Boolean;      { Bouton souligne actif }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -2047,15 +2150,24 @@ Begin
  CloseDropdownMenu;
 
  Case CmdID Of
-  CMD_FILE_NEW: Begin
-   { TODO: Nouveau message }
-   HideMouse;
-   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
-            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
-   SetColor(COLOR_STATUS_TEXT);
-   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
-             'Commande: Nouveau message          ');
-   ShowMouse;
+  CMD_FILE_NEW, CMD_MSG_NEW: Begin
+   { Ouvrir le compositeur pour un nouveau message (TODO 12) }
+   OpenNewMessage;
+  End;
+
+  CMD_MSG_REPLY: Begin
+   { Ouvrir le compositeur pour une reponse (TODO 12) }
+   OpenReplyMessage(False);
+  End;
+
+  CMD_MSG_REPLYALL: Begin
+   { Ouvrir le compositeur pour une reponse a tous (TODO 12) }
+   OpenReplyMessage(True);
+  End;
+
+  CMD_MSG_FORWARD: Begin
+   { Ouvrir le compositeur pour un transfert (TODO 12) }
+   OpenForwardMessage;
   End;
 
   CMD_FILE_EXIT: Begin
@@ -6367,6 +6479,775 @@ End;
   FIN DE L'IMPLEMENTATION DU GESTIONNAIRE DE COMPTES
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU COMPOSITEUR DE MESSAGES (TODO 12)
+  ============================================================================ }
+
+{ Initialise le compositeur de messages }
+Procedure InitializeComposer;
+Var
+ I: Integer;
+Begin
+ ComposerVisible := False;
+ ComposerFocusedField := COMP_FIELD_TO;
+ ComposerCursorVisible := True;
+ ComposerCursorTimer := 0;
+ ComposerFormatBold := False;
+ ComposerFormatItalic := False;
+ ComposerFormatUnderline := False;
+
+ { Initialiser le compositeur }
+ Composer.ToField := '';
+ Composer.CcField := '';
+ Composer.BccField := '';
+ Composer.SubjectField := '';
+ Composer.LineCount := 1;
+ Composer.CursorX := 0;
+ Composer.CursorY := 0;
+ Composer.ScrollX := 0;
+ Composer.ScrollY := 0;
+ Composer.HasSelection := False;
+ Composer.Modified := False;
+ Composer.State := csNew;
+ Composer.OriginalMsgID := '';
+
+ { Format par defaut }
+ Composer.CurrentFormat.Bold := False;
+ Composer.CurrentFormat.Italic := False;
+ Composer.CurrentFormat.Underline := False;
+ Composer.CurrentFormat.FontColor := COLOR_MENU_TEXT;
+
+ { Initialiser les lignes vides }
+ For I := 0 To COMPOSER_MAX_LINES - 1 Do Begin
+  Composer.Lines[I].Text := '';
+  Composer.Lines[I].Format.Bold := False;
+  Composer.Lines[I].Format.Italic := False;
+  Composer.Lines[I].Format.Underline := False;
+  Composer.Lines[I].Format.FontColor := COLOR_MENU_TEXT;
+ End;
+End;
+
+{ Initialise les champs d'en-tete du compositeur }
+Procedure InitComposerFields;
+Var
+ BaseX, BaseY: Integer;
+Begin
+ BaseX := COMPOSER_X + COMPOSER_LABEL_WIDTH + 10;
+ BaseY := COMPOSER_Y + 28;
+
+ { Champ A: (destinataires) }
+ ComposerInputFields[0].X := BaseX;
+ ComposerInputFields[0].Y := BaseY;
+ ComposerInputFields[0].Width := COMPOSER_WIDTH - COMPOSER_LABEL_WIDTH - 30;
+ ComposerInputFields[0].MaxLen := 250;
+ ComposerInputFields[0].Value := Composer.ToField;
+ ComposerInputFields[0].IsPassword := False;
+ ComposerInputFields[0].IsFocused := True;
+ ComposerInputFields[0].CursorPos := Length(Composer.ToField);
+ ComposerInputFields[0].Label_ := 'A:';
+
+ { Champ Cc: }
+ BaseY := BaseY + COMPOSER_FIELD_SPACING;
+ ComposerInputFields[1].X := BaseX;
+ ComposerInputFields[1].Y := BaseY;
+ ComposerInputFields[1].Width := COMPOSER_WIDTH - COMPOSER_LABEL_WIDTH - 30;
+ ComposerInputFields[1].MaxLen := 250;
+ ComposerInputFields[1].Value := Composer.CcField;
+ ComposerInputFields[1].IsPassword := False;
+ ComposerInputFields[1].IsFocused := False;
+ ComposerInputFields[1].CursorPos := Length(Composer.CcField);
+ ComposerInputFields[1].Label_ := 'Cc:';
+
+ { Champ Cci: }
+ BaseY := BaseY + COMPOSER_FIELD_SPACING;
+ ComposerInputFields[2].X := BaseX;
+ ComposerInputFields[2].Y := BaseY;
+ ComposerInputFields[2].Width := COMPOSER_WIDTH - COMPOSER_LABEL_WIDTH - 30;
+ ComposerInputFields[2].MaxLen := 250;
+ ComposerInputFields[2].Value := Composer.BccField;
+ ComposerInputFields[2].IsPassword := False;
+ ComposerInputFields[2].IsFocused := False;
+ ComposerInputFields[2].CursorPos := Length(Composer.BccField);
+ ComposerInputFields[2].Label_ := 'Cci:';
+
+ { Champ Objet: }
+ BaseY := BaseY + COMPOSER_FIELD_SPACING;
+ ComposerInputFields[3].X := BaseX;
+ ComposerInputFields[3].Y := BaseY;
+ ComposerInputFields[3].Width := COMPOSER_WIDTH - COMPOSER_LABEL_WIDTH - 30;
+ ComposerInputFields[3].MaxLen := 80;
+ ComposerInputFields[3].Value := Composer.SubjectField;
+ ComposerInputFields[3].IsPassword := False;
+ ComposerInputFields[3].IsFocused := False;
+ ComposerInputFields[3].CursorPos := Length(Composer.SubjectField);
+ ComposerInputFields[3].Label_ := 'Objet:';
+
+ ComposerFocusedField := COMP_FIELD_TO;
+End;
+
+{ Sauvegarde les valeurs des champs d'en-tete }
+Procedure SaveComposerFields;
+Begin
+ Composer.ToField := ComposerInputFields[0].Value;
+ Composer.CcField := ComposerInputFields[1].Value;
+ Composer.BccField := ComposerInputFields[2].Value;
+ Composer.SubjectField := ComposerInputFields[3].Value;
+End;
+
+{ Dessine un bouton de formatage }
+Procedure DrawFormatButton(X, Y, W, H: Integer; Caption: String; Pressed: Boolean);
+Begin
+ { Fond du bouton }
+ If Pressed Then
+  SetFillStyle(SolidFill, COLOR_LIST_SELECTED)
+ Else
+  SetFillStyle(SolidFill, COLOR_BUTTON_FACE);
+ Bar(X, Y, X + W, Y + H);
+
+ { Relief 3D }
+ Draw3DRect(X, Y, X + W, Y + H, Not Pressed);
+
+ { Texte centre }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(X + (W - TextWidth(Caption)) Div 2, Y + (H - TextHeight(Caption)) Div 2, Caption);
+End;
+
+{ Dessine la barre d'outils de formatage }
+Procedure DrawComposerToolbar;
+Var
+ ToolbarY, BtnX: Integer;
+Begin
+ ToolbarY := COMPOSER_Y + COMPOSER_HEADER_HEIGHT + 2;
+
+ { Fond de la barre d'outils }
+ SetFillStyle(SolidFill, COLOR_BUTTON_FACE);
+ Bar(COMPOSER_X + 2, ToolbarY, COMPOSER_X + COMPOSER_WIDTH - 2, ToolbarY + COMPOSER_TOOLBAR_HEIGHT - 2);
+
+ { Bordure }
+ SetColor(COLOR_BUTTON_DARK);
+ Line(COMPOSER_X + 2, ToolbarY + COMPOSER_TOOLBAR_HEIGHT - 1,
+      COMPOSER_X + COMPOSER_WIDTH - 2, ToolbarY + COMPOSER_TOOLBAR_HEIGHT - 1);
+
+ { Boutons de formatage }
+ BtnX := COMPOSER_X + 8;
+
+ { Bouton Gras (B) }
+ DrawFormatButton(BtnX, ToolbarY + 3, 24, 20, 'B', ComposerFormatBold);
+ BtnX := BtnX + 28;
+
+ { Bouton Italique (I) }
+ DrawFormatButton(BtnX, ToolbarY + 3, 24, 20, 'I', ComposerFormatItalic);
+ BtnX := BtnX + 28;
+
+ { Bouton Souligne (S) }
+ DrawFormatButton(BtnX, ToolbarY + 3, 24, 20, 'S', ComposerFormatUnderline);
+ BtnX := BtnX + 35;
+
+ { Separateur }
+ SetColor(COLOR_BUTTON_DARK);
+ Line(BtnX, ToolbarY + 5, BtnX, ToolbarY + COMPOSER_TOOLBAR_HEIGHT - 7);
+ SetColor(COLOR_BUTTON_LIGHT);
+ Line(BtnX + 1, ToolbarY + 5, BtnX + 1, ToolbarY + COMPOSER_TOOLBAR_HEIGHT - 7);
+
+ { Etiquette couleur }
+ BtnX := BtnX + 10;
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(BtnX, ToolbarY + 8, 'Couleur:');
+ BtnX := BtnX + 55;
+
+ { Bouton couleur noire }
+ SetFillStyle(SolidFill, Black);
+ Bar(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ BtnX := BtnX + 20;
+
+ { Bouton couleur rouge }
+ SetFillStyle(SolidFill, LightRed);
+ Bar(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ BtnX := BtnX + 20;
+
+ { Bouton couleur verte }
+ SetFillStyle(SolidFill, LightGreen);
+ Bar(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ BtnX := BtnX + 20;
+
+ { Bouton couleur bleue }
+ SetFillStyle(SolidFill, LightBlue);
+ Bar(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(BtnX, ToolbarY + 5, BtnX + 16, ToolbarY + 18);
+End;
+
+{ Dessine un champ de saisie du compositeur }
+Procedure DrawComposerField(Var Field: TInputField);
+Var
+ DisplayText: String;
+Begin
+ { Etiquette a gauche }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(COMPOSER_X + 10, Field.Y + 4, Field.Label_);
+
+ { Fond du champ }
+ If Field.IsFocused Then
+  SetFillStyle(SolidFill, COLOR_LIST_BG)
+ Else
+  SetFillStyle(SolidFill, COLOR_WINDOW_BG);
+ Bar(Field.X, Field.Y, Field.X + Field.Width, Field.Y + COMPOSER_FIELD_HEIGHT);
+
+ { Bordure 3D inversee }
+ Draw3DRect(Field.X, Field.Y, Field.X + Field.Width, Field.Y + COMPOSER_FIELD_HEIGHT, False);
+
+ { Texte }
+ DisplayText := Field.Value;
+ { Tronquer si trop long }
+ While TextWidth(DisplayText) > Field.Width - 8 Do
+  Delete(DisplayText, 1, 1);
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(Field.X + 4, Field.Y + 4, DisplayText);
+
+ { Curseur si actif }
+ If Field.IsFocused And ComposerCursorVisible Then Begin
+  SetColor(COLOR_MENU_TEXT);
+  Line(Field.X + 4 + TextWidth(DisplayText), Field.Y + 3,
+       Field.X + 4 + TextWidth(DisplayText), Field.Y + COMPOSER_FIELD_HEIGHT - 3);
+ End;
+End;
+
+{ Dessine la zone d'edition du compositeur }
+Procedure DrawComposerEditor;
+Var
+ EditorX, EditorY, EditorW, EditorH: Integer;
+ I, LineY, VisibleLine: Integer;
+ DisplayText: String;
+ LineFormat: TTextFormat;
+Begin
+ EditorX := COMPOSER_X + 4;
+ EditorY := COMPOSER_Y + COMPOSER_HEADER_HEIGHT + COMPOSER_TOOLBAR_HEIGHT + 4;
+ EditorW := COMPOSER_WIDTH - 8;
+ EditorH := COMPOSER_HEIGHT - COMPOSER_HEADER_HEIGHT - COMPOSER_TOOLBAR_HEIGHT - 45;
+
+ { Fond de l'editeur }
+ SetFillStyle(SolidFill, COLOR_LIST_BG);
+ Bar(EditorX, EditorY, EditorX + EditorW, EditorY + EditorH);
+
+ { Bordure 3D }
+ Draw3DRect(EditorX, EditorY, EditorX + EditorW, EditorY + EditorH, False);
+
+ { Dessiner les lignes de texte }
+ LineY := EditorY + 4;
+ For I := 0 To COMPOSER_EDITOR_VISIBLE_ROWS - 1 Do Begin
+  VisibleLine := Composer.ScrollY + I;
+  If VisibleLine < Composer.LineCount Then Begin
+   DisplayText := Composer.Lines[VisibleLine].Text;
+   LineFormat := Composer.Lines[VisibleLine].Format;
+
+   { Appliquer le defilement horizontal }
+   If Composer.ScrollX > 0 Then Begin
+    If Length(DisplayText) > Composer.ScrollX Then
+     Delete(DisplayText, 1, Composer.ScrollX)
+    Else
+     DisplayText := '';
+   End;
+
+   { Tronquer si trop long }
+   If Length(DisplayText) > COMPOSER_EDITOR_VISIBLE_COLS Then
+    DisplayText := Copy(DisplayText, 1, COMPOSER_EDITOR_VISIBLE_COLS);
+
+   { Appliquer le formatage }
+   SetColor(LineFormat.FontColor);
+   { Note: Le formatage gras/italique/souligne necessiterait
+     des polices differentes, simplifie ici }
+   OutTextXY(EditorX + 4, LineY, DisplayText);
+  End;
+  LineY := LineY + 14;
+ End;
+
+ { Dessiner le curseur si dans l'editeur }
+ If (ComposerFocusedField = COMP_FIELD_BODY) And ComposerCursorVisible Then Begin
+  If (Composer.CursorY >= Composer.ScrollY) And
+     (Composer.CursorY < Composer.ScrollY + COMPOSER_EDITOR_VISIBLE_ROWS) Then Begin
+   LineY := EditorY + 4 + (Composer.CursorY - Composer.ScrollY) * 14;
+   DisplayText := Copy(Composer.Lines[Composer.CursorY].Text, Composer.ScrollX + 1,
+                       Composer.CursorX - Composer.ScrollX);
+   SetColor(COLOR_MENU_TEXT);
+   Line(EditorX + 4 + TextWidth(DisplayText), LineY,
+        EditorX + 4 + TextWidth(DisplayText), LineY + 12);
+  End;
+ End;
+End;
+
+{ Dessine les boutons d'action du compositeur }
+Procedure DrawComposerButtons;
+Var
+ BtnY, BtnX: Integer;
+Begin
+ BtnY := COMPOSER_Y + COMPOSER_HEIGHT - 30;
+
+ { Bouton Envoyer }
+ BtnX := COMPOSER_X + 10;
+ DrawDialogButton(BtnX, BtnY, 80, 22, 'Envoyer', False, True);
+
+ { Bouton Brouillon }
+ BtnX := BtnX + 90;
+ DrawDialogButton(BtnX, BtnY, 80, 22, 'Brouillon', False, True);
+
+ { Bouton Annuler }
+ BtnX := COMPOSER_X + COMPOSER_WIDTH - 90;
+ DrawDialogButton(BtnX, BtnY, 80, 22, 'Annuler', False, True);
+End;
+
+{ Dessine la fenetre complete du compositeur }
+Procedure DrawComposerWindow;
+Var
+ Title: String;
+ I: Integer;
+Begin
+ If Not ComposerVisible Then Exit;
+
+ HideMouse;
+
+ { Titre selon l'etat }
+ Case Composer.State Of
+  csNew:      Title := 'Nouveau message';
+  csReply:    Title := 'Re: ' + Composer.SubjectField;
+  csReplyAll: Title := 'Re: ' + Composer.SubjectField;
+  csForward:  Title := 'Fwd: ' + Composer.SubjectField;
+  csDraft:    Title := 'Brouillon';
+  Else        Title := 'Message';
+ End;
+
+ { Dessiner la boite de dialogue }
+ DrawDialogBox(COMPOSER_X, COMPOSER_Y, COMPOSER_WIDTH, COMPOSER_HEIGHT, Title);
+
+ { Dessiner les champs d'en-tete }
+ For I := 0 To 3 Do
+  DrawComposerField(ComposerInputFields[I]);
+
+ { Barre d'outils de formatage }
+ DrawComposerToolbar;
+
+ { Zone d'edition }
+ DrawComposerEditor;
+
+ { Boutons d'action }
+ DrawComposerButtons;
+
+ ShowMouse;
+End;
+
+{ Ouvre le compositeur pour un nouveau message }
+Procedure OpenNewMessage;
+Begin
+ InitializeComposer;
+ Composer.State := csNew;
+ ComposerVisible := True;
+ InitComposerFields;
+ DrawComposerWindow;
+End;
+
+{ Ouvre le compositeur pour une reponse }
+Procedure OpenReplyMessage(ReplyAll: Boolean);
+Var
+ OrigMsg: TMessage;
+Begin
+ If SelectedMessage < 0 Then Exit;
+
+ InitializeComposer;
+ OrigMsg := Messages[SelectedMessage];
+
+ { Preparer l'en-tete }
+ Composer.ToField := OrigMsg.FromEmail;
+ If ReplyAll Then Begin
+  Composer.CcField := OrigMsg.CcEmail;
+  Composer.State := csReplyAll;
+ End
+ Else
+  Composer.State := csReply;
+
+ { Objet avec Re: }
+ If Pos('Re:', OrigMsg.Subject) <> 1 Then
+  Composer.SubjectField := 'Re: ' + OrigMsg.Subject
+ Else
+  Composer.SubjectField := OrigMsg.Subject;
+
+ Composer.OriginalMsgID := OrigMsg.MsgID;
+
+ { Preparer le corps avec citation }
+ Composer.Lines[0].Text := '';
+ Composer.Lines[1].Text := '--- Message original ---';
+ Composer.Lines[2].Text := 'De: ' + OrigMsg.FromName + ' <' + OrigMsg.FromEmail + '>';
+ Composer.Lines[3].Text := 'Date: ' + OrigMsg.DateFull;
+ Composer.Lines[4].Text := 'Objet: ' + OrigMsg.Subject;
+ Composer.Lines[5].Text := '';
+ Composer.LineCount := 6;
+
+ ComposerVisible := True;
+ InitComposerFields;
+ DrawComposerWindow;
+End;
+
+{ Ouvre le compositeur pour un transfert }
+Procedure OpenForwardMessage;
+Var
+ OrigMsg: TMessage;
+Begin
+ If SelectedMessage < 0 Then Exit;
+
+ InitializeComposer;
+ OrigMsg := Messages[SelectedMessage];
+
+ Composer.State := csForward;
+
+ { Objet avec Fwd: }
+ If Pos('Fwd:', OrigMsg.Subject) <> 1 Then
+  Composer.SubjectField := 'Fwd: ' + OrigMsg.Subject
+ Else
+  Composer.SubjectField := OrigMsg.Subject;
+
+ Composer.OriginalMsgID := OrigMsg.MsgID;
+
+ { Preparer le corps avec le message original }
+ Composer.Lines[0].Text := '';
+ Composer.Lines[1].Text := '---------- Message transfere ----------';
+ Composer.Lines[2].Text := 'De: ' + OrigMsg.FromName + ' <' + OrigMsg.FromEmail + '>';
+ Composer.Lines[3].Text := 'Date: ' + OrigMsg.DateFull;
+ Composer.Lines[4].Text := 'A: ' + OrigMsg.ToEmail;
+ Composer.Lines[5].Text := 'Objet: ' + OrigMsg.Subject;
+ Composer.Lines[6].Text := '';
+ Composer.LineCount := 7;
+
+ ComposerVisible := True;
+ InitComposerFields;
+ DrawComposerWindow;
+End;
+
+{ Ferme le compositeur }
+Procedure CloseComposer;
+Begin
+ ComposerVisible := False;
+ DrawInterface;
+End;
+
+{ Sauvegarde le message comme brouillon }
+Procedure SaveDraft;
+Begin
+ SaveComposerFields;
+ { Ici on sauvegarderait le brouillon }
+ { Pour l'instant, afficher un message }
+ HideMouse;
+ FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+          Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+ SetColor(COLOR_STATUS_TEXT);
+ OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+           'Brouillon enregistre                ');
+ ShowMouse;
+ Composer.Modified := False;
+End;
+
+{ Envoie le message }
+Procedure SendMessage;
+Begin
+ SaveComposerFields;
+
+ { Verifier les champs obligatoires }
+ If Composer.ToField = '' Then Begin
+  { Afficher erreur }
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(LightRed);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Erreur: Destinataire requis!        ');
+  ShowMouse;
+  Exit;
+ End;
+
+ { Ici on enverrait le message via SMTP }
+ { Pour l'instant, simuler l'envoi }
+ HideMouse;
+ FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+          Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+ SetColor(LightGreen);
+ OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+           'Message envoye avec succes!         ');
+ ShowMouse;
+
+ CloseComposer;
+End;
+
+{ Gere les clics dans le compositeur }
+Procedure HandleComposerClick(X, Y: Integer);
+Var
+ I, BtnX, BtnY, ToolbarY: Integer;
+ EditorX, EditorY, EditorW, EditorH: Integer;
+ ClickedLine: Integer;
+Begin
+ If Not ComposerVisible Then Exit;
+
+ { Verifier si clic hors de la fenetre }
+ If (X < COMPOSER_X) Or (X > COMPOSER_X + COMPOSER_WIDTH) Or
+    (Y < COMPOSER_Y) Or (Y > COMPOSER_Y + COMPOSER_HEIGHT) Then Begin
+  CloseComposer;
+  Exit;
+ End;
+
+ { Verifier les boutons d'action }
+ BtnY := COMPOSER_Y + COMPOSER_HEIGHT - 30;
+
+ { Bouton Envoyer }
+ BtnX := COMPOSER_X + 10;
+ If (X >= BtnX) And (X <= BtnX + 80) And (Y >= BtnY) And (Y <= BtnY + 22) Then Begin
+  SendMessage;
+  Exit;
+ End;
+
+ { Bouton Brouillon }
+ BtnX := BtnX + 90;
+ If (X >= BtnX) And (X <= BtnX + 80) And (Y >= BtnY) And (Y <= BtnY + 22) Then Begin
+  SaveDraft;
+  Exit;
+ End;
+
+ { Bouton Annuler }
+ BtnX := COMPOSER_X + COMPOSER_WIDTH - 90;
+ If (X >= BtnX) And (X <= BtnX + 80) And (Y >= BtnY) And (Y <= BtnY + 22) Then Begin
+  CloseComposer;
+  Exit;
+ End;
+
+ { Verifier les champs d'en-tete }
+ For I := 0 To 3 Do Begin
+  If (X >= ComposerInputFields[I].X) And
+     (X <= ComposerInputFields[I].X + ComposerInputFields[I].Width) And
+     (Y >= ComposerInputFields[I].Y) And
+     (Y <= ComposerInputFields[I].Y + COMPOSER_FIELD_HEIGHT) Then Begin
+   { Deselectionner tous les champs }
+   ComposerInputFields[0].IsFocused := False;
+   ComposerInputFields[1].IsFocused := False;
+   ComposerInputFields[2].IsFocused := False;
+   ComposerInputFields[3].IsFocused := False;
+   { Selectionner ce champ }
+   ComposerInputFields[I].IsFocused := True;
+   ComposerFocusedField := I;
+   DrawComposerWindow;
+   Exit;
+  End;
+ End;
+
+ { Verifier la barre d'outils de formatage }
+ ToolbarY := COMPOSER_Y + COMPOSER_HEADER_HEIGHT + 2;
+ If (Y >= ToolbarY) And (Y <= ToolbarY + COMPOSER_TOOLBAR_HEIGHT) Then Begin
+  BtnX := COMPOSER_X + 8;
+
+  { Bouton Gras }
+  If (X >= BtnX) And (X <= BtnX + 24) Then Begin
+   ComposerFormatBold := Not ComposerFormatBold;
+   Composer.CurrentFormat.Bold := ComposerFormatBold;
+   DrawComposerWindow;
+   Exit;
+  End;
+  BtnX := BtnX + 28;
+
+  { Bouton Italique }
+  If (X >= BtnX) And (X <= BtnX + 24) Then Begin
+   ComposerFormatItalic := Not ComposerFormatItalic;
+   Composer.CurrentFormat.Italic := ComposerFormatItalic;
+   DrawComposerWindow;
+   Exit;
+  End;
+  BtnX := BtnX + 28;
+
+  { Bouton Souligne }
+  If (X >= BtnX) And (X <= BtnX + 24) Then Begin
+   ComposerFormatUnderline := Not ComposerFormatUnderline;
+   Composer.CurrentFormat.Underline := ComposerFormatUnderline;
+   DrawComposerWindow;
+   Exit;
+  End;
+
+  { Boutons de couleur }
+  BtnX := COMPOSER_X + 8 + 28 + 28 + 35 + 10 + 55;
+  If (X >= BtnX) And (X <= BtnX + 16) Then Begin
+   Composer.CurrentFormat.FontColor := Black;
+   DrawComposerWindow;
+   Exit;
+  End;
+  BtnX := BtnX + 20;
+  If (X >= BtnX) And (X <= BtnX + 16) Then Begin
+   Composer.CurrentFormat.FontColor := LightRed;
+   DrawComposerWindow;
+   Exit;
+  End;
+  BtnX := BtnX + 20;
+  If (X >= BtnX) And (X <= BtnX + 16) Then Begin
+   Composer.CurrentFormat.FontColor := LightGreen;
+   DrawComposerWindow;
+   Exit;
+  End;
+  BtnX := BtnX + 20;
+  If (X >= BtnX) And (X <= BtnX + 16) Then Begin
+   Composer.CurrentFormat.FontColor := LightBlue;
+   DrawComposerWindow;
+   Exit;
+  End;
+ End;
+
+ { Verifier la zone d'edition }
+ EditorX := COMPOSER_X + 4;
+ EditorY := COMPOSER_Y + COMPOSER_HEADER_HEIGHT + COMPOSER_TOOLBAR_HEIGHT + 4;
+ EditorW := COMPOSER_WIDTH - 8;
+ EditorH := COMPOSER_HEIGHT - COMPOSER_HEADER_HEIGHT - COMPOSER_TOOLBAR_HEIGHT - 45;
+
+ If (X >= EditorX) And (X <= EditorX + EditorW) And
+    (Y >= EditorY) And (Y <= EditorY + EditorH) Then Begin
+  { Clic dans l'editeur }
+  ComposerFocusedField := COMP_FIELD_BODY;
+
+  { Deselectionner les champs d'en-tete }
+  ComposerInputFields[0].IsFocused := False;
+  ComposerInputFields[1].IsFocused := False;
+  ComposerInputFields[2].IsFocused := False;
+  ComposerInputFields[3].IsFocused := False;
+
+  { Calculer la ligne cliquee }
+  ClickedLine := Composer.ScrollY + (Y - EditorY - 4) Div 14;
+  If ClickedLine >= Composer.LineCount Then
+   ClickedLine := Composer.LineCount - 1;
+  If ClickedLine < 0 Then ClickedLine := 0;
+  Composer.CursorY := ClickedLine;
+
+  { Positionner le curseur X approximativement }
+  Composer.CursorX := Length(Composer.Lines[ClickedLine].Text);
+
+  DrawComposerWindow;
+ End;
+End;
+
+{ Gere les touches clavier dans le compositeur }
+Procedure HandleComposerKeyPress(Key: Char);
+Var
+ FieldValue: String;
+ CurrentLine: String;
+Begin
+ If Not ComposerVisible Then Exit;
+
+ If Key = #27 Then Begin { Escape }
+  CloseComposer;
+  Exit;
+ End;
+
+ { Gestion selon le champ actif }
+ If ComposerFocusedField < COMP_FIELD_BODY Then Begin
+  { Champs d'en-tete }
+  FieldValue := ComposerInputFields[ComposerFocusedField].Value;
+
+  If Key = #8 Then Begin { Backspace }
+   If Length(FieldValue) > 0 Then Begin
+    Delete(FieldValue, Length(FieldValue), 1);
+    ComposerInputFields[ComposerFocusedField].Value := FieldValue;
+    Composer.Modified := True;
+    DrawComposerWindow;
+   End;
+  End
+  Else If Key = #9 Then Begin { Tab }
+   ComposerInputFields[ComposerFocusedField].IsFocused := False;
+   Inc(ComposerFocusedField);
+   If ComposerFocusedField > COMP_FIELD_SUBJECT Then
+    ComposerFocusedField := COMP_FIELD_BODY
+   Else
+    ComposerInputFields[ComposerFocusedField].IsFocused := True;
+   DrawComposerWindow;
+  End
+  Else If Key = #13 Then Begin { Enter - passer au corps }
+   ComposerInputFields[ComposerFocusedField].IsFocused := False;
+   ComposerFocusedField := COMP_FIELD_BODY;
+   DrawComposerWindow;
+  End
+  Else If (Key >= ' ') And (Key <= '~') Then Begin { Caracteres imprimables }
+   If Length(FieldValue) < ComposerInputFields[ComposerFocusedField].MaxLen Then Begin
+    FieldValue := FieldValue + Key;
+    ComposerInputFields[ComposerFocusedField].Value := FieldValue;
+    Composer.Modified := True;
+    DrawComposerWindow;
+   End;
+  End;
+ End
+ Else Begin
+  { Zone d'edition du corps }
+  CurrentLine := Composer.Lines[Composer.CursorY].Text;
+
+  If Key = #8 Then Begin { Backspace }
+   If Composer.CursorX > 0 Then Begin
+    Delete(CurrentLine, Composer.CursorX, 1);
+    Composer.Lines[Composer.CursorY].Text := CurrentLine;
+    Dec(Composer.CursorX);
+    Composer.Modified := True;
+    DrawComposerWindow;
+   End
+   Else If Composer.CursorY > 0 Then Begin
+    { Fusionner avec la ligne precedente }
+    Dec(Composer.CursorY);
+    Composer.CursorX := Length(Composer.Lines[Composer.CursorY].Text);
+    Composer.Lines[Composer.CursorY].Text := Composer.Lines[Composer.CursorY].Text + CurrentLine;
+    { Decaler les lignes suivantes }
+    While Composer.CursorY + 1 < Composer.LineCount - 1 Do Begin
+     Composer.Lines[Composer.CursorY + 1] := Composer.Lines[Composer.CursorY + 2];
+     Inc(Composer.CursorY);
+    End;
+    Dec(Composer.LineCount);
+    Composer.CursorY := Composer.CursorY - (Composer.LineCount - Composer.CursorY - 1);
+    Composer.Modified := True;
+    DrawComposerWindow;
+   End;
+  End
+  Else If Key = #13 Then Begin { Enter - nouvelle ligne }
+   If Composer.LineCount < COMPOSER_MAX_LINES Then Begin
+    { Decaler les lignes suivantes }
+    If Composer.CursorY < Composer.LineCount - 1 Then Begin
+     { Note: Simplifie - insere une nouvelle ligne }
+    End;
+    Inc(Composer.LineCount);
+    Inc(Composer.CursorY);
+    Composer.CursorX := 0;
+    Composer.Lines[Composer.CursorY].Text := '';
+    Composer.Lines[Composer.CursorY].Format := Composer.CurrentFormat;
+    Composer.Modified := True;
+
+    { Ajuster le defilement si necessaire }
+    If Composer.CursorY >= Composer.ScrollY + COMPOSER_EDITOR_VISIBLE_ROWS Then
+     Inc(Composer.ScrollY);
+
+    DrawComposerWindow;
+   End;
+  End
+  Else If Key = #9 Then Begin { Tab - retour aux champs d'en-tete }
+   ComposerFocusedField := COMP_FIELD_TO;
+   ComposerInputFields[COMP_FIELD_TO].IsFocused := True;
+   DrawComposerWindow;
+  End
+  Else If (Key >= ' ') And (Key <= '~') Then Begin { Caracteres imprimables }
+   If Length(CurrentLine) < 250 Then Begin
+    Insert(Key, CurrentLine, Composer.CursorX + 1);
+    Composer.Lines[Composer.CursorY].Text := CurrentLine;
+    Composer.Lines[Composer.CursorY].Format := Composer.CurrentFormat;
+    Inc(Composer.CursorX);
+    Composer.Modified := True;
+    DrawComposerWindow;
+   End;
+  End;
+ End;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU COMPOSITEUR DE MESSAGES
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -7982,8 +8863,12 @@ Begin
 
   { Détection du clic gauche (bouton enfoncé) }
   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+   { Gerer les clics dans le compositeur de messages (TODO 12) }
+   If ComposerVisible Then Begin
+    HandleComposerClick(MouseX, MouseY);
+   End
    { Gerer les clics dans la boite de dialogue des comptes }
-   If AccountDialogVisible Then Begin
+   Else If AccountDialogVisible Then Begin
     HandleAccountDialogClick(MouseX, MouseY);
    End
    { Fermer le menu contextuel si clic ailleurs }
@@ -8046,8 +8931,12 @@ Begin
   { Vérification des touches du clavier }
   If KeyPressed Then Begin
    Key := ReadKey;
+   { Gerer les touches dans le compositeur de messages (TODO 12) }
+   If ComposerVisible Then Begin
+    HandleComposerKeyPress(Key);
+   End
    { Gerer les touches dans la boite de dialogue des comptes }
-   If AccountDialogVisible Then Begin
+   Else If AccountDialogVisible Then Begin
     HandleAccountDialogKeyPress(Key);
    End
    Else If Key = #27 Then Begin
@@ -8100,6 +8989,9 @@ BEGIN
 
  { Initialisation du gestionnaire de comptes (TODO 11) }
  InitializeAccountManager;
+
+ { Initialisation du compositeur de messages (TODO 12) }
+ InitializeComposer;
 
  { Affichage de l'interface }
  ShowMouse;
