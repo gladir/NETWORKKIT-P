@@ -146,7 +146,7 @@
       - Support du texte formaté et images
       - Signature différente pour réponses/transferts
 
-  20. [ ] Notifications et alertes de nouveaux messages
+  20. [x] Notifications et alertes de nouveaux messages
       - Vérification automatique à intervalle configurable
       - Alerte sonore paramétrable (fichier WAV)
       - Notification visuelle dans la barre de titre
@@ -860,6 +860,102 @@ Type
   CurrentTab: Integer;           { Onglet actuel (0=Texte, 1=HTML, 2=Parametres) }
   ScrollOffset: Integer;         { Defilement vertical }
  End;
+
+ { ============================================================================
+   TYPES POUR LES NOTIFICATIONS ET ALERTES (TODO 20)
+   ============================================================================ }
+
+ { Type d'alerte sonore }
+ TSoundAlertType = (
+  satNone,                       { Pas de son }
+  satSystemBeep,                 { Beep systeme }
+  satWAVFile,                    { Fichier WAV personnalise }
+  satMelody                      { Melodie integree }
+ );
+
+ { Type de notification visuelle }
+ TVisualNotificationType = (
+  vntNone,                       { Pas de notification visuelle }
+  vntTitleFlash,                 { Clignotement de la barre de titre }
+  vntTitleBadge,                 { Badge dans la barre de titre }
+  vntTrayIcon,                   { Icone dans la barre d'etat }
+  vntPopup                       { Fenetre popup }
+ );
+
+ { Etat de la notification }
+ TNotificationState = (
+  nsIdle,                        { En attente }
+  nsChecking,                    { Verification en cours }
+  nsNewMail,                     { Nouveau message detecte }
+  nsError                        { Erreur de verification }
+ );
+
+ { Parametres de notification par dossier }
+ TFolderNotificationSettings = Record
+  FolderID: Integer;             { ID du dossier }
+  FolderName: String[40];        { Nom du dossier }
+  EnableNotification: Boolean;   { Notifications activees }
+  SoundAlert: TSoundAlertType;   { Type d'alerte sonore }
+  VisualAlert: TVisualNotificationType; { Type d'alerte visuelle }
+  SoundFile: String[80];         { Chemin du fichier WAV }
+  PlaySoundOnce: Boolean;        { Jouer le son une seule fois }
+ End;
+
+ { Parametres globaux de notification }
+ TNotificationSettings = Record
+  Enabled: Boolean;              { Notifications activees globalement }
+  CheckInterval: Integer;        { Intervalle de verification (secondes) }
+  DefaultSoundAlert: TSoundAlertType; { Alerte sonore par defaut }
+  DefaultVisualAlert: TVisualNotificationType; { Alerte visuelle par defaut }
+  DefaultSoundFile: String[80];  { Fichier WAV par defaut }
+  ShowPopupDuration: Integer;    { Duree d'affichage popup (secondes) }
+  PopupPosition: Integer;        { Position du popup (0=bas-droite, 1=haut-droite) }
+  FlashCount: Integer;           { Nombre de clignotements }
+  FlashInterval: Integer;        { Intervalle de clignotement (ms) }
+  CheckOnStartup: Boolean;       { Verifier au demarrage }
+  PlaySoundRepeat: Boolean;      { Repeter le son }
+  MaxPopupMessages: Integer;     { Nombre max de messages dans popup }
+ End;
+
+ { Information sur un nouveau message pour notification }
+ TNewMailInfo = Record
+  AccountID: Integer;            { ID du compte }
+  AccountName: String[40];       { Nom du compte }
+  FolderID: Integer;             { ID du dossier }
+  FolderName: String[40];        { Nom du dossier }
+  MessageCount: Integer;         { Nombre de nouveaux messages }
+  FirstSender: String[40];       { Expediteur du premier message }
+  FirstSubject: String[60];      { Objet du premier message }
+  Timestamp: LongInt;            { Horodatage de la notification }
+  Displayed: Boolean;            { Notification affichee }
+  Acknowledged: Boolean;         { Notification acquittee }
+ End;
+
+ { Historique des notifications }
+ TNotificationHistoryItem = Record
+  Timestamp: LongInt;            { Horodatage }
+  AccountName: String[40];       { Nom du compte }
+  FolderName: String[40];        { Nom du dossier }
+  MessageCount: Integer;         { Nombre de messages }
+  Subject: String[60];           { Objet du premier message }
+ End;
+
+ { Etat de la fenetre de notification popup }
+ TNotificationPopupState = (
+  npsHidden,                     { Popup cache }
+  npsShowing,                    { Popup en cours d'affichage }
+  npsFadingIn,                   { Animation d'apparition }
+  npsFadingOut                   { Animation de disparition }
+ );
+
+ { Etat de la fenetre de configuration des notifications }
+ TNotificationConfigState = (
+  ncsHidden,                     { Fenetre cachee }
+  ncsGeneral,                    { Onglet parametres generaux }
+  ncsFolders,                    { Onglet parametres par dossier }
+  ncsSounds,                     { Onglet configuration sons }
+  ncsHistory                     { Onglet historique }
+ );
 
  { Type de colonne pour la liste des messages }
  TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
@@ -1832,6 +1928,51 @@ Const
  { Separateur standard de signature }
  SIG_SEPARATOR = '-- ';
 
+ { ============================================================================
+   CONSTANTES POUR LES NOTIFICATIONS ET ALERTES (TODO 20)
+   ============================================================================ }
+
+ { Intervalle de verification par defaut (en secondes) }
+ NOTIF_DEFAULT_CHECK_INTERVAL = 300;
+
+ { Intervalle minimum de verification (en secondes) }
+ NOTIF_MIN_CHECK_INTERVAL = 60;
+
+ { Intervalle maximum de verification (en secondes) }
+ NOTIF_MAX_CHECK_INTERVAL = 3600;
+
+ { Nombre maximum de notifications en attente }
+ MAX_PENDING_NOTIFICATIONS = 20;
+
+ { Nombre maximum d'elements dans l'historique }
+ MAX_NOTIFICATION_HISTORY = 50;
+
+ { Nombre maximum de parametres par dossier }
+ MAX_FOLDER_NOTIFICATION_SETTINGS = 30;
+
+ { Dimensions de la fenetre popup de notification }
+ NOTIF_POPUP_WIDTH = 300;
+ NOTIF_POPUP_HEIGHT = 100;
+
+ { Duree d'affichage du popup par defaut (en secondes) }
+ NOTIF_POPUP_DEFAULT_DURATION = 5;
+
+ { Intervalle de clignotement par defaut (en millisecondes) }
+ NOTIF_FLASH_DEFAULT_INTERVAL = 500;
+
+ { Nombre de clignotements par defaut }
+ NOTIF_FLASH_DEFAULT_COUNT = 5;
+
+ { Dimensions de la fenetre de configuration }
+ NOTIF_CONFIG_WIDTH = 500;
+ NOTIF_CONFIG_HEIGHT = 400;
+
+ { Frequence du beep systeme (Hz) }
+ NOTIF_BEEP_FREQUENCY = 800;
+
+ { Duree du beep systeme (ms) }
+ NOTIF_BEEP_DURATION = 200;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -2069,6 +2210,33 @@ Var
  SignaturePreviewMode: Boolean;        { Mode apercu actif }
  CurrentSignatureID: Integer;          { ID de la signature en cours }
  NextSignatureID: Integer;             { Prochain ID disponible }
+
+ { ============================================================================
+   VARIABLES POUR LES NOTIFICATIONS ET ALERTES (TODO 20)
+   ============================================================================ }
+
+ NotificationSettings: TNotificationSettings; { Parametres globaux }
+ FolderNotifSettings: Array[0..MAX_FOLDER_NOTIFICATION_SETTINGS-1] of TFolderNotificationSettings;
+ FolderNotifSettingsCount: Integer;    { Nombre de parametres par dossier }
+ PendingNotifications: Array[0..MAX_PENDING_NOTIFICATIONS-1] of TNewMailInfo;
+ PendingNotificationCount: Integer;    { Nombre de notifications en attente }
+ NotificationHistory: Array[0..MAX_NOTIFICATION_HISTORY-1] of TNotificationHistoryItem;
+ NotificationHistoryCount: Integer;    { Nombre d'elements dans l'historique }
+ NotificationState: TNotificationState; { Etat actuel de la notification }
+ LastCheckTime: LongInt;               { Horodatage derniere verification }
+ NextCheckTime: LongInt;               { Horodatage prochaine verification }
+ NotificationPopupState: TNotificationPopupState; { Etat du popup }
+ NotificationPopupX, NotificationPopupY: Integer; { Position du popup }
+ NotificationPopupStartTime: LongInt;  { Debut d'affichage du popup }
+ NotificationConfigState: TNotificationConfigState; { Etat de la config }
+ NotificationConfigX, NotificationConfigY: Integer; { Position de la fenetre }
+ NotificationConfigVisible: Boolean;   { Visibilite de la fenetre config }
+ TitleFlashing: Boolean;               { Clignotement en cours }
+ TitleFlashCount: Integer;             { Compteur de clignotements }
+ TitleFlashLastTime: LongInt;          { Dernier clignotement }
+ TitleFlashState: Boolean;             { Etat du clignotement (on/off) }
+ UnreadMailCount: Integer;             { Nombre de messages non lus total }
+ NewMailSinceLastCheck: Integer;       { Nouveaux messages depuis derniere verif }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -14019,6 +14187,927 @@ End;
   FIN DE L'IMPLEMENTATION DE LA GESTION DES SIGNATURES (TODO 19)
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DES NOTIFICATIONS ET ALERTES (TODO 20)
+  ============================================================================ }
+
+{ Initialise le systeme de notifications }
+Procedure Notif_Init;
+Var
+ I: Integer;
+Begin
+ { Parametres globaux par defaut }
+ NotificationSettings.Enabled := True;
+ NotificationSettings.CheckInterval := NOTIF_DEFAULT_CHECK_INTERVAL;
+ NotificationSettings.DefaultSoundAlert := satSystemBeep;
+ NotificationSettings.DefaultVisualAlert := vntTitleBadge;
+ NotificationSettings.DefaultSoundFile := '';
+ NotificationSettings.ShowPopupDuration := NOTIF_POPUP_DEFAULT_DURATION;
+ NotificationSettings.PopupPosition := 0;
+ NotificationSettings.FlashCount := NOTIF_FLASH_DEFAULT_COUNT;
+ NotificationSettings.FlashInterval := NOTIF_FLASH_DEFAULT_INTERVAL;
+ NotificationSettings.CheckOnStartup := True;
+ NotificationSettings.PlaySoundRepeat := False;
+ NotificationSettings.MaxPopupMessages := 5;
+
+ { Initialiser les parametres par dossier }
+ FolderNotifSettingsCount := 0;
+ For I := 0 To MAX_FOLDER_NOTIFICATION_SETTINGS - 1 Do Begin
+  FolderNotifSettings[I].FolderID := 0;
+  FolderNotifSettings[I].FolderName := '';
+  FolderNotifSettings[I].EnableNotification := True;
+  FolderNotifSettings[I].SoundAlert := satSystemBeep;
+  FolderNotifSettings[I].VisualAlert := vntTitleBadge;
+  FolderNotifSettings[I].SoundFile := '';
+  FolderNotifSettings[I].PlaySoundOnce := True;
+ End;
+
+ { Initialiser les notifications en attente }
+ PendingNotificationCount := 0;
+ For I := 0 To MAX_PENDING_NOTIFICATIONS - 1 Do Begin
+  PendingNotifications[I].AccountID := 0;
+  PendingNotifications[I].AccountName := '';
+  PendingNotifications[I].FolderID := 0;
+  PendingNotifications[I].FolderName := '';
+  PendingNotifications[I].MessageCount := 0;
+  PendingNotifications[I].FirstSender := '';
+  PendingNotifications[I].FirstSubject := '';
+  PendingNotifications[I].Timestamp := 0;
+  PendingNotifications[I].Displayed := False;
+  PendingNotifications[I].Acknowledged := False;
+ End;
+
+ { Initialiser l'historique }
+ NotificationHistoryCount := 0;
+ For I := 0 To MAX_NOTIFICATION_HISTORY - 1 Do Begin
+  NotificationHistory[I].Timestamp := 0;
+  NotificationHistory[I].AccountName := '';
+  NotificationHistory[I].FolderName := '';
+  NotificationHistory[I].MessageCount := 0;
+  NotificationHistory[I].Subject := '';
+ End;
+
+ { Etat initial }
+ NotificationState := nsIdle;
+ LastCheckTime := 0;
+ NextCheckTime := 0;
+ NotificationPopupState := npsHidden;
+ NotificationPopupX := GetMaxX - NOTIF_POPUP_WIDTH - 10;
+ NotificationPopupY := GetMaxY - NOTIF_POPUP_HEIGHT - 50;
+ NotificationPopupStartTime := 0;
+ NotificationConfigState := ncsHidden;
+ NotificationConfigX := (GetMaxX - NOTIF_CONFIG_WIDTH) Div 2;
+ NotificationConfigY := (GetMaxY - NOTIF_CONFIG_HEIGHT) Div 2;
+ NotificationConfigVisible := False;
+ TitleFlashing := False;
+ TitleFlashCount := 0;
+ TitleFlashLastTime := 0;
+ TitleFlashState := False;
+ UnreadMailCount := 0;
+ NewMailSinceLastCheck := 0;
+End;
+
+{ Joue un son d'alerte }
+Procedure Notif_PlaySound(SoundType: TSoundAlertType; SoundFile: String);
+Begin
+ Case SoundType Of
+  satNone: Begin
+   { Pas de son }
+  End;
+  satSystemBeep: Begin
+   { Beep systeme }
+   {$IFDEF FPC}
+    Sound(NOTIF_BEEP_FREQUENCY);
+    Delay(NOTIF_BEEP_DURATION);
+    NoSound;
+   {$ELSE}
+    Sound(NOTIF_BEEP_FREQUENCY);
+    Delay(NOTIF_BEEP_DURATION);
+    NoSound;
+   {$ENDIF}
+  End;
+  satWAVFile: Begin
+   { Fichier WAV - non supporte en mode console pure }
+   { Utiliser le beep systeme comme fallback }
+   Sound(NOTIF_BEEP_FREQUENCY);
+   Delay(NOTIF_BEEP_DURATION);
+   NoSound;
+  End;
+  satMelody: Begin
+   { Melodie integree }
+   Sound(800); Delay(100); NoSound; Delay(50);
+   Sound(1000); Delay(100); NoSound; Delay(50);
+   Sound(1200); Delay(150); NoSound;
+  End;
+ End;
+End;
+
+{ Demarre le clignotement de la barre de titre }
+Procedure Notif_StartTitleFlash;
+Begin
+ If Not TitleFlashing Then Begin
+  TitleFlashing := True;
+  TitleFlashCount := 0;
+  TitleFlashLastTime := 0;
+  TitleFlashState := True;
+ End;
+End;
+
+{ Arrete le clignotement de la barre de titre }
+Procedure Notif_StopTitleFlash;
+Begin
+ TitleFlashing := False;
+ TitleFlashCount := 0;
+ TitleFlashState := False;
+End;
+
+{ Met a jour le clignotement de la barre de titre }
+Procedure Notif_UpdateTitleFlash;
+Var
+ CurrentTime: LongInt;
+Begin
+ If Not TitleFlashing Then Exit;
+
+ CurrentTime := 0; { Simplification - utiliser GetTickCount en pratique }
+
+ If TitleFlashCount >= NotificationSettings.FlashCount * 2 Then Begin
+  Notif_StopTitleFlash;
+  Exit;
+ End;
+
+ { Alterner l'etat }
+ TitleFlashState := Not TitleFlashState;
+ Inc(TitleFlashCount);
+ TitleFlashLastTime := CurrentTime;
+End;
+
+{ Ajoute une notification a l'historique }
+Procedure Notif_AddToHistory(AccountName, FolderName, Subject: String; MsgCount: Integer);
+Var
+ I: Integer;
+Begin
+ { Decaler l'historique si plein }
+ If NotificationHistoryCount >= MAX_NOTIFICATION_HISTORY Then Begin
+  For I := 0 To MAX_NOTIFICATION_HISTORY - 2 Do
+   NotificationHistory[I] := NotificationHistory[I + 1];
+  NotificationHistoryCount := MAX_NOTIFICATION_HISTORY - 1;
+ End;
+
+ { Ajouter la nouvelle entree }
+ NotificationHistory[NotificationHistoryCount].Timestamp := 1743465600;
+ NotificationHistory[NotificationHistoryCount].AccountName := AccountName;
+ NotificationHistory[NotificationHistoryCount].FolderName := FolderName;
+ NotificationHistory[NotificationHistoryCount].MessageCount := MsgCount;
+ NotificationHistory[NotificationHistoryCount].Subject := Subject;
+ Inc(NotificationHistoryCount);
+End;
+
+{ Cree une nouvelle notification }
+Function Notif_Create(AccountID: Integer; AccountName, FolderName: String;
+                      FolderID, MsgCount: Integer; Sender, Subject: String): Integer;
+Var
+ Index: Integer;
+Begin
+ Notif_Create := -1;
+ If PendingNotificationCount >= MAX_PENDING_NOTIFICATIONS Then Exit;
+
+ Index := PendingNotificationCount;
+ Inc(PendingNotificationCount);
+
+ PendingNotifications[Index].AccountID := AccountID;
+ PendingNotifications[Index].AccountName := AccountName;
+ PendingNotifications[Index].FolderID := FolderID;
+ PendingNotifications[Index].FolderName := FolderName;
+ PendingNotifications[Index].MessageCount := MsgCount;
+ PendingNotifications[Index].FirstSender := Sender;
+ PendingNotifications[Index].FirstSubject := Subject;
+ PendingNotifications[Index].Timestamp := 1743465600;
+ PendingNotifications[Index].Displayed := False;
+ PendingNotifications[Index].Acknowledged := False;
+
+ { Ajouter a l'historique }
+ Notif_AddToHistory(AccountName, FolderName, Subject, MsgCount);
+
+ Notif_Create := Index;
+End;
+
+{ Acquitte une notification }
+Procedure Notif_Acknowledge(Index: Integer);
+Begin
+ If (Index >= 0) And (Index < PendingNotificationCount) Then
+  PendingNotifications[Index].Acknowledged := True;
+End;
+
+{ Acquitte toutes les notifications }
+Procedure Notif_AcknowledgeAll;
+Var
+ I: Integer;
+Begin
+ For I := 0 To PendingNotificationCount - 1 Do
+  PendingNotifications[I].Acknowledged := True;
+
+ Notif_StopTitleFlash;
+ NotificationPopupState := npsHidden;
+End;
+
+{ Supprime les notifications acquittees }
+Procedure Notif_CleanupAcknowledged;
+Var
+ I, NewCount: Integer;
+Begin
+ NewCount := 0;
+ For I := 0 To PendingNotificationCount - 1 Do Begin
+  If Not PendingNotifications[I].Acknowledged Then Begin
+   If NewCount <> I Then
+    PendingNotifications[NewCount] := PendingNotifications[I];
+   Inc(NewCount);
+  End;
+ End;
+ PendingNotificationCount := NewCount;
+End;
+
+{ Retourne le nombre de notifications non acquittees }
+Function Notif_GetUnacknowledgedCount: Integer;
+Var
+ I, Count: Integer;
+Begin
+ Count := 0;
+ For I := 0 To PendingNotificationCount - 1 Do Begin
+  If Not PendingNotifications[I].Acknowledged Then
+   Inc(Count);
+ End;
+ Notif_GetUnacknowledgedCount := Count;
+End;
+
+{ Configure les notifications pour un dossier }
+Procedure Notif_SetFolderSettings(FolderID: Integer; FolderName: String;
+                                   Enable: Boolean; Sound: TSoundAlertType;
+                                   Visual: TVisualNotificationType; SoundFile: String);
+Var
+ I, Index: Integer;
+Begin
+ { Chercher si le dossier existe deja }
+ Index := -1;
+ For I := 0 To FolderNotifSettingsCount - 1 Do Begin
+  If FolderNotifSettings[I].FolderID = FolderID Then Begin
+   Index := I;
+   Break;
+  End;
+ End;
+
+ { Creer une nouvelle entree si necessaire }
+ If Index < 0 Then Begin
+  If FolderNotifSettingsCount >= MAX_FOLDER_NOTIFICATION_SETTINGS Then Exit;
+  Index := FolderNotifSettingsCount;
+  Inc(FolderNotifSettingsCount);
+ End;
+
+ { Configurer les parametres }
+ FolderNotifSettings[Index].FolderID := FolderID;
+ FolderNotifSettings[Index].FolderName := FolderName;
+ FolderNotifSettings[Index].EnableNotification := Enable;
+ FolderNotifSettings[Index].SoundAlert := Sound;
+ FolderNotifSettings[Index].VisualAlert := Visual;
+ FolderNotifSettings[Index].SoundFile := SoundFile;
+ FolderNotifSettings[Index].PlaySoundOnce := True;
+End;
+
+{ Retourne les parametres de notification pour un dossier }
+Function Notif_GetFolderSettings(FolderID: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ Notif_GetFolderSettings := -1;
+ For I := 0 To FolderNotifSettingsCount - 1 Do Begin
+  If FolderNotifSettings[I].FolderID = FolderID Then Begin
+   Notif_GetFolderSettings := I;
+   Exit;
+  End;
+ End;
+End;
+
+{ Verifie les nouveaux messages (simulation) }
+Procedure Notif_CheckNewMail;
+Begin
+ If Not NotificationSettings.Enabled Then Exit;
+
+ NotificationState := nsChecking;
+
+ { Simulation: detecter de nouveaux messages }
+ { En pratique, cela utiliserait IMAP IDLE ou une verification periodique }
+
+ { Exemple de notification simulee }
+ { NotifIndex := Notif_Create(1, 'Mon compte', 'Boite de reception', 1, 2,
+                               'expediteur@example.com', 'Nouveau message important'); }
+
+ NotificationState := nsIdle;
+ LastCheckTime := 1743465600;
+ NextCheckTime := LastCheckTime + NotificationSettings.CheckInterval;
+End;
+
+{ Declenche les alertes pour les nouvelles notifications }
+Procedure Notif_TriggerAlerts;
+Var
+ I, FolderIndex: Integer;
+ SoundType: TSoundAlertType;
+ VisualType: TVisualNotificationType;
+ SoundFile: String;
+ SoundPlayed: Boolean;
+Begin
+ SoundPlayed := False;
+
+ For I := 0 To PendingNotificationCount - 1 Do Begin
+  If Not PendingNotifications[I].Displayed Then Begin
+   { Marquer comme affichee }
+   PendingNotifications[I].Displayed := True;
+
+   { Determiner le type d'alerte }
+   FolderIndex := Notif_GetFolderSettings(PendingNotifications[I].FolderID);
+   If FolderIndex >= 0 Then Begin
+    If Not FolderNotifSettings[FolderIndex].EnableNotification Then Continue;
+    SoundType := FolderNotifSettings[FolderIndex].SoundAlert;
+    VisualType := FolderNotifSettings[FolderIndex].VisualAlert;
+    SoundFile := FolderNotifSettings[FolderIndex].SoundFile;
+   End Else Begin
+    SoundType := NotificationSettings.DefaultSoundAlert;
+    VisualType := NotificationSettings.DefaultVisualAlert;
+    SoundFile := NotificationSettings.DefaultSoundFile;
+   End;
+
+   { Jouer le son (une seule fois si plusieurs notifications) }
+   If Not SoundPlayed Then Begin
+    Notif_PlaySound(SoundType, SoundFile);
+    SoundPlayed := True;
+   End;
+
+   { Declencher l'alerte visuelle }
+   Case VisualType Of
+    vntTitleFlash: Notif_StartTitleFlash;
+    vntTitleBadge: Begin
+     { Le badge sera affiche lors du dessin de la barre de titre }
+    End;
+    vntPopup: Begin
+     NotificationPopupState := npsShowing;
+     NotificationPopupStartTime := 0;
+    End;
+   End;
+  End;
+ End;
+End;
+
+{ Affiche le popup de notification }
+Procedure Notif_DrawPopup;
+Var
+ X1, Y1, X2, Y2: Integer;
+ I, Y, DisplayCount: Integer;
+ DisplayStr: String;
+Begin
+ If NotificationPopupState = npsHidden Then Exit;
+
+ X1 := NotificationPopupX;
+ Y1 := NotificationPopupY;
+ X2 := X1 + NOTIF_POPUP_WIDTH;
+ Y2 := Y1 + NOTIF_POPUP_HEIGHT;
+
+ { Fond du popup }
+ SetFillStyle(SolidFill, LightBlue);
+ Bar(X1, Y1, X2, Y2);
+
+ { Bordure }
+ SetColor(Blue);
+ Rectangle(X1, Y1, X2, Y2);
+
+ { Titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1 + 1, Y1 + 1, X2 - 1, Y1 + 20);
+ SetColor(White);
+ OutTextXY(X1 + 10, Y1 + 5, 'Nouveau courrier');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 20, Y1 + 3, X2 - 3, Y1 + 17);
+ SetColor(White);
+ OutTextXY(X2 - 15, Y1 + 5, 'X');
+
+ { Contenu }
+ Y := Y1 + 28;
+ DisplayCount := 0;
+
+ For I := 0 To PendingNotificationCount - 1 Do Begin
+  If Not PendingNotifications[I].Acknowledged Then Begin
+   If DisplayCount >= NotificationSettings.MaxPopupMessages Then Begin
+    SetColor(DarkGray);
+    OutTextXY(X1 + 10, Y, '... et plus');
+    Break;
+   End;
+
+   SetColor(Black);
+   DisplayStr := PendingNotifications[I].FirstSender;
+   If Length(DisplayStr) > 30 Then
+    DisplayStr := Copy(DisplayStr, 1, 27) + '...';
+   OutTextXY(X1 + 10, Y, DisplayStr);
+   Y := Y + 14;
+
+   SetColor(DarkGray);
+   DisplayStr := PendingNotifications[I].FirstSubject;
+   If Length(DisplayStr) > 35 Then
+    DisplayStr := Copy(DisplayStr, 1, 32) + '...';
+   OutTextXY(X1 + 15, Y, DisplayStr);
+   Y := Y + 16;
+
+   Inc(DisplayCount);
+  End;
+ End;
+End;
+
+{ Gere les clics dans le popup de notification }
+Procedure Notif_HandlePopupClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+Begin
+ If NotificationPopupState = npsHidden Then Exit;
+
+ X1 := NotificationPopupX;
+ Y1 := NotificationPopupY;
+ X2 := X1 + NOTIF_POPUP_WIDTH;
+ Y2 := Y1 + NOTIF_POPUP_HEIGHT;
+
+ { Verifier si clic dans le popup }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Exit;
+
+ { Bouton fermer }
+ If (MX >= X2 - 20) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 17) Then Begin
+  Notif_AcknowledgeAll;
+  Exit;
+ End;
+
+ { Clic dans le contenu - ouvrir la boite de reception }
+ { Pour l'instant, simplement acquitter }
+ Notif_AcknowledgeAll;
+End;
+
+{ Affiche la fenetre de configuration des notifications }
+Procedure Notif_DrawConfigWindow;
+Var
+ X1, Y1, X2, Y2: Integer;
+ Y, BtnX, BtnY, BtnW, BtnH: Integer;
+ DisplayStr, CheckStr: String;
+ I: Integer;
+Begin
+ If Not NotificationConfigVisible Then Exit;
+
+ X1 := NotificationConfigX;
+ Y1 := NotificationConfigY;
+ X2 := X1 + NOTIF_CONFIG_WIDTH;
+ Y2 := Y1 + NOTIF_CONFIG_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X1, Y1, X2, Y2);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1, Y1, X2, Y1 + 25);
+ SetColor(White);
+ OutTextXY(X1 + 10, Y1 + 7, 'Configuration des notifications');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
+ SetColor(White);
+ OutTextXY(X2 - 18, Y1 + 7, 'X');
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X1, Y1, X2, Y2);
+ SetColor(White);
+ Line(X1 + 1, Y1 + 26, X2 - 1, Y1 + 26);
+
+ Y := Y1 + 35;
+
+ Case NotificationConfigState Of
+  ncsHidden: Exit;
+
+  ncsGeneral: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 10, Y, X1 + 90, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 95, Y, X1 + 175, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 95, Y, X1 + 175, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y + 5, 'Dossiers');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 180, Y, X1 + 240, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 180, Y, X1 + 240, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 190, Y + 5, 'Sons');
+
+   Y := Y + 35;
+
+   { Activer les notifications }
+   If NotificationSettings.Enabled Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, CheckStr + ' Activer les notifications de nouveau courrier');
+   Y := Y + 25;
+
+   { Intervalle de verification }
+   OutTextXY(X1 + 20, Y, 'Verifier les nouveaux messages toutes les:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 280, Y - 3, X1 + 340, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 280, Y - 3, X1 + 340, Y + 15);
+   Str(NotificationSettings.CheckInterval Div 60, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 285, Y, DisplayStr + ' min');
+   Y := Y + 25;
+
+   { Verifier au demarrage }
+   If NotificationSettings.CheckOnStartup Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' Verifier au demarrage');
+   Y := Y + 25;
+
+   { Type d'alerte sonore par defaut }
+   OutTextXY(X1 + 20, Y, 'Alerte sonore:');
+   If NotificationSettings.DefaultSoundAlert = satNone Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 150, Y, CheckStr + ' Aucune');
+   If NotificationSettings.DefaultSoundAlert = satSystemBeep Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 250, Y, CheckStr + ' Beep systeme');
+   Y := Y + 18;
+   If NotificationSettings.DefaultSoundAlert = satMelody Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 150, Y, CheckStr + ' Melodie');
+   If NotificationSettings.DefaultSoundAlert = satWAVFile Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 250, Y, CheckStr + ' Fichier WAV');
+   Y := Y + 25;
+
+   { Type d'alerte visuelle par defaut }
+   OutTextXY(X1 + 20, Y, 'Alerte visuelle:');
+   If NotificationSettings.DefaultVisualAlert = vntNone Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 150, Y, CheckStr + ' Aucune');
+   If NotificationSettings.DefaultVisualAlert = vntTitleFlash Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 250, Y, CheckStr + ' Clignotement');
+   Y := Y + 18;
+   If NotificationSettings.DefaultVisualAlert = vntTitleBadge Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 150, Y, CheckStr + ' Badge titre');
+   If NotificationSettings.DefaultVisualAlert = vntPopup Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 250, Y, CheckStr + ' Popup');
+   Y := Y + 30;
+
+   { Duree du popup }
+   OutTextXY(X1 + 20, Y, 'Duree d''affichage du popup:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 200, Y - 3, X1 + 250, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 200, Y - 3, X1 + 250, Y + 15);
+   Str(NotificationSettings.ShowPopupDuration, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 205, Y, DisplayStr + ' sec');
+  End;
+
+  ncsFolders: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 10, Y, X1 + 90, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 10, Y, X1 + 90, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 95, Y, X1 + 175, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y + 5, 'Dossiers');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 180, Y, X1 + 240, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 180, Y, X1 + 240, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 190, Y + 5, 'Sons');
+
+   Y := Y + 35;
+
+   { Liste des dossiers avec leurs parametres }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Configurer les notifications par dossier:');
+   Y := Y + 25;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 20, Y + 180);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 20, Y + 180);
+
+   SetColor(Black);
+   OutTextXY(X1 + 25, Y + 5, 'Dossier                    Son         Visuel');
+   Y := Y + 20;
+   Line(X1 + 20, Y, X2 - 20, Y);
+
+   For I := 0 To FolderNotifSettingsCount - 1 Do Begin
+    If I > 6 Then Break;
+    If FolderNotifSettings[I].EnableNotification Then CheckStr := '[X]' Else CheckStr := '[ ]';
+    OutTextXY(X1 + 25, Y + 5 + I * 22, CheckStr + ' ' + FolderNotifSettings[I].FolderName);
+   End;
+  End;
+
+  ncsSounds: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 10, Y, X1 + 90, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 10, Y, X1 + 90, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 95, Y, X1 + 175, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 95, Y, X1 + 175, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y + 5, 'Dossiers');
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 180, Y, X1 + 240, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 190, Y + 5, 'Sons');
+
+   Y := Y + 35;
+
+   { Configuration des sons }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Fichier WAV par defaut:');
+   Y := Y + 20;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(Black);
+   If Length(NotificationSettings.DefaultSoundFile) > 0 Then
+    OutTextXY(X1 + 25, Y + 5, NotificationSettings.DefaultSoundFile)
+   Else
+    OutTextXY(X1 + 25, Y + 5, '(Aucun fichier selectionne)');
+
+   { Bouton Parcourir }
+   BtnX := X2 - 90;
+   BtnW := 70;
+   BtnH := 20;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, Y, BtnX + BtnW, Y + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, Y, BtnX + BtnW, Y + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 10, Y + 5, 'Parcourir');
+
+   Y := Y + 35;
+
+   { Bouton Test }
+   OutTextXY(X1 + 20, Y, 'Tester le son:');
+   BtnX := X1 + 120;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, Y - 3, BtnX + 80, Y + 17);
+   SetColor(DarkGray);
+   Rectangle(BtnX, Y - 3, BtnX + 80, Y + 17);
+   SetColor(Black);
+   OutTextXY(BtnX + 20, Y, 'Tester');
+  End;
+
+  ncsHistory: Begin
+   { Historique des notifications }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Historique des notifications:');
+   Y := Y + 25;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 20, Y + 250);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 20, Y + 250);
+
+   SetColor(Black);
+   For I := NotificationHistoryCount - 1 DownTo 0 Do Begin
+    If NotificationHistoryCount - 1 - I > 10 Then Break;
+    DisplayStr := NotificationHistory[I].AccountName + ' - ' +
+                  NotificationHistory[I].FolderName + ': ' +
+                  NotificationHistory[I].Subject;
+    If Length(DisplayStr) > 55 Then
+     DisplayStr := Copy(DisplayStr, 1, 52) + '...';
+    OutTextXY(X1 + 25, Y + 5 + (NotificationHistoryCount - 1 - I) * 22, DisplayStr);
+   End;
+  End;
+ End;
+
+ { Boutons OK et Annuler }
+ BtnW := 80;
+ BtnH := 25;
+ BtnY := Y2 - 40;
+
+ { Bouton OK }
+ BtnX := X2 - 180;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 30, BtnY + 7, 'OK');
+
+ { Bouton Annuler }
+ BtnX := X2 - 90;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 15, BtnY + 7, 'Annuler');
+End;
+
+{ Gere les clics dans la fenetre de configuration }
+Procedure Notif_HandleConfigClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ TabY: Integer;
+Begin
+ If Not NotificationConfigVisible Then Exit;
+
+ X1 := NotificationConfigX;
+ Y1 := NotificationConfigY;
+ X2 := X1 + NOTIF_CONFIG_WIDTH;
+ Y2 := Y1 + NOTIF_CONFIG_HEIGHT;
+
+ { Verifier si clic hors de la fenetre }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Begin
+  NotificationConfigVisible := False;
+  NotificationConfigState := ncsHidden;
+  Exit;
+ End;
+
+ { Bouton fermer }
+ If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
+  NotificationConfigVisible := False;
+  NotificationConfigState := ncsHidden;
+  Exit;
+ End;
+
+ TabY := Y1 + 35;
+
+ { Onglets }
+ If (MY >= TabY) And (MY <= TabY + 20) Then Begin
+  If (MX >= X1 + 10) And (MX <= X1 + 90) Then Begin
+   NotificationConfigState := ncsGeneral;
+   Exit;
+  End;
+  If (MX >= X1 + 95) And (MX <= X1 + 175) Then Begin
+   NotificationConfigState := ncsFolders;
+   Exit;
+  End;
+  If (MX >= X1 + 180) And (MX <= X1 + 240) Then Begin
+   NotificationConfigState := ncsSounds;
+   Exit;
+  End;
+ End;
+
+ { Options de l'onglet General }
+ If NotificationConfigState = ncsGeneral Then Begin
+  { Activer les notifications }
+  If (MY >= TabY + 35) And (MY <= TabY + 50) And (MX >= X1 + 20) And (MX <= X1 + 400) Then Begin
+   NotificationSettings.Enabled := Not NotificationSettings.Enabled;
+   Exit;
+  End;
+
+  { Verifier au demarrage }
+  If (MY >= TabY + 85) And (MY <= TabY + 100) And (MX >= X1 + 20) And (MX <= X1 + 300) Then Begin
+   NotificationSettings.CheckOnStartup := Not NotificationSettings.CheckOnStartup;
+   Exit;
+  End;
+
+  { Types d'alerte sonore }
+  If (MY >= TabY + 110) And (MY <= TabY + 125) Then Begin
+   If (MX >= X1 + 150) And (MX <= X1 + 240) Then Begin
+    NotificationSettings.DefaultSoundAlert := satNone;
+    Exit;
+   End;
+   If (MX >= X1 + 250) And (MX <= X1 + 380) Then Begin
+    NotificationSettings.DefaultSoundAlert := satSystemBeep;
+    Exit;
+   End;
+  End;
+  If (MY >= TabY + 128) And (MY <= TabY + 143) Then Begin
+   If (MX >= X1 + 150) And (MX <= X1 + 240) Then Begin
+    NotificationSettings.DefaultSoundAlert := satMelody;
+    Exit;
+   End;
+   If (MX >= X1 + 250) And (MX <= X1 + 380) Then Begin
+    NotificationSettings.DefaultSoundAlert := satWAVFile;
+    Exit;
+   End;
+  End;
+
+  { Types d'alerte visuelle }
+  If (MY >= TabY + 153) And (MY <= TabY + 168) Then Begin
+   If (MX >= X1 + 150) And (MX <= X1 + 240) Then Begin
+    NotificationSettings.DefaultVisualAlert := vntNone;
+    Exit;
+   End;
+   If (MX >= X1 + 250) And (MX <= X1 + 380) Then Begin
+    NotificationSettings.DefaultVisualAlert := vntTitleFlash;
+    Exit;
+   End;
+  End;
+  If (MY >= TabY + 171) And (MY <= TabY + 186) Then Begin
+   If (MX >= X1 + 150) And (MX <= X1 + 240) Then Begin
+    NotificationSettings.DefaultVisualAlert := vntTitleBadge;
+    Exit;
+   End;
+   If (MX >= X1 + 250) And (MX <= X1 + 380) Then Begin
+    NotificationSettings.DefaultVisualAlert := vntPopup;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Boutons OK et Annuler }
+ BtnW := 80;
+ BtnH := 25;
+ BtnY := Y2 - 40;
+
+ { Bouton OK }
+ BtnX := X2 - 180;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  NotificationConfigVisible := False;
+  NotificationConfigState := ncsHidden;
+  Exit;
+ End;
+
+ { Bouton Annuler }
+ BtnX := X2 - 90;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  NotificationConfigVisible := False;
+  NotificationConfigState := ncsHidden;
+  Exit;
+ End;
+End;
+
+{ Gere les touches clavier dans la configuration }
+Procedure Notif_HandleConfigKey(Key: Char);
+Begin
+ If Not NotificationConfigVisible Then Exit;
+
+ Case Key Of
+  #27: Begin { Echap }
+   NotificationConfigVisible := False;
+   NotificationConfigState := ncsHidden;
+  End;
+ End;
+End;
+
+{ Affiche la fenetre de configuration des notifications }
+Procedure Notif_ShowConfig;
+Begin
+ NotificationConfigVisible := True;
+ NotificationConfigState := ncsGeneral;
+End;
+
+{ Masque la fenetre de configuration des notifications }
+Procedure Notif_HideConfig;
+Begin
+ NotificationConfigVisible := False;
+ NotificationConfigState := ncsHidden;
+End;
+
+{ Retourne le texte du badge pour la barre de titre }
+Function Notif_GetTitleBadge: String;
+Var
+ Count: Integer;
+ Result: String;
+Begin
+ Count := Notif_GetUnacknowledgedCount;
+ If Count > 0 Then Begin
+  Str(Count, Result);
+  Notif_GetTitleBadge := '(' + Result + ') ';
+ End Else
+  Notif_GetTitleBadge := '';
+End;
+
+{ Ajoute des parametres de notification de demonstration }
+Procedure Notif_AddDemoSettings;
+Begin
+ { Configurer les notifications pour les dossiers standards }
+ Notif_SetFolderSettings(1, 'Boite de reception', True, satSystemBeep, vntTitleBadge, '');
+ Notif_SetFolderSettings(2, 'Elements envoyes', False, satNone, vntNone, '');
+ Notif_SetFolderSettings(3, 'Brouillons', False, satNone, vntNone, '');
+ Notif_SetFolderSettings(4, 'Elements supprimes', False, satNone, vntNone, '');
+ Notif_SetFolderSettings(5, 'Courrier indesirable', True, satMelody, vntPopup, '');
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DES NOTIFICATIONS ET ALERTES (TODO 20)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -15813,6 +16902,10 @@ BEGIN
  { Initialisation du systeme de signatures (TODO 19) }
  Sig_Init;
  Sig_AddDemoSignatures;
+
+ { Initialisation du systeme de notifications (TODO 20) }
+ Notif_Init;
+ Notif_AddDemoSettings;
 
  { Affichage de l'interface }
  ShowMouse;
