@@ -132,7 +132,7 @@
       - Ordre d'exécution des règles configurable
       - Activation/désactivation des règles individuelles
 
-  18. [ ] Fonctionnalités de recherche avancée
+  18. [x] Fonctionnalités de recherche avancée
       - Recherche dans: Objet, Corps, Expéditeur, Destinataire
       - Filtres: Plage de dates, Taille, Avec pièces jointes
       - Recherche dans tous les dossiers ou dossier actuel
@@ -724,6 +724,60 @@ Type
   rwsNew,                        { Nouvelle regle }
   rwsConditions,                 { Edition des conditions }
   rwsActions                     { Edition des actions }
+ );
+
+ { ============================================================================
+   TYPES POUR LA RECHERCHE AVANCEE (TODO 18)
+   ============================================================================ }
+
+ { Champs de recherche }
+ TSearchField = (
+  sfSubject,                     { Recherche dans l'objet }
+  sfBody,                        { Recherche dans le corps }
+  sfSender,                      { Recherche dans l'expediteur }
+  sfRecipient,                   { Recherche dans le destinataire }
+  sfAll                          { Recherche dans tous les champs }
+ );
+
+ { Etat des filtres de recherche }
+ TSearchFilter = Record
+  SearchText: String[80];        { Texte a rechercher }
+  SearchField: TSearchField;     { Champ de recherche }
+  CaseSensitive: Boolean;        { Respecter la casse }
+  WholeWord: Boolean;            { Mot entier seulement }
+  HasAttachment: Boolean;        { Avec pieces jointes }
+  FilterByAttachment: Boolean;   { Filtrer par pieces jointes }
+  DateFilterEnabled: Boolean;    { Filtrer par date }
+  DateFrom: LongInt;             { Date de debut }
+  DateTo: LongInt;               { Date de fin }
+  SizeFilterEnabled: Boolean;    { Filtrer par taille }
+  MinSize: LongInt;              { Taille minimale }
+  MaxSize: LongInt;              { Taille maximale }
+  SearchAllFolders: Boolean;     { Rechercher dans tous les dossiers }
+ End;
+
+ { Resultat de recherche }
+ TSearchResult = Record
+  MessageIndex: Integer;         { Index du message }
+  MatchPosition: Integer;        { Position de la correspondance }
+  MatchLength: Integer;          { Longueur de la correspondance }
+  MatchField: TSearchField;      { Champ ou la correspondance a ete trouvee }
+  MatchContext: String[80];      { Contexte autour de la correspondance }
+ End;
+
+ { Element de l'historique de recherche }
+ TSearchHistoryItem = Record
+  SearchText: String[80];        { Texte recherche }
+  SearchDate: LongInt;           { Date de la recherche }
+  ResultCount: Integer;          { Nombre de resultats }
+ End;
+
+ { Etat de la fenetre de recherche }
+ TSearchWindowState = (
+  swsHidden,                     { Fenetre cachee }
+  swsSimple,                     { Recherche simple }
+  swsAdvanced,                   { Recherche avancee }
+  swsResults                     { Affichage des resultats }
  );
 
  { Type de colonne pour la liste des messages }
@@ -1644,6 +1698,26 @@ Const
  { Fichier de sauvegarde des regles }
  RULES_FILE = 'RULES.DAT';
 
+ { ============================================================================
+   CONSTANTES POUR LA RECHERCHE AVANCEE (TODO 18)
+   ============================================================================ }
+
+ { Nombre maximum de resultats de recherche }
+ MAX_SEARCH_RESULTS = 100;
+
+ { Nombre maximum d'elements dans l'historique }
+ MAX_SEARCH_HISTORY = 20;
+
+ { Dimensions de la fenetre de recherche }
+ SEARCH_WINDOW_WIDTH = 480;
+ SEARCH_WINDOW_HEIGHT = 380;
+
+ { Hauteur d'une ligne de resultat }
+ SEARCH_RESULT_HEIGHT = 20;
+
+ { Nombre de resultats visibles }
+ SEARCH_RESULTS_VISIBLE = 10;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1848,6 +1922,21 @@ Var
  EditingRuleIndex: Integer;             { Index de la regle en edition }
  EditingConditionIndex: Integer;        { Index de la condition en edition }
  EditingActionIndex: Integer;           { Index de l'action en edition }
+
+ { Variables globales pour la recherche avancee (TODO 18) }
+ SearchFilter: TSearchFilter;           { Filtre de recherche actuel }
+ SearchResults: Array[0..MAX_SEARCH_RESULTS-1] of TSearchResult; { Resultats }
+ SearchResultCount: Integer;            { Nombre de resultats }
+ SearchHistory: Array[0..MAX_SEARCH_HISTORY-1] of TSearchHistoryItem; { Historique }
+ SearchHistoryCount: Integer;           { Nombre d'elements dans l'historique }
+ SearchWindowState: TSearchWindowState; { Etat de la fenetre }
+ SearchWindowX, SearchWindowY: Integer; { Position de la fenetre }
+ SearchVisible: Boolean;                { Visibilite de la fenetre }
+ SearchScrollOffset: Integer;           { Decalage de defilement }
+ SearchSelectedIndex: Integer;          { Resultat selectionne }
+ SearchInProgress: Boolean;             { Recherche en cours }
+ HighlightResults: Boolean;             { Mise en surbrillance active }
+ CurrentHighlightIndex: Integer;        { Index de surbrillance actuel }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -11959,6 +12048,806 @@ End;
   FIN DE L'IMPLEMENTATION DU SYSTEME DE REGLES
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DE LA RECHERCHE AVANCEE (TODO 18)
+  ============================================================================ }
+
+{ Initialise le filtre de recherche }
+Procedure Search_InitFilter;
+Begin
+ SearchFilter.SearchText := '';
+ SearchFilter.SearchField := sfAll;
+ SearchFilter.CaseSensitive := False;
+ SearchFilter.WholeWord := False;
+ SearchFilter.HasAttachment := False;
+ SearchFilter.FilterByAttachment := False;
+ SearchFilter.DateFilterEnabled := False;
+ SearchFilter.DateFrom := 0;
+ SearchFilter.DateTo := 0;
+ SearchFilter.SizeFilterEnabled := False;
+ SearchFilter.MinSize := 0;
+ SearchFilter.MaxSize := 0;
+ SearchFilter.SearchAllFolders := False;
+End;
+
+{ Initialise le systeme de recherche }
+Procedure Search_Init;
+Var
+ I: Integer;
+Begin
+ Search_InitFilter;
+ SearchResultCount := 0;
+ SearchHistoryCount := 0;
+ SearchWindowState := swsHidden;
+ SearchWindowX := (640 - SEARCH_WINDOW_WIDTH) Div 2;
+ SearchWindowY := (480 - SEARCH_WINDOW_HEIGHT) Div 2;
+ SearchVisible := False;
+ SearchScrollOffset := 0;
+ SearchSelectedIndex := -1;
+ SearchInProgress := False;
+ HighlightResults := True;
+ CurrentHighlightIndex := -1;
+
+ For I := 0 To MAX_SEARCH_RESULTS - 1 Do Begin
+  SearchResults[I].MessageIndex := -1;
+  SearchResults[I].MatchPosition := 0;
+  SearchResults[I].MatchLength := 0;
+  SearchResults[I].MatchField := sfAll;
+  SearchResults[I].MatchContext := '';
+ End;
+
+ For I := 0 To MAX_SEARCH_HISTORY - 1 Do Begin
+  SearchHistory[I].SearchText := '';
+  SearchHistory[I].SearchDate := 0;
+  SearchHistory[I].ResultCount := 0;
+ End;
+End;
+
+{ Convertit une chaine en minuscules }
+Function Search_ToLower(S: String): String;
+Var
+ I: Integer;
+ R: String;
+Begin
+ R := S;
+ For I := 1 To Length(R) Do
+  If (R[I] >= 'A') And (R[I] <= 'Z') Then
+   R[I] := Chr(Ord(R[I]) + 32);
+ Search_ToLower := R;
+End;
+
+{ Verifie si une chaine contient un mot entier }
+Function Search_ContainsWholeWord(Haystack, Needle: String;
+                                   CaseSensitive: Boolean): Boolean;
+Var
+ H, N: String;
+ P: Integer;
+ CharBefore, CharAfter: Char;
+Begin
+ Search_ContainsWholeWord := False;
+
+ If CaseSensitive Then Begin
+  H := Haystack;
+  N := Needle;
+ End
+ Else Begin
+  H := Search_ToLower(Haystack);
+  N := Search_ToLower(Needle);
+ End;
+
+ P := Pos(N, H);
+ While P > 0 Do Begin
+  { Verifier le caractere avant }
+  If P > 1 Then
+   CharBefore := H[P - 1]
+  Else
+   CharBefore := ' ';
+
+  { Verifier le caractere apres }
+  If P + Length(N) <= Length(H) Then
+   CharAfter := H[P + Length(N)]
+  Else
+   CharAfter := ' ';
+
+  { Verifier si c'est un mot entier }
+  If ((CharBefore = ' ') Or (CharBefore = ',') Or (CharBefore = '.') Or
+      (CharBefore = ';') Or (CharBefore = ':') Or (CharBefore = '!') Or
+      (CharBefore = '?') Or (CharBefore = '<') Or (CharBefore = '>')) And
+     ((CharAfter = ' ') Or (CharAfter = ',') Or (CharAfter = '.') Or
+      (CharAfter = ';') Or (CharAfter = ':') Or (CharAfter = '!') Or
+      (CharAfter = '?') Or (CharAfter = '<') Or (CharAfter = '>')) Then Begin
+   Search_ContainsWholeWord := True;
+   Exit;
+  End;
+
+  { Chercher la prochaine occurrence }
+  If P + Length(N) < Length(H) Then Begin
+   Delete(H, 1, P);
+   P := Pos(N, H);
+  End
+  Else
+   P := 0;
+ End;
+End;
+
+{ Verifie si une chaine contient une autre }
+Function Search_Contains(Haystack, Needle: String;
+                          CaseSensitive, WholeWord: Boolean): Integer;
+Var
+ H, N: String;
+ P: Integer;
+Begin
+ Search_Contains := 0;
+ If Length(Needle) = 0 Then Exit;
+ If Length(Needle) > Length(Haystack) Then Exit;
+
+ If WholeWord Then Begin
+  If Search_ContainsWholeWord(Haystack, Needle, CaseSensitive) Then
+   Search_Contains := Pos(Search_ToLower(Needle), Search_ToLower(Haystack))
+  Else
+   Search_Contains := 0;
+  Exit;
+ End;
+
+ If CaseSensitive Then Begin
+  H := Haystack;
+  N := Needle;
+ End
+ Else Begin
+  H := Search_ToLower(Haystack);
+  N := Search_ToLower(Needle);
+ End;
+
+ P := Pos(N, H);
+ Search_Contains := P;
+End;
+
+{ Obtient le corps du message comme une seule chaine }
+Function Search_GetMessageBody(MsgIndex: Integer): String;
+Var
+ I: Integer;
+ Body: String;
+Begin
+ Body := '';
+ If (MsgIndex >= 0) And (MsgIndex < MessageCount) Then Begin
+  For I := 0 To Messages[MsgIndex].BodyLineCount - 1 Do Begin
+   If Length(Body) + Length(Messages[MsgIndex].Body[I]) < 250 Then
+    Body := Body + Messages[MsgIndex].Body[I] + ' ';
+  End;
+ End;
+ Search_GetMessageBody := Body;
+End;
+
+{ Extrait le contexte autour d'une correspondance }
+Function Search_GetContext(S: String; MatchPos, MatchLen: Integer): String;
+Var
+ Start, EndPos: Integer;
+ Context: String;
+Begin
+ { Extraire 30 caracteres avant et apres }
+ Start := MatchPos - 30;
+ If Start < 1 Then Start := 1;
+
+ EndPos := MatchPos + MatchLen + 30;
+ If EndPos > Length(S) Then EndPos := Length(S);
+
+ Context := Copy(S, Start, EndPos - Start + 1);
+
+ { Ajouter des ellipses si necessaire }
+ If Start > 1 Then Context := '...' + Context;
+ If EndPos < Length(S) Then Context := Context + '...';
+
+ Search_GetContext := Context;
+End;
+
+{ Recherche dans un message specifique }
+Function Search_InMessage(MsgIndex: Integer): Boolean;
+Var
+ Found: Boolean;
+ MatchPos: Integer;
+ FieldText, Body: String;
+ NewResult: TSearchResult;
+Begin
+ Search_InMessage := False;
+ Found := False;
+
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+ If SearchResultCount >= MAX_SEARCH_RESULTS Then Exit;
+
+ { Verifier les filtres }
+ If SearchFilter.FilterByAttachment Then Begin
+  If SearchFilter.HasAttachment <> Messages[MsgIndex].HasAttachment Then Exit;
+ End;
+
+ If SearchFilter.DateFilterEnabled Then Begin
+  If (SearchFilter.DateFrom > 0) And
+     (Messages[MsgIndex].DateSort < SearchFilter.DateFrom) Then Exit;
+  If (SearchFilter.DateTo > 0) And
+     (Messages[MsgIndex].DateSort > SearchFilter.DateTo) Then Exit;
+ End;
+
+ If SearchFilter.SizeFilterEnabled Then Begin
+  If (SearchFilter.MinSize > 0) And
+     (Messages[MsgIndex].Size < SearchFilter.MinSize) Then Exit;
+  If (SearchFilter.MaxSize > 0) And
+     (Messages[MsgIndex].Size > SearchFilter.MaxSize) Then Exit;
+ End;
+
+ { Recherche dans l'objet }
+ If (SearchFilter.SearchField = sfSubject) Or (SearchFilter.SearchField = sfAll) Then Begin
+  MatchPos := Search_Contains(Messages[MsgIndex].Subject, SearchFilter.SearchText,
+                              SearchFilter.CaseSensitive, SearchFilter.WholeWord);
+  If MatchPos > 0 Then Begin
+   NewResult.MessageIndex := MsgIndex;
+   NewResult.MatchPosition := MatchPos;
+   NewResult.MatchLength := Length(SearchFilter.SearchText);
+   NewResult.MatchField := sfSubject;
+   NewResult.MatchContext := Search_GetContext(Messages[MsgIndex].Subject,
+                                               MatchPos, NewResult.MatchLength);
+   SearchResults[SearchResultCount] := NewResult;
+   Inc(SearchResultCount);
+   Found := True;
+   If SearchResultCount >= MAX_SEARCH_RESULTS Then Begin
+    Search_InMessage := Found;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Recherche dans l'expediteur }
+ If (SearchFilter.SearchField = sfSender) Or (SearchFilter.SearchField = sfAll) Then Begin
+  FieldText := Messages[MsgIndex].FromName + ' <' + Messages[MsgIndex].FromEmail + '>';
+  MatchPos := Search_Contains(FieldText, SearchFilter.SearchText,
+                              SearchFilter.CaseSensitive, SearchFilter.WholeWord);
+  If MatchPos > 0 Then Begin
+   NewResult.MessageIndex := MsgIndex;
+   NewResult.MatchPosition := MatchPos;
+   NewResult.MatchLength := Length(SearchFilter.SearchText);
+   NewResult.MatchField := sfSender;
+   NewResult.MatchContext := Search_GetContext(FieldText, MatchPos, NewResult.MatchLength);
+   SearchResults[SearchResultCount] := NewResult;
+   Inc(SearchResultCount);
+   Found := True;
+   If SearchResultCount >= MAX_SEARCH_RESULTS Then Begin
+    Search_InMessage := Found;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Recherche dans le destinataire }
+ If (SearchFilter.SearchField = sfRecipient) Or (SearchFilter.SearchField = sfAll) Then Begin
+  FieldText := Messages[MsgIndex].ToName + ' <' + Messages[MsgIndex].ToEmail + '>';
+  MatchPos := Search_Contains(FieldText, SearchFilter.SearchText,
+                              SearchFilter.CaseSensitive, SearchFilter.WholeWord);
+  If MatchPos > 0 Then Begin
+   NewResult.MessageIndex := MsgIndex;
+   NewResult.MatchPosition := MatchPos;
+   NewResult.MatchLength := Length(SearchFilter.SearchText);
+   NewResult.MatchField := sfRecipient;
+   NewResult.MatchContext := Search_GetContext(FieldText, MatchPos, NewResult.MatchLength);
+   SearchResults[SearchResultCount] := NewResult;
+   Inc(SearchResultCount);
+   Found := True;
+   If SearchResultCount >= MAX_SEARCH_RESULTS Then Begin
+    Search_InMessage := Found;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Recherche dans le corps }
+ If (SearchFilter.SearchField = sfBody) Or (SearchFilter.SearchField = sfAll) Then Begin
+  Body := Search_GetMessageBody(MsgIndex);
+  MatchPos := Search_Contains(Body, SearchFilter.SearchText,
+                              SearchFilter.CaseSensitive, SearchFilter.WholeWord);
+  If MatchPos > 0 Then Begin
+   NewResult.MessageIndex := MsgIndex;
+   NewResult.MatchPosition := MatchPos;
+   NewResult.MatchLength := Length(SearchFilter.SearchText);
+   NewResult.MatchField := sfBody;
+   NewResult.MatchContext := Search_GetContext(Body, MatchPos, NewResult.MatchLength);
+   SearchResults[SearchResultCount] := NewResult;
+   Inc(SearchResultCount);
+   Found := True;
+  End;
+ End;
+
+ Search_InMessage := Found;
+End;
+
+{ Execute la recherche }
+Procedure Search_Execute;
+Var
+ I: Integer;
+Begin
+ SearchResultCount := 0;
+ SearchSelectedIndex := -1;
+ SearchScrollOffset := 0;
+ SearchInProgress := True;
+
+ If Length(SearchFilter.SearchText) = 0 Then Begin
+  SearchInProgress := False;
+  Exit;
+ End;
+
+ { Rechercher dans tous les messages }
+ For I := 0 To MessageCount - 1 Do Begin
+  Search_InMessage(I);
+  If SearchResultCount >= MAX_SEARCH_RESULTS Then Break;
+ End;
+
+ SearchInProgress := False;
+
+ { Ajouter a l'historique }
+ If SearchResultCount > 0 Then
+  Search_AddToHistory(SearchFilter.SearchText, SearchResultCount);
+End;
+
+{ Ajoute une recherche a l'historique }
+Procedure Search_AddToHistory(SearchText: String; ResultCount: Integer);
+Var
+ I: Integer;
+Begin
+ { Verifier si deja dans l'historique }
+ For I := 0 To SearchHistoryCount - 1 Do Begin
+  If SearchHistory[I].SearchText = SearchText Then Begin
+   { Mettre a jour }
+   SearchHistory[I].SearchDate := 0; { TODO: Date actuelle }
+   SearchHistory[I].ResultCount := ResultCount;
+   Exit;
+  End;
+ End;
+
+ { Decaler si necessaire }
+ If SearchHistoryCount >= MAX_SEARCH_HISTORY Then Begin
+  For I := 0 To MAX_SEARCH_HISTORY - 2 Do
+   SearchHistory[I] := SearchHistory[I + 1];
+  SearchHistoryCount := MAX_SEARCH_HISTORY - 1;
+ End;
+
+ { Ajouter }
+ SearchHistory[SearchHistoryCount].SearchText := SearchText;
+ SearchHistory[SearchHistoryCount].SearchDate := 0; { TODO: Date actuelle }
+ SearchHistory[SearchHistoryCount].ResultCount := ResultCount;
+ Inc(SearchHistoryCount);
+End;
+
+{ Efface l'historique de recherche }
+Procedure Search_ClearHistory;
+Var
+ I: Integer;
+Begin
+ For I := 0 To MAX_SEARCH_HISTORY - 1 Do Begin
+  SearchHistory[I].SearchText := '';
+  SearchHistory[I].SearchDate := 0;
+  SearchHistory[I].ResultCount := 0;
+ End;
+ SearchHistoryCount := 0;
+End;
+
+{ Va au resultat suivant }
+Procedure Search_NextResult;
+Begin
+ If SearchResultCount = 0 Then Exit;
+
+ Inc(CurrentHighlightIndex);
+ If CurrentHighlightIndex >= SearchResultCount Then
+  CurrentHighlightIndex := 0;
+
+ { Selectionner le message correspondant }
+ If SearchResults[CurrentHighlightIndex].MessageIndex >= 0 Then
+  SelectedMessage := SearchResults[CurrentHighlightIndex].MessageIndex;
+End;
+
+{ Va au resultat precedent }
+Procedure Search_PrevResult;
+Begin
+ If SearchResultCount = 0 Then Exit;
+
+ Dec(CurrentHighlightIndex);
+ If CurrentHighlightIndex < 0 Then
+  CurrentHighlightIndex := SearchResultCount - 1;
+
+ { Selectionner le message correspondant }
+ If SearchResults[CurrentHighlightIndex].MessageIndex >= 0 Then
+  SelectedMessage := SearchResults[CurrentHighlightIndex].MessageIndex;
+End;
+
+{ Retourne le nom d'un champ de recherche }
+Function Search_GetFieldName(Field: TSearchField): String;
+Begin
+ Case Field Of
+  sfSubject: Search_GetFieldName := 'Objet';
+  sfBody: Search_GetFieldName := 'Corps';
+  sfSender: Search_GetFieldName := 'Expediteur';
+  sfRecipient: Search_GetFieldName := 'Destinataire';
+  sfAll: Search_GetFieldName := 'Tous';
+  Else Search_GetFieldName := 'Inconnu';
+ End;
+End;
+
+{ Dessine la fenetre de recherche }
+Procedure Search_DrawWindow;
+Var
+ X, Y, W, H: Integer;
+ I, Y1: Integer;
+ DisplayStr: String;
+ CheckStr: String;
+Begin
+ If Not SearchVisible Then Exit;
+
+ X := SearchWindowX;
+ Y := SearchWindowY;
+ W := SEARCH_WINDOW_WIDTH;
+ H := SEARCH_WINDOW_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X, Y, X + W, Y + H);
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + W, Y + H);
+ SetColor(White);
+ Line(X + 1, Y + 1, X + W - 1, Y + 1);
+ Line(X + 1, Y + 1, X + 1, Y + H - 1);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X + 2, Y + 2, X + W - 2, Y + 22);
+ SetColor(White);
+ OutTextXY(X + 10, Y + 7, 'Recherche avancee');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X + W - 20, Y + 4, X + W - 4, Y + 20);
+ SetColor(White);
+ OutTextXY(X + W - 16, Y + 7, 'X');
+
+ { Zone de saisie du texte }
+ Y1 := Y + 30;
+ SetColor(Black);
+ OutTextXY(X + 10, Y1 + 4, 'Rechercher:');
+
+ SetFillStyle(SolidFill, White);
+ Bar(X + 90, Y1, X + W - 10, Y1 + 20);
+ SetColor(Black);
+ Rectangle(X + 90, Y1, X + W - 10, Y1 + 20);
+ OutTextXY(X + 95, Y1 + 5, SearchFilter.SearchText);
+
+ { Options de recherche }
+ Y1 := Y + 58;
+ SetColor(Black);
+ OutTextXY(X + 10, Y1, 'Rechercher dans:');
+
+ { Radio boutons pour le champ }
+ Y1 := Y + 75;
+ If SearchFilter.SearchField = sfAll Then CheckStr := '(o)' Else CheckStr := '( )';
+ OutTextXY(X + 10, Y1, CheckStr + ' Tous');
+ If SearchFilter.SearchField = sfSubject Then CheckStr := '(o)' Else CheckStr := '( )';
+ OutTextXY(X + 100, Y1, CheckStr + ' Objet');
+ If SearchFilter.SearchField = sfSender Then CheckStr := '(o)' Else CheckStr := '( )';
+ OutTextXY(X + 200, Y1, CheckStr + ' Expediteur');
+
+ Y1 := Y + 92;
+ If SearchFilter.SearchField = sfBody Then CheckStr := '(o)' Else CheckStr := '( )';
+ OutTextXY(X + 10, Y1, CheckStr + ' Corps');
+ If SearchFilter.SearchField = sfRecipient Then CheckStr := '(o)' Else CheckStr := '( )';
+ OutTextXY(X + 100, Y1, CheckStr + ' Destinataire');
+
+ { Cases a cocher }
+ Y1 := Y + 115;
+ If SearchFilter.CaseSensitive Then CheckStr := '[X]' Else CheckStr := '[ ]';
+ OutTextXY(X + 10, Y1, CheckStr + ' Respecter la casse');
+
+ If SearchFilter.WholeWord Then CheckStr := '[X]' Else CheckStr := '[ ]';
+ OutTextXY(X + 200, Y1, CheckStr + ' Mot entier');
+
+ Y1 := Y + 132;
+ If SearchFilter.FilterByAttachment Then CheckStr := '[X]' Else CheckStr := '[ ]';
+ OutTextXY(X + 10, Y1, CheckStr + ' Avec pieces jointes uniquement');
+
+ If SearchFilter.SearchAllFolders Then CheckStr := '[X]' Else CheckStr := '[ ]';
+ OutTextXY(X + 250, Y1, CheckStr + ' Tous dossiers');
+
+ { Boutons }
+ Y1 := Y + 155;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + 100, Y1 + 25);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + 100, Y1 + 25);
+ OutTextXY(X + 22, Y1 + 8, 'Rechercher');
+
+ Bar(X + 110, Y1, X + 200, Y1 + 25);
+ Rectangle(X + 110, Y1, X + 200, Y1 + 25);
+ OutTextXY(X + 130, Y1 + 8, 'Effacer');
+
+ { Zone des resultats }
+ Y1 := Y + 190;
+ SetColor(Black);
+ Str(SearchResultCount, DisplayStr);
+ OutTextXY(X + 10, Y1, 'Resultats: ' + DisplayStr);
+
+ { En-tete }
+ Y1 := Y + 208;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + W - 10, Y1 + 16);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + W - 10, Y1 + 16);
+ OutTextXY(X + 15, Y1 + 3, 'Champ');
+ OutTextXY(X + 100, Y1 + 3, 'Contexte');
+
+ { Liste des resultats }
+ Y1 := Y + 226;
+ For I := 0 To SEARCH_RESULTS_VISIBLE - 1 Do Begin
+  If I + SearchScrollOffset >= SearchResultCount Then Break;
+
+  { Fond de la ligne }
+  If I + SearchScrollOffset = SearchSelectedIndex Then
+   SetFillStyle(SolidFill, Blue)
+  Else If (I Mod 2) = 0 Then
+   SetFillStyle(SolidFill, White)
+  Else
+   SetFillStyle(SolidFill, LightGray);
+
+  Bar(X + 10, Y1 + I * SEARCH_RESULT_HEIGHT,
+      X + W - 10, Y1 + (I + 1) * SEARCH_RESULT_HEIGHT - 1);
+
+  If I + SearchScrollOffset = SearchSelectedIndex Then
+   SetColor(White)
+  Else
+   SetColor(Black);
+
+  { Champ }
+  DisplayStr := Search_GetFieldName(SearchResults[I + SearchScrollOffset].MatchField);
+  OutTextXY(X + 15, Y1 + I * SEARCH_RESULT_HEIGHT + 4, DisplayStr);
+
+  { Contexte }
+  DisplayStr := SearchResults[I + SearchScrollOffset].MatchContext;
+  If Length(DisplayStr) > 45 Then
+   DisplayStr := Copy(DisplayStr, 1, 43) + '..';
+  OutTextXY(X + 100, Y1 + I * SEARCH_RESULT_HEIGHT + 4, DisplayStr);
+ End;
+
+ { Boutons du bas }
+ Y1 := Y + H - 35;
+
+ { Bouton Precedent }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + 100, Y1 + 25);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + 100, Y1 + 25);
+ OutTextXY(X + 22, Y1 + 8, 'Precedent');
+
+ { Bouton Suivant }
+ Bar(X + 110, Y1, X + 200, Y1 + 25);
+ Rectangle(X + 110, Y1, X + 200, Y1 + 25);
+ OutTextXY(X + 130, Y1 + 8, 'Suivant');
+
+ { Bouton Fermer }
+ Bar(X + W - 80, Y1, X + W - 10, Y1 + 25);
+ Rectangle(X + W - 80, Y1, X + W - 10, Y1 + 25);
+ OutTextXY(X + W - 62, Y1 + 8, 'Fermer');
+End;
+
+{ Affiche la fenetre de recherche }
+Procedure Search_Show;
+Begin
+ SearchVisible := True;
+ SearchWindowState := swsAdvanced;
+ SearchSelectedIndex := -1;
+ SearchScrollOffset := 0;
+End;
+
+{ Cache la fenetre de recherche }
+Procedure Search_Hide;
+Begin
+ SearchVisible := False;
+ SearchWindowState := swsHidden;
+End;
+
+{ Gere un clic dans la fenetre de recherche }
+Function Search_HandleClick(MX, MY: Integer): Boolean;
+Var
+ X, Y, W, H: Integer;
+ I, Y1: Integer;
+Begin
+ Search_HandleClick := False;
+ If Not SearchVisible Then Exit;
+
+ X := SearchWindowX;
+ Y := SearchWindowY;
+ W := SEARCH_WINDOW_WIDTH;
+ H := SEARCH_WINDOW_HEIGHT;
+
+ { Verifier si clic dans la fenetre }
+ If (MX < X) Or (MX > X + W) Or (MY < Y) Or (MY > Y + H) Then Exit;
+
+ Search_HandleClick := True;
+
+ { Bouton fermer }
+ If (MX >= X + W - 20) And (MX <= X + W - 4) And (MY >= Y + 4) And (MY <= Y + 20) Then Begin
+  Search_Hide;
+  Exit;
+ End;
+
+ { Radio boutons - Champ de recherche }
+ Y1 := Y + 75;
+ If (MY >= Y1 - 2) And (MY <= Y1 + 14) Then Begin
+  If (MX >= X + 10) And (MX <= X + 90) Then
+   SearchFilter.SearchField := sfAll
+  Else If (MX >= X + 100) And (MX <= X + 180) Then
+   SearchFilter.SearchField := sfSubject
+  Else If (MX >= X + 200) And (MX <= X + 320) Then
+   SearchFilter.SearchField := sfSender;
+  Exit;
+ End;
+
+ Y1 := Y + 92;
+ If (MY >= Y1 - 2) And (MY <= Y1 + 14) Then Begin
+  If (MX >= X + 10) And (MX <= X + 90) Then
+   SearchFilter.SearchField := sfBody
+  Else If (MX >= X + 100) And (MX <= X + 220) Then
+   SearchFilter.SearchField := sfRecipient;
+  Exit;
+ End;
+
+ { Cases a cocher }
+ Y1 := Y + 115;
+ If (MY >= Y1 - 2) And (MY <= Y1 + 14) Then Begin
+  If (MX >= X + 10) And (MX <= X + 180) Then
+   SearchFilter.CaseSensitive := Not SearchFilter.CaseSensitive
+  Else If (MX >= X + 200) And (MX <= X + 320) Then
+   SearchFilter.WholeWord := Not SearchFilter.WholeWord;
+  Exit;
+ End;
+
+ Y1 := Y + 132;
+ If (MY >= Y1 - 2) And (MY <= Y1 + 14) Then Begin
+  If (MX >= X + 10) And (MX <= X + 240) Then Begin
+   SearchFilter.FilterByAttachment := Not SearchFilter.FilterByAttachment;
+   If SearchFilter.FilterByAttachment Then
+    SearchFilter.HasAttachment := True;
+  End
+  Else If (MX >= X + 250) And (MX <= X + 400) Then
+   SearchFilter.SearchAllFolders := Not SearchFilter.SearchAllFolders;
+  Exit;
+ End;
+
+ { Bouton Rechercher }
+ Y1 := Y + 155;
+ If (MX >= X + 10) And (MX <= X + 100) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  Search_Execute;
+  Exit;
+ End;
+
+ { Bouton Effacer }
+ If (MX >= X + 110) And (MX <= X + 200) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  Search_InitFilter;
+  SearchResultCount := 0;
+  Exit;
+ End;
+
+ { Liste des resultats }
+ Y1 := Y + 226;
+ For I := 0 To SEARCH_RESULTS_VISIBLE - 1 Do Begin
+  If I + SearchScrollOffset >= SearchResultCount Then Break;
+
+  If (MY >= Y1 + I * SEARCH_RESULT_HEIGHT) And
+     (MY < Y1 + (I + 1) * SEARCH_RESULT_HEIGHT) Then Begin
+   SearchSelectedIndex := I + SearchScrollOffset;
+   { Selectionner le message correspondant }
+   If SearchResults[SearchSelectedIndex].MessageIndex >= 0 Then Begin
+    SelectedMessage := SearchResults[SearchSelectedIndex].MessageIndex;
+    CurrentHighlightIndex := SearchSelectedIndex;
+   End;
+   Exit;
+  End;
+ End;
+
+ { Boutons du bas }
+ Y1 := Y + H - 35;
+
+ { Bouton Precedent }
+ If (MX >= X + 10) And (MX <= X + 100) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  Search_PrevResult;
+  Exit;
+ End;
+
+ { Bouton Suivant }
+ If (MX >= X + 110) And (MX <= X + 200) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  Search_NextResult;
+  Exit;
+ End;
+
+ { Bouton Fermer }
+ If (MX >= X + W - 80) And (MX <= X + W - 10) And (MY >= Y1) And (MY <= Y1 + 25) Then Begin
+  Search_Hide;
+  Exit;
+ End;
+End;
+
+{ Gere une touche dans la fenetre de recherche }
+Function Search_HandleKey(Key: Char): Boolean;
+Begin
+ Search_HandleKey := False;
+ If Not SearchVisible Then Exit;
+
+ Search_HandleKey := True;
+
+ Case Key Of
+  #27: { Echap }
+   Search_Hide;
+  #13: { Entree }
+   Search_Execute;
+  #8: { Backspace }
+   If Length(SearchFilter.SearchText) > 0 Then
+    Delete(SearchFilter.SearchText, Length(SearchFilter.SearchText), 1);
+  Else
+   If (Key >= ' ') And (Key <= '~') Then Begin
+    If Length(SearchFilter.SearchText) < 78 Then
+     SearchFilter.SearchText := SearchFilter.SearchText + Key;
+   End
+   Else
+    Search_HandleKey := False;
+ End;
+End;
+
+{ Dessine la surbrillance d'un texte }
+Procedure Search_HighlightText(X, Y: Integer; Text: String; MatchPos, MatchLen: Integer);
+Var
+ BeforeText, MatchText, AfterText: String;
+ X1: Integer;
+Begin
+ If (MatchPos <= 0) Or (MatchPos > Length(Text)) Then Begin
+  SetColor(Black);
+  OutTextXY(X, Y, Text);
+  Exit;
+ End;
+
+ BeforeText := Copy(Text, 1, MatchPos - 1);
+ MatchText := Copy(Text, MatchPos, MatchLen);
+ AfterText := Copy(Text, MatchPos + MatchLen, Length(Text) - MatchPos - MatchLen + 1);
+
+ { Texte avant }
+ SetColor(Black);
+ OutTextXY(X, Y, BeforeText);
+ X1 := X + TextWidth(BeforeText);
+
+ { Texte en surbrillance }
+ SetFillStyle(SolidFill, Yellow);
+ Bar(X1, Y - 1, X1 + TextWidth(MatchText), Y + TextHeight(MatchText) + 1);
+ SetColor(Black);
+ OutTextXY(X1, Y, MatchText);
+ X1 := X1 + TextWidth(MatchText);
+
+ { Texte apres }
+ SetColor(Black);
+ OutTextXY(X1, Y, AfterText);
+End;
+
+{ Verifie si un message fait partie des resultats de recherche }
+Function Search_IsHighlighted(MsgIndex: Integer): Boolean;
+Var
+ I: Integer;
+Begin
+ Search_IsHighlighted := False;
+ If Not HighlightResults Then Exit;
+ If SearchResultCount = 0 Then Exit;
+
+ For I := 0 To SearchResultCount - 1 Do Begin
+  If SearchResults[I].MessageIndex = MsgIndex Then Begin
+   Search_IsHighlighted := True;
+   Exit;
+  End;
+ End;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DE LA RECHERCHE AVANCEE
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -13746,6 +14635,9 @@ BEGIN
  { Initialisation du systeme de regles (TODO 17) }
  Rules_Init;
  Rules_AddDemoRules;
+
+ { Initialisation de la recherche avancee (TODO 18) }
+ Search_Init;
 
  { Affichage de l'interface }
  ShowMouse;
