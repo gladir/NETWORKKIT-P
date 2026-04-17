@@ -3307,6 +3307,9 @@ Var
  UseCustomStrings: Boolean;            { Utiliser les chaines personnalisees }
  LanguageFilePath: String[80];         { Chemin du fichier de langue }
 
+{ Déclaration avancée de DrawInterface pour utilisation dans les menus }
+Procedure DrawInterface; Forward;
+
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
   ============================================================================ }
@@ -3392,13 +3395,6 @@ End;
   { PtcMouse gère l'affichage automatiquement }
  End;
 
- Procedure GetMouseState(Var X, Y, Button: Integer);
- Begin
-  { PtcMouse: Utiliser la fonction GetMouse du module PtcMouse }
-  X := GetMouseX;
-  Y := GetMouseY;
-  Button := GetMouseButtons;
- End;
 {$ENDIF}
 
 { Fonction pour obtenir le temps actuel en millisecondes (approximatif) }
@@ -3878,7 +3874,7 @@ Begin
  HideMouse;
 
  { Fond de l'infobulle (jaune clair) }
- SetFillStyle(SolidFill, LightYellow);
+ SetFillStyle(SolidFill, Yellow);
  Bar(TipX, TipY, TipX + TipW, TipY + TipH);
 
  { Bordure noire }
@@ -3923,9 +3919,6 @@ End;
 { ============================================================================
   PROCÉDURES D'INITIALISATION ET GESTION DES MENUS
   ============================================================================ }
-
-{ Déclaration avancée de DrawInterface pour utilisation dans les menus }
-Procedure DrawInterface; Forward;
 
 { Ajoute un élément à un menu }
 Procedure AddMenuItem(Var Menu: TDropdownMenu; Caption, Shortcut: String;
