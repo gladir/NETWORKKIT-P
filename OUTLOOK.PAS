@@ -153,7 +153,7 @@
       - Icône de la barre d'état système (si disponible)
       - Option de notification par dossier
 
-  21. [ ] Impression des messages et aperçu avant impression
+  21. [x] Impression des messages et aperçu avant impression
       - Fenêtre d'aperçu avant impression
       - Configuration des marges et en-têtes/pieds de page
       - Impression du message actuel ou sélection
@@ -955,6 +955,98 @@ Type
   ncsFolders,                    { Onglet parametres par dossier }
   ncsSounds,                     { Onglet configuration sons }
   ncsHistory                     { Onglet historique }
+ );
+
+ { ============================================================================
+   TYPES POUR L'IMPRESSION ET L'APERCU AVANT IMPRESSION (TODO 21)
+   ============================================================================ }
+
+ { Port d'imprimante }
+ TPrinterPort = (
+  ppLPT1,                        { Port LPT1 }
+  ppLPT2,                        { Port LPT2 }
+  ppLPT3,                        { Port LPT3 }
+  ppFile                         { Fichier }
+ );
+
+ { Format d'export }
+ TExportFormat = (
+  efText,                        { Texte brut }
+  efHTML,                        { HTML }
+  efRTF                          { Rich Text Format }
+ );
+
+ { Orientation de la page }
+ TPageOrientation = (
+  poPortrait,                    { Portrait }
+  poLandscape                    { Paysage }
+ );
+
+ { Taille de papier }
+ TPaperSize = (
+  psLetter,                      { Lettre US (8.5 x 11) }
+  psLegal,                       { Legal (8.5 x 14) }
+  psA4,                          { A4 (210 x 297 mm) }
+  psA5                           { A5 (148 x 210 mm) }
+ );
+
+ { Configuration des marges (en millimetres) }
+ TPrintMargins = Record
+  Top: Integer;                  { Marge superieure }
+  Bottom: Integer;               { Marge inferieure }
+  Left: Integer;                 { Marge gauche }
+  Right: Integer;                { Marge droite }
+ End;
+
+ { En-tete et pied de page }
+ TPrintHeaderFooter = Record
+  Left: String[60];              { Texte gauche }
+  Center: String[60];            { Texte centre }
+  Right: String[60];             { Texte droite }
+  Enabled: Boolean;              { Active }
+ End;
+
+ { Parametres d'impression }
+ TPrintSettings = Record
+  Port: TPrinterPort;            { Port d'imprimante }
+  OutputFile: String[80];        { Fichier de sortie (si ppFile) }
+  ExportFormat: TExportFormat;   { Format d'export }
+  PageOrientation: TPageOrientation; { Orientation }
+  PaperSize: TPaperSize;         { Taille du papier }
+  Margins: TPrintMargins;        { Marges }
+  Header: TPrintHeaderFooter;    { En-tete }
+  Footer: TPrintHeaderFooter;    { Pied de page }
+  PrintHeaders: Boolean;         { Imprimer les en-tetes du message }
+  PrintAttachmentList: Boolean;  { Imprimer la liste des pieces jointes }
+  FontSize: Integer;             { Taille de police (points) }
+  LineSpacing: Integer;          { Interligne (pourcentage, 100 = simple) }
+  Copies: Integer;               { Nombre de copies }
+  PageNumbers: Boolean;          { Afficher les numeros de page }
+  PrintDate: Boolean;            { Afficher la date d'impression }
+ End;
+
+ { Contenu d'une page pour l'apercu }
+ TPrintPageContent = Record
+  Lines: Array[0..59] of String[80]; { Lignes de texte (max 60 par page) }
+  LineCount: Integer;            { Nombre de lignes }
+  PageNumber: Integer;           { Numero de page }
+  HasMore: Boolean;              { Page suivante existe }
+ End;
+
+ { Etat de l'apercu avant impression }
+ TPrintPreviewState = (
+  ppsHidden,                     { Fenetre cachee }
+  ppsShowing,                    { Affichage normal }
+  ppsZoomed                      { Affichage zoom }
+ );
+
+ { Etat de la fenetre de configuration d'impression }
+ TPrintConfigState = (
+  pcsHidden,                     { Fenetre cachee }
+  pcsGeneral,                    { Onglet general }
+  pcsMargins,                    { Onglet marges }
+  pcsHeaderFooter,               { Onglet en-tetes/pieds de page }
+  pcsExport                      { Onglet export }
  );
 
  { Type de colonne pour la liste des messages }
@@ -1973,6 +2065,44 @@ Const
  { Duree du beep systeme (ms) }
  NOTIF_BEEP_DURATION = 200;
 
+ { ============================================================================
+   CONSTANTES POUR L'IMPRESSION ET L'APERCU (TODO 21)
+   ============================================================================ }
+
+ { Nombre maximum de lignes par page }
+ PRINT_MAX_LINES_PER_PAGE = 60;
+
+ { Nombre maximum de pages dans l'apercu }
+ MAX_PRINT_PAGES = 100;
+
+ { Dimensions de la fenetre d'apercu }
+ PRINT_PREVIEW_WIDTH = 550;
+ PRINT_PREVIEW_HEIGHT = 420;
+
+ { Dimensions de la fenetre de configuration }
+ PRINT_CONFIG_WIDTH = 450;
+ PRINT_CONFIG_HEIGHT = 350;
+
+ { Marges par defaut (en mm) }
+ PRINT_DEFAULT_MARGIN_TOP = 20;
+ PRINT_DEFAULT_MARGIN_BOTTOM = 20;
+ PRINT_DEFAULT_MARGIN_LEFT = 25;
+ PRINT_DEFAULT_MARGIN_RIGHT = 15;
+
+ { Taille de police par defaut }
+ PRINT_DEFAULT_FONT_SIZE = 10;
+
+ { Interligne par defaut (100 = simple) }
+ PRINT_DEFAULT_LINE_SPACING = 120;
+
+ { Caracteres par ligne selon la taille du papier }
+ PRINT_CHARS_PER_LINE_LETTER = 80;
+ PRINT_CHARS_PER_LINE_A4 = 78;
+
+ { Lignes par page selon la taille du papier }
+ PRINT_LINES_PER_PAGE_LETTER = 60;
+ PRINT_LINES_PER_PAGE_A4 = 64;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -2237,6 +2367,24 @@ Var
  TitleFlashState: Boolean;             { Etat du clignotement (on/off) }
  UnreadMailCount: Integer;             { Nombre de messages non lus total }
  NewMailSinceLastCheck: Integer;       { Nouveaux messages depuis derniere verif }
+
+ { ============================================================================
+   VARIABLES POUR L'IMPRESSION ET L'APERCU (TODO 21)
+   ============================================================================ }
+
+ PrintSettings: TPrintSettings;        { Parametres d'impression }
+ PrintPages: Array[0..MAX_PRINT_PAGES-1] of TPrintPageContent; { Pages generees }
+ PrintPageCount: Integer;              { Nombre de pages }
+ PrintCurrentPage: Integer;            { Page actuelle dans l'apercu }
+ PrintPreviewState: TPrintPreviewState; { Etat de l'apercu }
+ PrintPreviewX, PrintPreviewY: Integer; { Position de la fenetre d'apercu }
+ PrintPreviewZoom: Integer;            { Niveau de zoom (100 = 100%) }
+ PrintConfigState: TPrintConfigState;  { Etat de la configuration }
+ PrintConfigX, PrintConfigY: Integer;  { Position de la fenetre config }
+ PrintConfigVisible: Boolean;          { Visibilite de la config }
+ PrintMessageIndex: Integer;           { Index du message a imprimer }
+ PrintInProgress: Boolean;             { Impression en cours }
+ PrintFile: Text;                      { Fichier d'impression }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -15108,6 +15256,1252 @@ End;
   FIN DE L'IMPLEMENTATION DES NOTIFICATIONS ET ALERTES (TODO 20)
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DE L'IMPRESSION ET APERCU AVANT IMPRESSION (TODO 21)
+  ============================================================================ }
+
+{ Initialise le systeme d'impression }
+Procedure Print_Init;
+Var
+ I, J: Integer;
+Begin
+ { Parametres par defaut }
+ PrintSettings.Port := ppLPT1;
+ PrintSettings.OutputFile := '';
+ PrintSettings.ExportFormat := efText;
+ PrintSettings.PageOrientation := poPortrait;
+ PrintSettings.PaperSize := psA4;
+ PrintSettings.Margins.Top := PRINT_DEFAULT_MARGIN_TOP;
+ PrintSettings.Margins.Bottom := PRINT_DEFAULT_MARGIN_BOTTOM;
+ PrintSettings.Margins.Left := PRINT_DEFAULT_MARGIN_LEFT;
+ PrintSettings.Margins.Right := PRINT_DEFAULT_MARGIN_RIGHT;
+ PrintSettings.Header.Left := '';
+ PrintSettings.Header.Center := 'Outlook Express';
+ PrintSettings.Header.Right := '';
+ PrintSettings.Header.Enabled := True;
+ PrintSettings.Footer.Left := '';
+ PrintSettings.Footer.Center := 'Page %PAGE%';
+ PrintSettings.Footer.Right := '%DATE%';
+ PrintSettings.Footer.Enabled := True;
+ PrintSettings.PrintHeaders := True;
+ PrintSettings.PrintAttachmentList := True;
+ PrintSettings.FontSize := PRINT_DEFAULT_FONT_SIZE;
+ PrintSettings.LineSpacing := PRINT_DEFAULT_LINE_SPACING;
+ PrintSettings.Copies := 1;
+ PrintSettings.PageNumbers := True;
+ PrintSettings.PrintDate := True;
+
+ { Initialiser les pages }
+ PrintPageCount := 0;
+ PrintCurrentPage := 0;
+ For I := 0 To MAX_PRINT_PAGES - 1 Do Begin
+  PrintPages[I].LineCount := 0;
+  PrintPages[I].PageNumber := 0;
+  PrintPages[I].HasMore := False;
+  For J := 0 To PRINT_MAX_LINES_PER_PAGE - 1 Do
+   PrintPages[I].Lines[J] := '';
+ End;
+
+ { Etat initial }
+ PrintPreviewState := ppsHidden;
+ PrintPreviewX := (GetMaxX - PRINT_PREVIEW_WIDTH) Div 2;
+ PrintPreviewY := (GetMaxY - PRINT_PREVIEW_HEIGHT) Div 2;
+ PrintPreviewZoom := 100;
+ PrintConfigState := pcsHidden;
+ PrintConfigX := (GetMaxX - PRINT_CONFIG_WIDTH) Div 2;
+ PrintConfigY := (GetMaxY - PRINT_CONFIG_HEIGHT) Div 2;
+ PrintConfigVisible := False;
+ PrintMessageIndex := -1;
+ PrintInProgress := False;
+End;
+
+{ Retourne le nombre de lignes par page selon le papier }
+Function Print_GetLinesPerPage: Integer;
+Begin
+ Case PrintSettings.PaperSize Of
+  psLetter, psLegal: Print_GetLinesPerPage := PRINT_LINES_PER_PAGE_LETTER;
+  psA4, psA5: Print_GetLinesPerPage := PRINT_LINES_PER_PAGE_A4;
+ Else
+  Print_GetLinesPerPage := PRINT_LINES_PER_PAGE_LETTER;
+ End;
+End;
+
+{ Retourne le nombre de caracteres par ligne selon le papier }
+Function Print_GetCharsPerLine: Integer;
+Begin
+ Case PrintSettings.PaperSize Of
+  psLetter, psLegal: Print_GetCharsPerLine := PRINT_CHARS_PER_LINE_LETTER;
+  psA4, psA5: Print_GetCharsPerLine := PRINT_CHARS_PER_LINE_A4;
+ Else
+  Print_GetCharsPerLine := PRINT_CHARS_PER_LINE_LETTER;
+ End;
+End;
+
+{ Remplace les variables dans une chaine d'en-tete/pied de page }
+Function Print_ReplaceVariables(S: String; PageNum, TotalPages: Integer): String;
+Var
+ Result: String;
+ PageStr, TotalStr: String;
+Begin
+ Result := S;
+ Str(PageNum, PageStr);
+ Str(TotalPages, TotalStr);
+
+ { Remplacer %PAGE% par le numero de page }
+ While Pos('%PAGE%', Result) > 0 Do
+  Result := Copy(Result, 1, Pos('%PAGE%', Result) - 1) + PageStr +
+            Copy(Result, Pos('%PAGE%', Result) + 6, Length(Result));
+
+ { Remplacer %TOTAL% par le nombre total de pages }
+ While Pos('%TOTAL%', Result) > 0 Do
+  Result := Copy(Result, 1, Pos('%TOTAL%', Result) - 1) + TotalStr +
+            Copy(Result, Pos('%TOTAL%', Result) + 7, Length(Result));
+
+ { Remplacer %DATE% par la date actuelle }
+ While Pos('%DATE%', Result) > 0 Do
+  Result := Copy(Result, 1, Pos('%DATE%', Result) - 1) + '17/04/2026' +
+            Copy(Result, Pos('%DATE%', Result) + 6, Length(Result));
+
+ Print_ReplaceVariables := Result;
+End;
+
+{ Genere les pages d'impression pour un message }
+Procedure Print_GeneratePages(MsgIndex: Integer);
+Var
+ CurrentPage, CurrentLine, BodyLine: Integer;
+ LinesPerPage, CharsPerLine: Integer;
+ TempLine: String;
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ PrintMessageIndex := MsgIndex;
+ PrintPageCount := 0;
+ CurrentPage := 0;
+ CurrentLine := 0;
+ LinesPerPage := Print_GetLinesPerPage;
+ CharsPerLine := Print_GetCharsPerLine;
+
+ { Initialiser la premiere page }
+ PrintPages[CurrentPage].LineCount := 0;
+ PrintPages[CurrentPage].PageNumber := 1;
+
+ { Ajouter les en-tetes du message si active }
+ If PrintSettings.PrintHeaders Then Begin
+  { De: }
+  TempLine := 'De: ' + Messages[MsgIndex].FromName + ' <' + Messages[MsgIndex].FromEmail + '>';
+  If Length(TempLine) > CharsPerLine Then
+   TempLine := Copy(TempLine, 1, CharsPerLine);
+  PrintPages[CurrentPage].Lines[CurrentLine] := TempLine;
+  Inc(CurrentLine);
+
+  { A: }
+  TempLine := 'A: ' + Messages[MsgIndex].ToName + ' <' + Messages[MsgIndex].ToEmail + '>';
+  If Length(TempLine) > CharsPerLine Then
+   TempLine := Copy(TempLine, 1, CharsPerLine);
+  PrintPages[CurrentPage].Lines[CurrentLine] := TempLine;
+  Inc(CurrentLine);
+
+  { Cc: si present }
+  If Length(Messages[MsgIndex].CcEmail) > 0 Then Begin
+   TempLine := 'Cc: ' + Messages[MsgIndex].CcEmail;
+   If Length(TempLine) > CharsPerLine Then
+    TempLine := Copy(TempLine, 1, CharsPerLine);
+   PrintPages[CurrentPage].Lines[CurrentLine] := TempLine;
+   Inc(CurrentLine);
+  End;
+
+  { Date: }
+  TempLine := 'Date: ' + Messages[MsgIndex].DateFull;
+  PrintPages[CurrentPage].Lines[CurrentLine] := TempLine;
+  Inc(CurrentLine);
+
+  { Objet: }
+  TempLine := 'Objet: ' + Messages[MsgIndex].Subject;
+  If Length(TempLine) > CharsPerLine Then
+   TempLine := Copy(TempLine, 1, CharsPerLine);
+  PrintPages[CurrentPage].Lines[CurrentLine] := TempLine;
+  Inc(CurrentLine);
+
+  { Ligne vide de separation }
+  PrintPages[CurrentPage].Lines[CurrentLine] := '';
+  Inc(CurrentLine);
+
+  { Ligne de separation }
+  PrintPages[CurrentPage].Lines[CurrentLine] := '----------------------------------------';
+  Inc(CurrentLine);
+
+  { Ligne vide }
+  PrintPages[CurrentPage].Lines[CurrentLine] := '';
+  Inc(CurrentLine);
+ End;
+
+ { Ajouter le corps du message }
+ For BodyLine := 0 To Messages[MsgIndex].BodyLineCount - 1 Do Begin
+  { Verifier si on doit passer a la page suivante }
+  If CurrentLine >= LinesPerPage Then Begin
+   PrintPages[CurrentPage].LineCount := CurrentLine;
+   PrintPages[CurrentPage].HasMore := True;
+   Inc(CurrentPage);
+   If CurrentPage >= MAX_PRINT_PAGES Then Break;
+   CurrentLine := 0;
+   PrintPages[CurrentPage].PageNumber := CurrentPage + 1;
+  End;
+
+  TempLine := Messages[MsgIndex].Body[BodyLine];
+  If Length(TempLine) > CharsPerLine Then
+   TempLine := Copy(TempLine, 1, CharsPerLine);
+  PrintPages[CurrentPage].Lines[CurrentLine] := TempLine;
+  Inc(CurrentLine);
+ End;
+
+ { Liste des pieces jointes si active }
+ If PrintSettings.PrintAttachmentList And (Messages[MsgIndex].AttachmentCount > 0) Then Begin
+  { Verifier l'espace }
+  If CurrentLine + 3 >= LinesPerPage Then Begin
+   PrintPages[CurrentPage].LineCount := CurrentLine;
+   PrintPages[CurrentPage].HasMore := True;
+   Inc(CurrentPage);
+   If CurrentPage < MAX_PRINT_PAGES Then Begin
+    CurrentLine := 0;
+    PrintPages[CurrentPage].PageNumber := CurrentPage + 1;
+   End;
+  End;
+
+  If CurrentPage < MAX_PRINT_PAGES Then Begin
+   PrintPages[CurrentPage].Lines[CurrentLine] := '';
+   Inc(CurrentLine);
+   PrintPages[CurrentPage].Lines[CurrentLine] := '----------------------------------------';
+   Inc(CurrentLine);
+   PrintPages[CurrentPage].Lines[CurrentLine] := 'Pieces jointes:';
+   Inc(CurrentLine);
+
+   For BodyLine := 0 To Messages[MsgIndex].AttachmentCount - 1 Do Begin
+    If CurrentLine >= LinesPerPage Then Begin
+     PrintPages[CurrentPage].LineCount := CurrentLine;
+     PrintPages[CurrentPage].HasMore := True;
+     Inc(CurrentPage);
+     If CurrentPage >= MAX_PRINT_PAGES Then Break;
+     CurrentLine := 0;
+     PrintPages[CurrentPage].PageNumber := CurrentPage + 1;
+    End;
+    PrintPages[CurrentPage].Lines[CurrentLine] := '  - ' + Messages[MsgIndex].Attachments[BodyLine].FileName;
+    Inc(CurrentLine);
+   End;
+  End;
+ End;
+
+ { Finaliser la derniere page }
+ If CurrentPage < MAX_PRINT_PAGES Then Begin
+  PrintPages[CurrentPage].LineCount := CurrentLine;
+  PrintPages[CurrentPage].HasMore := False;
+ End;
+
+ PrintPageCount := CurrentPage + 1;
+ PrintCurrentPage := 0;
+End;
+
+{ Exporte un message en texte brut }
+Procedure Print_ExportToText(MsgIndex: Integer; FileName: String);
+Var
+ F: Text;
+ I, J: Integer;
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ { Generer les pages }
+ Print_GeneratePages(MsgIndex);
+
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Exit;
+
+ { Ecrire chaque page }
+ For I := 0 To PrintPageCount - 1 Do Begin
+  { En-tete si active }
+  If PrintSettings.Header.Enabled Then Begin
+   WriteLn(F, Print_ReplaceVariables(PrintSettings.Header.Center, I + 1, PrintPageCount));
+   WriteLn(F, '');
+  End;
+
+  { Contenu }
+  For J := 0 To PrintPages[I].LineCount - 1 Do
+   WriteLn(F, PrintPages[I].Lines[J]);
+
+  { Pied de page si active }
+  If PrintSettings.Footer.Enabled Then Begin
+   WriteLn(F, '');
+   WriteLn(F, Print_ReplaceVariables(PrintSettings.Footer.Center, I + 1, PrintPageCount));
+  End;
+
+  { Saut de page si pas la derniere }
+  If I < PrintPageCount - 1 Then
+   WriteLn(F, #12); { Form feed }
+ End;
+
+ Close(F);
+ {$I+}
+End;
+
+{ Exporte un message en HTML }
+Procedure Print_ExportToHTML(MsgIndex: Integer; FileName: String);
+Var
+ F: Text;
+ I, J: Integer;
+ Line: String;
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ { Generer les pages }
+ Print_GeneratePages(MsgIndex);
+
+ {$I-}
+ Assign(F, FileName);
+ Rewrite(F);
+ If IOResult <> 0 Then Exit;
+
+ { En-tete HTML }
+ WriteLn(F, '<!DOCTYPE html>');
+ WriteLn(F, '<html>');
+ WriteLn(F, '<head>');
+ WriteLn(F, '<meta charset="UTF-8">');
+ WriteLn(F, '<title>Message: ' + Messages[MsgIndex].Subject + '</title>');
+ WriteLn(F, '<style>');
+ WriteLn(F, 'body { font-family: Arial, sans-serif; margin: 20px; }');
+ WriteLn(F, '.header { background: #f0f0f0; padding: 10px; border: 1px solid #ccc; }');
+ WriteLn(F, '.header p { margin: 5px 0; }');
+ WriteLn(F, '.body { margin-top: 20px; white-space: pre-wrap; }');
+ WriteLn(F, '.attachments { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; }');
+ WriteLn(F, '.footer { margin-top: 30px; font-size: 0.9em; color: #666; }');
+ WriteLn(F, '</style>');
+ WriteLn(F, '</head>');
+ WriteLn(F, '<body>');
+
+ { En-tete du message }
+ WriteLn(F, '<div class="header">');
+ WriteLn(F, '<p><strong>De:</strong> ' + Messages[MsgIndex].FromName + ' &lt;' + Messages[MsgIndex].FromEmail + '&gt;</p>');
+ WriteLn(F, '<p><strong>A:</strong> ' + Messages[MsgIndex].ToName + ' &lt;' + Messages[MsgIndex].ToEmail + '&gt;</p>');
+ If Length(Messages[MsgIndex].CcEmail) > 0 Then
+  WriteLn(F, '<p><strong>Cc:</strong> ' + Messages[MsgIndex].CcEmail + '</p>');
+ WriteLn(F, '<p><strong>Date:</strong> ' + Messages[MsgIndex].DateFull + '</p>');
+ WriteLn(F, '<p><strong>Objet:</strong> ' + Messages[MsgIndex].Subject + '</p>');
+ WriteLn(F, '</div>');
+
+ { Corps du message }
+ WriteLn(F, '<div class="body">');
+ For I := 0 To Messages[MsgIndex].BodyLineCount - 1 Do Begin
+  Line := Messages[MsgIndex].Body[I];
+  { Echapper les caracteres HTML }
+  While Pos('<', Line) > 0 Do
+   Line := Copy(Line, 1, Pos('<', Line) - 1) + '&lt;' + Copy(Line, Pos('<', Line) + 1, Length(Line));
+  While Pos('>', Line) > 0 Do
+   Line := Copy(Line, 1, Pos('>', Line) - 1) + '&gt;' + Copy(Line, Pos('>', Line) + 1, Length(Line));
+  WriteLn(F, Line);
+ End;
+ WriteLn(F, '</div>');
+
+ { Pieces jointes }
+ If Messages[MsgIndex].AttachmentCount > 0 Then Begin
+  WriteLn(F, '<div class="attachments">');
+  WriteLn(F, '<p><strong>Pieces jointes:</strong></p>');
+  WriteLn(F, '<ul>');
+  For I := 0 To Messages[MsgIndex].AttachmentCount - 1 Do
+   WriteLn(F, '<li>' + Messages[MsgIndex].Attachments[I].FileName + '</li>');
+  WriteLn(F, '</ul>');
+  WriteLn(F, '</div>');
+ End;
+
+ { Pied de page }
+ WriteLn(F, '<div class="footer">');
+ WriteLn(F, '<p>Imprime depuis Outlook Express - ' + Print_ReplaceVariables('%DATE%', 1, 1) + '</p>');
+ WriteLn(F, '</div>');
+
+ WriteLn(F, '</body>');
+ WriteLn(F, '</html>');
+
+ Close(F);
+ {$I+}
+End;
+
+{ Envoie les donnees vers l'imprimante }
+Procedure Print_SendToPrinter(MsgIndex: Integer);
+Var
+ PrinterName: String;
+ F: Text;
+ I, J, Copy: Integer;
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ { Generer les pages }
+ Print_GeneratePages(MsgIndex);
+
+ { Determiner le port }
+ Case PrintSettings.Port Of
+  ppLPT1: PrinterName := 'LPT1';
+  ppLPT2: PrinterName := 'LPT2';
+  ppLPT3: PrinterName := 'LPT3';
+  ppFile: Begin
+   If Length(PrintSettings.OutputFile) > 0 Then Begin
+    Case PrintSettings.ExportFormat Of
+     efText: Print_ExportToText(MsgIndex, PrintSettings.OutputFile);
+     efHTML: Print_ExportToHTML(MsgIndex, PrintSettings.OutputFile);
+    End;
+   End;
+   Exit;
+  End;
+ End;
+
+ { Imprimer chaque copie }
+ For Copy := 1 To PrintSettings.Copies Do Begin
+  {$I-}
+  Assign(F, PrinterName);
+  Rewrite(F);
+  If IOResult <> 0 Then Exit;
+
+  { Ecrire chaque page }
+  For I := 0 To PrintPageCount - 1 Do Begin
+   { En-tete si active }
+   If PrintSettings.Header.Enabled Then Begin
+    If Length(PrintSettings.Header.Left) > 0 Then
+     Write(F, Print_ReplaceVariables(PrintSettings.Header.Left, I + 1, PrintPageCount));
+    If Length(PrintSettings.Header.Center) > 0 Then Begin
+     { Centrer le texte }
+     WriteLn(F, '');
+     WriteLn(F, Print_ReplaceVariables(PrintSettings.Header.Center, I + 1, PrintPageCount));
+    End;
+    WriteLn(F, '');
+   End;
+
+   { Contenu }
+   For J := 0 To PrintPages[I].LineCount - 1 Do
+    WriteLn(F, PrintPages[I].Lines[J]);
+
+   { Pied de page si active }
+   If PrintSettings.Footer.Enabled Then Begin
+    WriteLn(F, '');
+    If Length(PrintSettings.Footer.Left) > 0 Then
+     Write(F, Print_ReplaceVariables(PrintSettings.Footer.Left, I + 1, PrintPageCount));
+    If Length(PrintSettings.Footer.Center) > 0 Then
+     WriteLn(F, Print_ReplaceVariables(PrintSettings.Footer.Center, I + 1, PrintPageCount));
+    If Length(PrintSettings.Footer.Right) > 0 Then
+     WriteLn(F, Print_ReplaceVariables(PrintSettings.Footer.Right, I + 1, PrintPageCount));
+   End;
+
+   { Saut de page si pas la derniere }
+   If I < PrintPageCount - 1 Then
+    Write(F, #12); { Form feed }
+  End;
+
+  Close(F);
+  {$I+}
+ End;
+End;
+
+{ Affiche l'apercu avant impression }
+Procedure Print_DrawPreview;
+Var
+ X1, Y1, X2, Y2: Integer;
+ PageX, PageY, PageW, PageH: Integer;
+ I, Y, LineH: Integer;
+ DisplayStr, PageStr: String;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+Begin
+ If PrintPreviewState = ppsHidden Then Exit;
+
+ X1 := PrintPreviewX;
+ Y1 := PrintPreviewY;
+ X2 := X1 + PRINT_PREVIEW_WIDTH;
+ Y2 := Y1 + PRINT_PREVIEW_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X1, Y1, X2, Y2);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1, Y1, X2, Y1 + 25);
+ SetColor(White);
+ OutTextXY(X1 + 10, Y1 + 7, 'Apercu avant impression');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
+ SetColor(White);
+ OutTextXY(X2 - 18, Y1 + 7, 'X');
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X1, Y1, X2, Y2);
+
+ { Zone de l'apercu de page (fond blanc) }
+ PageW := 200;
+ PageH := 280;
+ PageX := X1 + 20;
+ PageY := Y1 + 35;
+ SetFillStyle(SolidFill, White);
+ Bar(PageX, PageY, PageX + PageW, PageY + PageH);
+ SetColor(Black);
+ Rectangle(PageX, PageY, PageX + PageW, PageY + PageH);
+
+ { Afficher le contenu de la page actuelle }
+ If (PrintCurrentPage >= 0) And (PrintCurrentPage < PrintPageCount) Then Begin
+  LineH := 4;
+  SetColor(DarkGray);
+  For I := 0 To PrintPages[PrintCurrentPage].LineCount - 1 Do Begin
+   Y := PageY + 5 + I * LineH;
+   If Y + LineH > PageY + PageH - 5 Then Break;
+   { Simuler les lignes de texte avec des traits }
+   DisplayStr := PrintPages[PrintCurrentPage].Lines[I];
+   If Length(DisplayStr) > 0 Then
+    Line(PageX + 5, Y + 2, PageX + 5 + Length(DisplayStr) * 2, Y + 2);
+  End;
+ End;
+
+ { Informations de page }
+ SetColor(Black);
+ Str(PrintCurrentPage + 1, PageStr);
+ OutTextXY(PageX + PageW + 20, PageY + 10, 'Page: ' + PageStr);
+ Str(PrintPageCount, PageStr);
+ OutTextXY(PageX + PageW + 20, PageY + 25, 'Total: ' + PageStr + ' pages');
+
+ { Boutons de navigation }
+ BtnW := 80;
+ BtnH := 25;
+ BtnY := PageY + 60;
+
+ { Bouton Page precedente }
+ BtnX := PageX + PageW + 20;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 5, BtnY + 7, '< Prec.');
+
+ { Bouton Page suivante }
+ BtnY := BtnY + 30;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 5, BtnY + 7, 'Suiv. >');
+
+ { Bouton Zoom }
+ BtnY := BtnY + 40;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ Str(PrintPreviewZoom, PageStr);
+ SetColor(Black);
+ OutTextXY(BtnX + 10, BtnY + 7, 'Zoom ' + PageStr + '%');
+
+ { Boutons d'action en bas }
+ BtnY := Y2 - 40;
+
+ { Bouton Imprimer }
+ BtnX := X1 + 20;
+ SetFillStyle(SolidFill, Green);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(White);
+ OutTextXY(BtnX + 15, BtnY + 7, 'Imprimer');
+
+ { Bouton Configurer }
+ BtnX := BtnX + BtnW + 10;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 10, BtnY + 7, 'Options');
+
+ { Bouton Exporter }
+ BtnX := BtnX + BtnW + 10;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 10, BtnY + 7, 'Exporter');
+
+ { Bouton Fermer }
+ BtnX := X2 - BtnW - 10;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 15, BtnY + 7, 'Fermer');
+End;
+
+{ Gere les clics dans l'apercu avant impression }
+Procedure Print_HandlePreviewClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ PageX, PageW: Integer;
+Begin
+ If PrintPreviewState = ppsHidden Then Exit;
+
+ X1 := PrintPreviewX;
+ Y1 := PrintPreviewY;
+ X2 := X1 + PRINT_PREVIEW_WIDTH;
+ Y2 := Y1 + PRINT_PREVIEW_HEIGHT;
+ BtnW := 80;
+ BtnH := 25;
+ PageW := 200;
+ PageX := X1 + 20;
+
+ { Verifier si clic hors de la fenetre }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Begin
+  PrintPreviewState := ppsHidden;
+  Exit;
+ End;
+
+ { Bouton fermer (X) }
+ If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
+  PrintPreviewState := ppsHidden;
+  Exit;
+ End;
+
+ { Boutons de navigation }
+ BtnX := PageX + PageW + 20;
+ BtnY := Y1 + 35 + 60;
+
+ { Page precedente }
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  If PrintCurrentPage > 0 Then Dec(PrintCurrentPage);
+  Exit;
+ End;
+
+ { Page suivante }
+ BtnY := BtnY + 30;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  If PrintCurrentPage < PrintPageCount - 1 Then Inc(PrintCurrentPage);
+  Exit;
+ End;
+
+ { Zoom }
+ BtnY := BtnY + 40;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  PrintPreviewZoom := PrintPreviewZoom + 25;
+  If PrintPreviewZoom > 200 Then PrintPreviewZoom := 50;
+  Exit;
+ End;
+
+ { Boutons d'action en bas }
+ BtnY := Y2 - 40;
+
+ { Bouton Imprimer }
+ BtnX := X1 + 20;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  Print_SendToPrinter(PrintMessageIndex);
+  PrintPreviewState := ppsHidden;
+  Exit;
+ End;
+
+ { Bouton Configurer }
+ BtnX := BtnX + BtnW + 10;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  PrintConfigVisible := True;
+  PrintConfigState := pcsGeneral;
+  Exit;
+ End;
+
+ { Bouton Exporter }
+ BtnX := BtnX + BtnW + 10;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  { Exporter en texte par defaut }
+  Print_ExportToText(PrintMessageIndex, 'message.txt');
+  Exit;
+ End;
+
+ { Bouton Fermer }
+ BtnX := X2 - BtnW - 10;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  PrintPreviewState := ppsHidden;
+  Exit;
+ End;
+End;
+
+{ Affiche la fenetre de configuration d'impression }
+Procedure Print_DrawConfigWindow;
+Var
+ X1, Y1, X2, Y2: Integer;
+ Y, BtnX, BtnY, BtnW, BtnH: Integer;
+ DisplayStr, CheckStr: String;
+Begin
+ If Not PrintConfigVisible Then Exit;
+
+ X1 := PrintConfigX;
+ Y1 := PrintConfigY;
+ X2 := X1 + PRINT_CONFIG_WIDTH;
+ Y2 := Y1 + PRINT_CONFIG_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X1, Y1, X2, Y2);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1, Y1, X2, Y1 + 25);
+ SetColor(White);
+ OutTextXY(X1 + 10, Y1 + 7, 'Configuration de l''impression');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
+ SetColor(White);
+ OutTextXY(X2 - 18, Y1 + 7, 'X');
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X1, Y1, X2, Y2);
+
+ Y := Y1 + 35;
+
+ Case PrintConfigState Of
+  pcsHidden: Exit;
+
+  pcsGeneral: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 95, Y + 5, 'Marges');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 165, Y + 5, 'En-tetes');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 265, Y + 5, 'Export');
+
+   Y := Y + 35;
+
+   { Port d'imprimante }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Imprimante:');
+   If PrintSettings.Port = ppLPT1 Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 120, Y, CheckStr + ' LPT1');
+   If PrintSettings.Port = ppLPT2 Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 200, Y, CheckStr + ' LPT2');
+   If PrintSettings.Port = ppFile Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 280, Y, CheckStr + ' Fichier');
+   Y := Y + 25;
+
+   { Taille du papier }
+   OutTextXY(X1 + 20, Y, 'Papier:');
+   If PrintSettings.PaperSize = psLetter Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 120, Y, CheckStr + ' Letter');
+   If PrintSettings.PaperSize = psA4 Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 200, Y, CheckStr + ' A4');
+   If PrintSettings.PaperSize = psLegal Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 280, Y, CheckStr + ' Legal');
+   Y := Y + 25;
+
+   { Orientation }
+   OutTextXY(X1 + 20, Y, 'Orientation:');
+   If PrintSettings.PageOrientation = poPortrait Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 120, Y, CheckStr + ' Portrait');
+   If PrintSettings.PageOrientation = poLandscape Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 220, Y, CheckStr + ' Paysage');
+   Y := Y + 25;
+
+   { Nombre de copies }
+   OutTextXY(X1 + 20, Y, 'Copies:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 120, Y - 3, X1 + 170, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 120, Y - 3, X1 + 170, Y + 15);
+   Str(PrintSettings.Copies, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 130, Y, DisplayStr);
+   Y := Y + 25;
+
+   { Options }
+   If PrintSettings.PrintHeaders Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' Imprimer les en-tetes du message');
+   Y := Y + 20;
+
+   If PrintSettings.PrintAttachmentList Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' Lister les pieces jointes');
+   Y := Y + 20;
+
+   If PrintSettings.PageNumbers Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' Afficher les numeros de page');
+  End;
+
+  pcsMargins: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 95, Y + 5, 'Marges');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 165, Y + 5, 'En-tetes');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 265, Y + 5, 'Export');
+
+   Y := Y + 35;
+
+   { Marges }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Marges (en mm):');
+   Y := Y + 25;
+
+   OutTextXY(X1 + 40, Y, 'Haut:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 100, Y - 3, X1 + 150, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 100, Y - 3, X1 + 150, Y + 15);
+   Str(PrintSettings.Margins.Top, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y, DisplayStr);
+
+   OutTextXY(X1 + 180, Y, 'Bas:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 230, Y - 3, X1 + 280, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 230, Y - 3, X1 + 280, Y + 15);
+   Str(PrintSettings.Margins.Bottom, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 235, Y, DisplayStr);
+   Y := Y + 30;
+
+   OutTextXY(X1 + 40, Y, 'Gauche:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 100, Y - 3, X1 + 150, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 100, Y - 3, X1 + 150, Y + 15);
+   Str(PrintSettings.Margins.Left, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y, DisplayStr);
+
+   OutTextXY(X1 + 180, Y, 'Droite:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 230, Y - 3, X1 + 280, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 230, Y - 3, X1 + 280, Y + 15);
+   Str(PrintSettings.Margins.Right, DisplayStr);
+   SetColor(Black);
+   OutTextXY(X1 + 235, Y, DisplayStr);
+  End;
+
+  pcsHeaderFooter: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 95, Y + 5, 'Marges');
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 165, Y + 5, 'En-tetes');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 265, Y + 5, 'Export');
+
+   Y := Y + 35;
+
+   { En-tete }
+   SetColor(Black);
+   If PrintSettings.Header.Enabled Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' En-tete de page');
+   Y := Y + 25;
+
+   OutTextXY(X1 + 40, Y, 'Centre:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 100, Y - 3, X2 - 30, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 100, Y - 3, X2 - 30, Y + 15);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y, PrintSettings.Header.Center);
+   Y := Y + 30;
+
+   { Pied de page }
+   If PrintSettings.Footer.Enabled Then CheckStr := '[X]' Else CheckStr := '[ ]';
+   OutTextXY(X1 + 20, Y, CheckStr + ' Pied de page');
+   Y := Y + 25;
+
+   OutTextXY(X1 + 40, Y, 'Centre:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 100, Y - 3, X2 - 30, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 100, Y - 3, X2 - 30, Y + 15);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y, PrintSettings.Footer.Center);
+   Y := Y + 25;
+
+   OutTextXY(X1 + 40, Y, 'Droite:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 100, Y - 3, X2 - 30, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 100, Y - 3, X2 - 30, Y + 15);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y, PrintSettings.Footer.Right);
+   Y := Y + 30;
+
+   OutTextXY(X1 + 20, Y, 'Variables: %PAGE%, %TOTAL%, %DATE%');
+  End;
+
+  pcsExport: Begin
+   { Onglets }
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 10, Y, X1 + 80, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y + 5, 'General');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 85, Y, X1 + 155, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 95, Y + 5, 'Marges');
+
+   SetFillStyle(SolidFill, LightGray);
+   Bar(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 160, Y, X1 + 250, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 165, Y + 5, 'En-tetes');
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 255, Y, X1 + 325, Y + 20);
+   SetColor(Black);
+   OutTextXY(X1 + 265, Y + 5, 'Export');
+
+   Y := Y + 35;
+
+   { Format d'export }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Format d''export:');
+   Y := Y + 25;
+
+   If PrintSettings.ExportFormat = efText Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 40, Y, CheckStr + ' Texte brut (.txt)');
+   Y := Y + 20;
+
+   If PrintSettings.ExportFormat = efHTML Then CheckStr := '(o)' Else CheckStr := '( )';
+   OutTextXY(X1 + 40, Y, CheckStr + ' HTML (.html)');
+   Y := Y + 30;
+
+   { Fichier de sortie }
+   OutTextXY(X1 + 20, Y, 'Fichier de sortie:');
+   Y := Y + 20;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 100, Y + 20);
+   SetColor(Black);
+   If Length(PrintSettings.OutputFile) > 0 Then
+    OutTextXY(X1 + 25, Y + 5, PrintSettings.OutputFile)
+   Else
+    OutTextXY(X1 + 25, Y + 5, 'message.txt');
+
+   { Bouton Parcourir }
+   BtnX := X2 - 90;
+   BtnW := 70;
+   BtnH := 20;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, Y, BtnX + BtnW, Y + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, Y, BtnX + BtnW, Y + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 10, Y + 5, 'Parcourir');
+  End;
+ End;
+
+ { Boutons OK et Annuler }
+ BtnW := 80;
+ BtnH := 25;
+ BtnY := Y2 - 40;
+
+ { Bouton OK }
+ BtnX := X2 - 180;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 30, BtnY + 7, 'OK');
+
+ { Bouton Annuler }
+ BtnX := X2 - 90;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 15, BtnY + 7, 'Annuler');
+End;
+
+{ Gere les clics dans la fenetre de configuration }
+Procedure Print_HandleConfigClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ TabY: Integer;
+Begin
+ If Not PrintConfigVisible Then Exit;
+
+ X1 := PrintConfigX;
+ Y1 := PrintConfigY;
+ X2 := X1 + PRINT_CONFIG_WIDTH;
+ Y2 := Y1 + PRINT_CONFIG_HEIGHT;
+ BtnW := 80;
+ BtnH := 25;
+
+ { Verifier si clic hors de la fenetre }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Begin
+  PrintConfigVisible := False;
+  PrintConfigState := pcsHidden;
+  Exit;
+ End;
+
+ { Bouton fermer }
+ If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
+  PrintConfigVisible := False;
+  PrintConfigState := pcsHidden;
+  Exit;
+ End;
+
+ TabY := Y1 + 35;
+
+ { Onglets }
+ If (MY >= TabY) And (MY <= TabY + 20) Then Begin
+  If (MX >= X1 + 10) And (MX <= X1 + 80) Then Begin
+   PrintConfigState := pcsGeneral;
+   Exit;
+  End;
+  If (MX >= X1 + 85) And (MX <= X1 + 155) Then Begin
+   PrintConfigState := pcsMargins;
+   Exit;
+  End;
+  If (MX >= X1 + 160) And (MX <= X1 + 250) Then Begin
+   PrintConfigState := pcsHeaderFooter;
+   Exit;
+  End;
+  If (MX >= X1 + 255) And (MX <= X1 + 325) Then Begin
+   PrintConfigState := pcsExport;
+   Exit;
+  End;
+ End;
+
+ { Options de l'onglet General }
+ If PrintConfigState = pcsGeneral Then Begin
+  { Port d'imprimante }
+  If (MY >= TabY + 35) And (MY <= TabY + 50) Then Begin
+   If (MX >= X1 + 120) And (MX <= X1 + 190) Then Begin
+    PrintSettings.Port := ppLPT1;
+    Exit;
+   End;
+   If (MX >= X1 + 200) And (MX <= X1 + 270) Then Begin
+    PrintSettings.Port := ppLPT2;
+    Exit;
+   End;
+   If (MX >= X1 + 280) And (MX <= X1 + 360) Then Begin
+    PrintSettings.Port := ppFile;
+    Exit;
+   End;
+  End;
+
+  { Taille du papier }
+  If (MY >= TabY + 60) And (MY <= TabY + 75) Then Begin
+   If (MX >= X1 + 120) And (MX <= X1 + 190) Then Begin
+    PrintSettings.PaperSize := psLetter;
+    Exit;
+   End;
+   If (MX >= X1 + 200) And (MX <= X1 + 250) Then Begin
+    PrintSettings.PaperSize := psA4;
+    Exit;
+   End;
+   If (MX >= X1 + 280) And (MX <= X1 + 340) Then Begin
+    PrintSettings.PaperSize := psLegal;
+    Exit;
+   End;
+  End;
+
+  { Orientation }
+  If (MY >= TabY + 85) And (MY <= TabY + 100) Then Begin
+   If (MX >= X1 + 120) And (MX <= X1 + 210) Then Begin
+    PrintSettings.PageOrientation := poPortrait;
+    Exit;
+   End;
+   If (MX >= X1 + 220) And (MX <= X1 + 310) Then Begin
+    PrintSettings.PageOrientation := poLandscape;
+    Exit;
+   End;
+  End;
+
+  { Options checkboxes }
+  If (MY >= TabY + 135) And (MY <= TabY + 150) And (MX >= X1 + 20) And (MX <= X1 + 350) Then Begin
+   PrintSettings.PrintHeaders := Not PrintSettings.PrintHeaders;
+   Exit;
+  End;
+  If (MY >= TabY + 155) And (MY <= TabY + 170) And (MX >= X1 + 20) And (MX <= X1 + 300) Then Begin
+   PrintSettings.PrintAttachmentList := Not PrintSettings.PrintAttachmentList;
+   Exit;
+  End;
+  If (MY >= TabY + 175) And (MY <= TabY + 190) And (MX >= X1 + 20) And (MX <= X1 + 300) Then Begin
+   PrintSettings.PageNumbers := Not PrintSettings.PageNumbers;
+   Exit;
+  End;
+ End;
+
+ { Options de l'onglet En-tetes }
+ If PrintConfigState = pcsHeaderFooter Then Begin
+  If (MY >= TabY + 35) And (MY <= TabY + 50) And (MX >= X1 + 20) And (MX <= X1 + 200) Then Begin
+   PrintSettings.Header.Enabled := Not PrintSettings.Header.Enabled;
+   Exit;
+  End;
+  If (MY >= TabY + 110) And (MY <= TabY + 125) And (MX >= X1 + 20) And (MX <= X1 + 200) Then Begin
+   PrintSettings.Footer.Enabled := Not PrintSettings.Footer.Enabled;
+   Exit;
+  End;
+ End;
+
+ { Options de l'onglet Export }
+ If PrintConfigState = pcsExport Then Begin
+  If (MY >= TabY + 60) And (MY <= TabY + 75) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+   PrintSettings.ExportFormat := efText;
+   Exit;
+  End;
+  If (MY >= TabY + 80) And (MY <= TabY + 95) And (MX >= X1 + 40) And (MX <= X1 + 200) Then Begin
+   PrintSettings.ExportFormat := efHTML;
+   Exit;
+  End;
+ End;
+
+ { Boutons OK et Annuler }
+ BtnY := Y2 - 40;
+
+ { Bouton OK }
+ BtnX := X2 - 180;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  { Regenerer les pages avec les nouveaux parametres }
+  If PrintMessageIndex >= 0 Then
+   Print_GeneratePages(PrintMessageIndex);
+  PrintConfigVisible := False;
+  PrintConfigState := pcsHidden;
+  Exit;
+ End;
+
+ { Bouton Annuler }
+ BtnX := X2 - 90;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  PrintConfigVisible := False;
+  PrintConfigState := pcsHidden;
+  Exit;
+ End;
+End;
+
+{ Affiche l'apercu avant impression pour un message }
+Procedure Print_ShowPreview(MsgIndex: Integer);
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ Print_GeneratePages(MsgIndex);
+ PrintPreviewState := ppsShowing;
+ PrintCurrentPage := 0;
+End;
+
+{ Masque l'apercu avant impression }
+Procedure Print_HidePreview;
+Begin
+ PrintPreviewState := ppsHidden;
+End;
+
+{ Affiche la fenetre de configuration }
+Procedure Print_ShowConfig;
+Begin
+ PrintConfigVisible := True;
+ PrintConfigState := pcsGeneral;
+End;
+
+{ Masque la fenetre de configuration }
+Procedure Print_HideConfig;
+Begin
+ PrintConfigVisible := False;
+ PrintConfigState := pcsHidden;
+End;
+
+{ Imprime le message selectionne }
+Procedure Print_PrintSelectedMessage;
+Begin
+ If SelectedMessage >= 0 Then
+  Print_SendToPrinter(SelectedMessage);
+End;
+
+{ Exporte le message selectionne en texte }
+Procedure Print_ExportSelectedToText(FileName: String);
+Begin
+ If SelectedMessage >= 0 Then
+  Print_ExportToText(SelectedMessage, FileName);
+End;
+
+{ Exporte le message selectionne en HTML }
+Procedure Print_ExportSelectedToHTML(FileName: String);
+Begin
+ If SelectedMessage >= 0 Then
+  Print_ExportToHTML(SelectedMessage, FileName);
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DE L'IMPRESSION ET APERCU (TODO 21)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -16906,6 +18300,9 @@ BEGIN
  { Initialisation du systeme de notifications (TODO 20) }
  Notif_Init;
  Notif_AddDemoSettings;
+
+ { Initialisation du systeme d'impression (TODO 21) }
+ Print_Init;
 
  { Affichage de l'interface }
  ShowMouse;
