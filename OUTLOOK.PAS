@@ -167,7 +167,7 @@
       - Restauration depuis une sauvegarde
       - Export de la liste des contacts
 
-  23. [ ] Configuration des préférences utilisateur
+  23. [x] Configuration des préférences utilisateur
       - Onglet Général: Langue, dossier par défaut, démarrage
       - Onglet Lecture: Police, taille, codage par défaut
       - Onglet Rédaction: Format par défaut, correcteur, signature
@@ -1129,6 +1129,125 @@ Type
   StartTime: LongInt;            { Heure de debut }
   EndTime: LongInt;              { Heure de fin }
   FileSize: LongInt;             { Taille du fichier }
+ End;
+
+ { ============================================================================
+   TYPES POUR LA CONFIGURATION DES PREFERENCES (TODO 23)
+   ============================================================================ }
+
+ { Onglet de preferences actif }
+ TPrefsTab = (
+  ptGeneral,                     { Onglet General }
+  ptReading,                     { Onglet Lecture }
+  ptComposing,                   { Onglet Redaction }
+  ptConnection,                  { Onglet Connexion }
+  ptSecurity                     { Onglet Securite }
+ );
+
+ { Langue de l'interface }
+ TInterfaceLanguage = (
+  ilFrench,                      { Francais (par defaut) }
+  ilEnglish,                     { English }
+  ilGerman,                      { Deutsch }
+  ilItalian,                     { Italiano }
+  ilSpanish,                     { Espanol }
+  ilPortuguese,                  { Portugues }
+  ilSwedish,                     { Svenska }
+  ilDanish,                      { Dansk }
+  ilJapanese,                    { Nihongo (romaji) }
+  ilAlbanian                     { Shqip }
+ );
+
+ { Format de composition par defaut }
+ TComposeFormat = (
+  cfPlainText,                   { Texte brut }
+  cfHTML,                        { HTML }
+  cfRichText                     { Texte enrichi }
+ );
+
+ { Encodage par defaut }
+ TDefaultEncoding = (
+  deISO8859_1,                   { ISO-8859-1 (Latin-1) }
+  deISO8859_15,                  { ISO-8859-15 (Latin-9) }
+  deUTF8,                        { UTF-8 }
+  deWindows1252,                 { Windows-1252 }
+  deASCII                        { US-ASCII }
+ );
+
+ { Preferences generales }
+ TGeneralPrefs = Record
+  Language: TInterfaceLanguage;  { Langue de l'interface }
+  DefaultFolder: String[80];     { Dossier par defaut }
+  StartMinimized: Boolean;       { Demarrer minimise }
+  CheckMailOnStart: Boolean;     { Verifier messages au demarrage }
+  EmptyTrashOnExit: Boolean;     { Vider corbeille en quittant }
+  ShowSplash: Boolean;           { Afficher ecran d'accueil }
+  MinimizeToTray: Boolean;       { Minimiser dans la barre des taches }
+  ConfirmExit: Boolean;          { Confirmer la fermeture }
+ End;
+
+ { Preferences de lecture }
+ TReadingPrefs = Record
+  FontName: String[40];          { Nom de la police }
+  FontSize: Integer;             { Taille de la police }
+  DefaultEncoding: TDefaultEncoding; { Encodage par defaut }
+  MarkAsReadDelay: Integer;      { Delai avant marquage lu (secondes) }
+  ShowPreviewPane: Boolean;      { Afficher le volet de previsualisation }
+  PreviewOnRight: Boolean;       { Volet a droite (sinon en bas) }
+  AutoExpandGroups: Boolean;     { Developper automatiquement les groupes }
+  ShowHeaders: Boolean;          { Afficher tous les en-tetes }
+  UseAlternateRowColor: Boolean; { Couleurs alternees }
+ End;
+
+ { Preferences de redaction }
+ TComposingPrefs = Record
+  DefaultFormat: TComposeFormat; { Format par defaut }
+  FontName: String[40];          { Police de redaction }
+  FontSize: Integer;             { Taille de police }
+  SpellCheckEnabled: Boolean;    { Correcteur actif }
+  SpellCheckOnSend: Boolean;     { Verifier avant envoi }
+  AutoSaveDrafts: Boolean;       { Sauvegarde auto brouillons }
+  AutoSaveInterval: Integer;     { Intervalle (minutes) }
+  WrapTextAt: Integer;           { Retour a la ligne (colonnes) }
+  IncludeOriginal: Boolean;      { Inclure message original }
+  QuotePrefix: String[5];        { Prefixe de citation }
+  DefaultSignature: Integer;     { Index signature par defaut }
+ End;
+
+ { Preferences de connexion }
+ TConnectionPrefs = Record
+  CheckInterval: Integer;        { Intervalle de verification (minutes) }
+  ConnectionTimeout: Integer;    { Delai de connexion (secondes) }
+  MaxRetries: Integer;           { Nombre de tentatives }
+  RetryDelay: Integer;           { Delai entre tentatives (secondes) }
+  OfflineMode: Boolean;          { Mode hors ligne }
+  AutoReconnect: Boolean;        { Reconnexion automatique }
+  SavePassword: Boolean;         { Sauvegarder mot de passe }
+  UseSSL: Boolean;               { Utiliser SSL/TLS }
+  VerifyCertificates: Boolean;   { Verifier les certificats }
+ End;
+
+ { Preferences de securite }
+ TSecurityPrefs = Record
+  WarnOnExternal: Boolean;       { Avertir liens externes }
+  BlockExternalImages: Boolean;  { Bloquer images externes }
+  WarnOnAttachments: Boolean;    { Avertir pieces jointes }
+  BlockedExtensions: String[80]; { Extensions bloquees }
+  EnableVirusCheck: Boolean;     { Verification antivirus }
+  WarnOnUnencrypted: Boolean;    { Avertir non chiffre }
+  EnablePhishingFilter: Boolean; { Filtre anti-hameconnage }
+  TrustSenderImages: Boolean;    { Faire confiance aux images des contacts }
+  MaxAttachmentSize: LongInt;    { Taille max piece jointe (octets) }
+ End;
+
+ { Toutes les preferences utilisateur }
+ TUserPreferences = Record
+  General: TGeneralPrefs;        { Preferences generales }
+  Reading: TReadingPrefs;        { Preferences de lecture }
+  Composing: TComposingPrefs;    { Preferences de redaction }
+  Connection: TConnectionPrefs;  { Preferences de connexion }
+  Security: TSecurityPrefs;      { Preferences de securite }
+  Modified: Boolean;             { Preferences modifiees }
  End;
 
  { Type de colonne pour la liste des messages }
@@ -2214,6 +2333,71 @@ Const
  { Taille maximale d'un fichier de sauvegarde (10 Mo) }
  MAX_BACKUP_SIZE = 10485760;
 
+ { ============================================================================
+   CONSTANTES POUR LA CONFIGURATION DES PREFERENCES (TODO 23)
+   ============================================================================ }
+
+ { Dimensions de la fenetre de preferences }
+ PREFS_WINDOW_WIDTH = 500;
+ PREFS_WINDOW_HEIGHT = 400;
+
+ { Largeur de la liste des onglets }
+ PREFS_TAB_WIDTH = 120;
+
+ { Nombre d'onglets }
+ PREFS_TAB_COUNT = 5;
+
+ { Hauteur d'un onglet }
+ PREFS_TAB_HEIGHT = 30;
+
+ { Marges internes }
+ PREFS_MARGIN = 15;
+
+ { Nom du fichier de preferences }
+ PREFS_FILENAME = 'OUTLOOK.CFG';
+
+ { Version du fichier de preferences }
+ PREFS_VERSION = 1;
+
+ { Noms des onglets }
+ PREFS_TAB_NAMES: Array[0..4] of String[15] = (
+  'General',
+  'Lecture',
+  'Redaction',
+  'Connexion',
+  'Securite'
+ );
+
+ { Noms des langues }
+ PREFS_LANG_NAMES: Array[0..9] of String[15] = (
+  'Francais',
+  'English',
+  'Deutsch',
+  'Italiano',
+  'Espanol',
+  'Portugues',
+  'Svenska',
+  'Dansk',
+  'Nihongo',
+  'Shqip'
+ );
+
+ { Noms des encodages }
+ PREFS_ENCODING_NAMES: Array[0..4] of String[15] = (
+  'ISO-8859-1',
+  'ISO-8859-15',
+  'UTF-8',
+  'Windows-1252',
+  'US-ASCII'
+ );
+
+ { Noms des formats }
+ PREFS_FORMAT_NAMES: Array[0..2] of String[15] = (
+  'Texte brut',
+  'HTML',
+  'Texte enrichi'
+ );
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -2512,6 +2696,20 @@ Var
  BackupSelectedCount: Integer;         { Nombre de messages selectionnes }
  BackupProgressPercent: Integer;       { Pourcentage de progression }
  BackupLastError: String[120];         { Dernier message d'erreur }
+
+ { ============================================================================
+   VARIABLES POUR LA CONFIGURATION DES PREFERENCES (TODO 23)
+   ============================================================================ }
+
+ UserPrefs: TUserPreferences;          { Preferences utilisateur }
+ PrefsVisible: Boolean;                { Fenetre visible }
+ PrefsWindowX, PrefsWindowY: Integer;  { Position de la fenetre }
+ PrefsCurrentTab: TPrefsTab;           { Onglet actif }
+ PrefsScrollOffset: Integer;           { Defilement dans l'onglet }
+ PrefsHoveredTab: Integer;             { Onglet survole }
+ PrefsEditingField: Integer;           { Champ en cours d'edition }
+ PrefsEditBuffer: String[80];          { Tampon d'edition }
+ PrefsNeedsSave: Boolean;              { Modifications non sauvegardees }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -17552,6 +17750,986 @@ End;
   FIN DE L'IMPLEMENTATION DE LA SAUVEGARDE ET L'EXPORT (TODO 22)
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DE LA CONFIGURATION DES PREFERENCES (TODO 23)
+  ============================================================================ }
+
+{ Initialise les preferences avec les valeurs par defaut }
+Procedure Prefs_InitDefaults;
+Begin
+ { Preferences generales }
+ UserPrefs.General.Language := ilFrench;
+ UserPrefs.General.DefaultFolder := 'Boite de reception';
+ UserPrefs.General.StartMinimized := False;
+ UserPrefs.General.CheckMailOnStart := True;
+ UserPrefs.General.EmptyTrashOnExit := False;
+ UserPrefs.General.ShowSplash := True;
+ UserPrefs.General.MinimizeToTray := False;
+ UserPrefs.General.ConfirmExit := True;
+
+ { Preferences de lecture }
+ UserPrefs.Reading.FontName := 'Arial';
+ UserPrefs.Reading.FontSize := 10;
+ UserPrefs.Reading.DefaultEncoding := deISO8859_1;
+ UserPrefs.Reading.MarkAsReadDelay := 3;
+ UserPrefs.Reading.ShowPreviewPane := True;
+ UserPrefs.Reading.PreviewOnRight := False;
+ UserPrefs.Reading.AutoExpandGroups := True;
+ UserPrefs.Reading.ShowHeaders := False;
+ UserPrefs.Reading.UseAlternateRowColor := True;
+
+ { Preferences de redaction }
+ UserPrefs.Composing.DefaultFormat := cfPlainText;
+ UserPrefs.Composing.FontName := 'Courier';
+ UserPrefs.Composing.FontSize := 10;
+ UserPrefs.Composing.SpellCheckEnabled := False;
+ UserPrefs.Composing.SpellCheckOnSend := False;
+ UserPrefs.Composing.AutoSaveDrafts := True;
+ UserPrefs.Composing.AutoSaveInterval := 5;
+ UserPrefs.Composing.WrapTextAt := 76;
+ UserPrefs.Composing.IncludeOriginal := True;
+ UserPrefs.Composing.QuotePrefix := '> ';
+ UserPrefs.Composing.DefaultSignature := 0;
+
+ { Preferences de connexion }
+ UserPrefs.Connection.CheckInterval := 10;
+ UserPrefs.Connection.ConnectionTimeout := 30;
+ UserPrefs.Connection.MaxRetries := 3;
+ UserPrefs.Connection.RetryDelay := 5;
+ UserPrefs.Connection.OfflineMode := False;
+ UserPrefs.Connection.AutoReconnect := True;
+ UserPrefs.Connection.SavePassword := True;
+ UserPrefs.Connection.UseSSL := True;
+ UserPrefs.Connection.VerifyCertificates := True;
+
+ { Preferences de securite }
+ UserPrefs.Security.WarnOnExternal := True;
+ UserPrefs.Security.BlockExternalImages := True;
+ UserPrefs.Security.WarnOnAttachments := True;
+ UserPrefs.Security.BlockedExtensions := '.exe;.bat;.com;.vbs;.scr;.pif';
+ UserPrefs.Security.EnableVirusCheck := False;
+ UserPrefs.Security.WarnOnUnencrypted := False;
+ UserPrefs.Security.EnablePhishingFilter := True;
+ UserPrefs.Security.TrustSenderImages := True;
+ UserPrefs.Security.MaxAttachmentSize := 10485760;
+
+ UserPrefs.Modified := False;
+
+ { Variables de la fenetre }
+ PrefsVisible := False;
+ PrefsWindowX := (GetMaxX - PREFS_WINDOW_WIDTH) Div 2;
+ PrefsWindowY := (GetMaxY - PREFS_WINDOW_HEIGHT) Div 2;
+ PrefsCurrentTab := ptGeneral;
+ PrefsScrollOffset := 0;
+ PrefsHoveredTab := -1;
+ PrefsEditingField := -1;
+ PrefsEditBuffer := '';
+ PrefsNeedsSave := False;
+End;
+
+{ Sauvegarde les preferences dans un fichier }
+Procedure Prefs_Save;
+Var
+ F: File of Byte;
+ B: Byte;
+ W: Word;
+ I: Integer;
+ S: String;
+Begin
+ {$I-}
+ Assign(F, PREFS_FILENAME);
+ Rewrite(F);
+ If IOResult <> 0 Then Exit;
+
+ { Ecrire la version }
+ B := PREFS_VERSION;
+ Write(F, B);
+
+ { Preferences generales }
+ B := Ord(UserPrefs.General.Language);
+ Write(F, B);
+ B := Length(UserPrefs.General.DefaultFolder);
+ Write(F, B);
+ For I := 1 To Length(UserPrefs.General.DefaultFolder) Do Begin
+  B := Ord(UserPrefs.General.DefaultFolder[I]);
+  Write(F, B);
+ End;
+ If UserPrefs.General.StartMinimized Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.General.CheckMailOnStart Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.General.EmptyTrashOnExit Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.General.ShowSplash Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.General.MinimizeToTray Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.General.ConfirmExit Then B := 1 Else B := 0;
+ Write(F, B);
+
+ { Preferences de lecture }
+ B := Length(UserPrefs.Reading.FontName);
+ Write(F, B);
+ For I := 1 To Length(UserPrefs.Reading.FontName) Do Begin
+  B := Ord(UserPrefs.Reading.FontName[I]);
+  Write(F, B);
+ End;
+ B := UserPrefs.Reading.FontSize;
+ Write(F, B);
+ B := Ord(UserPrefs.Reading.DefaultEncoding);
+ Write(F, B);
+ B := UserPrefs.Reading.MarkAsReadDelay;
+ Write(F, B);
+ If UserPrefs.Reading.ShowPreviewPane Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Reading.PreviewOnRight Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Reading.AutoExpandGroups Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Reading.ShowHeaders Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Reading.UseAlternateRowColor Then B := 1 Else B := 0;
+ Write(F, B);
+
+ { Preferences de redaction }
+ B := Ord(UserPrefs.Composing.DefaultFormat);
+ Write(F, B);
+ B := Length(UserPrefs.Composing.FontName);
+ Write(F, B);
+ For I := 1 To Length(UserPrefs.Composing.FontName) Do Begin
+  B := Ord(UserPrefs.Composing.FontName[I]);
+  Write(F, B);
+ End;
+ B := UserPrefs.Composing.FontSize;
+ Write(F, B);
+ If UserPrefs.Composing.SpellCheckEnabled Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Composing.SpellCheckOnSend Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Composing.AutoSaveDrafts Then B := 1 Else B := 0;
+ Write(F, B);
+ B := UserPrefs.Composing.AutoSaveInterval;
+ Write(F, B);
+ B := UserPrefs.Composing.WrapTextAt;
+ Write(F, B);
+ If UserPrefs.Composing.IncludeOriginal Then B := 1 Else B := 0;
+ Write(F, B);
+ B := Length(UserPrefs.Composing.QuotePrefix);
+ Write(F, B);
+ For I := 1 To Length(UserPrefs.Composing.QuotePrefix) Do Begin
+  B := Ord(UserPrefs.Composing.QuotePrefix[I]);
+  Write(F, B);
+ End;
+ B := UserPrefs.Composing.DefaultSignature;
+ Write(F, B);
+
+ { Preferences de connexion }
+ B := UserPrefs.Connection.CheckInterval;
+ Write(F, B);
+ B := UserPrefs.Connection.ConnectionTimeout;
+ Write(F, B);
+ B := UserPrefs.Connection.MaxRetries;
+ Write(F, B);
+ B := UserPrefs.Connection.RetryDelay;
+ Write(F, B);
+ If UserPrefs.Connection.OfflineMode Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Connection.AutoReconnect Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Connection.SavePassword Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Connection.UseSSL Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Connection.VerifyCertificates Then B := 1 Else B := 0;
+ Write(F, B);
+
+ { Preferences de securite }
+ If UserPrefs.Security.WarnOnExternal Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Security.BlockExternalImages Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Security.WarnOnAttachments Then B := 1 Else B := 0;
+ Write(F, B);
+ B := Length(UserPrefs.Security.BlockedExtensions);
+ Write(F, B);
+ For I := 1 To Length(UserPrefs.Security.BlockedExtensions) Do Begin
+  B := Ord(UserPrefs.Security.BlockedExtensions[I]);
+  Write(F, B);
+ End;
+ If UserPrefs.Security.EnableVirusCheck Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Security.WarnOnUnencrypted Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Security.EnablePhishingFilter Then B := 1 Else B := 0;
+ Write(F, B);
+ If UserPrefs.Security.TrustSenderImages Then B := 1 Else B := 0;
+ Write(F, B);
+
+ Close(F);
+ {$I+}
+
+ UserPrefs.Modified := False;
+ PrefsNeedsSave := False;
+End;
+
+{ Charge les preferences depuis un fichier }
+Function Prefs_Load: Boolean;
+Var
+ F: File of Byte;
+ B: Byte;
+ I, Len: Integer;
+Begin
+ Prefs_Load := False;
+
+ {$I-}
+ Assign(F, PREFS_FILENAME);
+ Reset(F);
+ If IOResult <> 0 Then Exit;
+
+ { Lire et verifier la version }
+ Read(F, B);
+ If B > PREFS_VERSION Then Begin
+  Close(F);
+  Exit;
+ End;
+
+ { Preferences generales }
+ Read(F, B);
+ UserPrefs.General.Language := TInterfaceLanguage(B);
+ Read(F, B);
+ Len := B;
+ UserPrefs.General.DefaultFolder := '';
+ For I := 1 To Len Do Begin
+  Read(F, B);
+  UserPrefs.General.DefaultFolder := UserPrefs.General.DefaultFolder + Chr(B);
+ End;
+ Read(F, B); UserPrefs.General.StartMinimized := (B = 1);
+ Read(F, B); UserPrefs.General.CheckMailOnStart := (B = 1);
+ Read(F, B); UserPrefs.General.EmptyTrashOnExit := (B = 1);
+ Read(F, B); UserPrefs.General.ShowSplash := (B = 1);
+ Read(F, B); UserPrefs.General.MinimizeToTray := (B = 1);
+ Read(F, B); UserPrefs.General.ConfirmExit := (B = 1);
+
+ { Preferences de lecture }
+ Read(F, B);
+ Len := B;
+ UserPrefs.Reading.FontName := '';
+ For I := 1 To Len Do Begin
+  Read(F, B);
+  UserPrefs.Reading.FontName := UserPrefs.Reading.FontName + Chr(B);
+ End;
+ Read(F, B); UserPrefs.Reading.FontSize := B;
+ Read(F, B); UserPrefs.Reading.DefaultEncoding := TDefaultEncoding(B);
+ Read(F, B); UserPrefs.Reading.MarkAsReadDelay := B;
+ Read(F, B); UserPrefs.Reading.ShowPreviewPane := (B = 1);
+ Read(F, B); UserPrefs.Reading.PreviewOnRight := (B = 1);
+ Read(F, B); UserPrefs.Reading.AutoExpandGroups := (B = 1);
+ Read(F, B); UserPrefs.Reading.ShowHeaders := (B = 1);
+ Read(F, B); UserPrefs.Reading.UseAlternateRowColor := (B = 1);
+
+ { Preferences de redaction }
+ Read(F, B); UserPrefs.Composing.DefaultFormat := TComposeFormat(B);
+ Read(F, B);
+ Len := B;
+ UserPrefs.Composing.FontName := '';
+ For I := 1 To Len Do Begin
+  Read(F, B);
+  UserPrefs.Composing.FontName := UserPrefs.Composing.FontName + Chr(B);
+ End;
+ Read(F, B); UserPrefs.Composing.FontSize := B;
+ Read(F, B); UserPrefs.Composing.SpellCheckEnabled := (B = 1);
+ Read(F, B); UserPrefs.Composing.SpellCheckOnSend := (B = 1);
+ Read(F, B); UserPrefs.Composing.AutoSaveDrafts := (B = 1);
+ Read(F, B); UserPrefs.Composing.AutoSaveInterval := B;
+ Read(F, B); UserPrefs.Composing.WrapTextAt := B;
+ Read(F, B); UserPrefs.Composing.IncludeOriginal := (B = 1);
+ Read(F, B);
+ Len := B;
+ UserPrefs.Composing.QuotePrefix := '';
+ For I := 1 To Len Do Begin
+  Read(F, B);
+  UserPrefs.Composing.QuotePrefix := UserPrefs.Composing.QuotePrefix + Chr(B);
+ End;
+ Read(F, B); UserPrefs.Composing.DefaultSignature := B;
+
+ { Preferences de connexion }
+ Read(F, B); UserPrefs.Connection.CheckInterval := B;
+ Read(F, B); UserPrefs.Connection.ConnectionTimeout := B;
+ Read(F, B); UserPrefs.Connection.MaxRetries := B;
+ Read(F, B); UserPrefs.Connection.RetryDelay := B;
+ Read(F, B); UserPrefs.Connection.OfflineMode := (B = 1);
+ Read(F, B); UserPrefs.Connection.AutoReconnect := (B = 1);
+ Read(F, B); UserPrefs.Connection.SavePassword := (B = 1);
+ Read(F, B); UserPrefs.Connection.UseSSL := (B = 1);
+ Read(F, B); UserPrefs.Connection.VerifyCertificates := (B = 1);
+
+ { Preferences de securite }
+ Read(F, B); UserPrefs.Security.WarnOnExternal := (B = 1);
+ Read(F, B); UserPrefs.Security.BlockExternalImages := (B = 1);
+ Read(F, B); UserPrefs.Security.WarnOnAttachments := (B = 1);
+ Read(F, B);
+ Len := B;
+ UserPrefs.Security.BlockedExtensions := '';
+ For I := 1 To Len Do Begin
+  Read(F, B);
+  UserPrefs.Security.BlockedExtensions := UserPrefs.Security.BlockedExtensions + Chr(B);
+ End;
+ Read(F, B); UserPrefs.Security.EnableVirusCheck := (B = 1);
+ Read(F, B); UserPrefs.Security.WarnOnUnencrypted := (B = 1);
+ Read(F, B); UserPrefs.Security.EnablePhishingFilter := (B = 1);
+ Read(F, B); UserPrefs.Security.TrustSenderImages := (B = 1);
+
+ Close(F);
+ {$I+}
+
+ UserPrefs.Modified := False;
+ PrefsNeedsSave := False;
+ Prefs_Load := True;
+End;
+
+{ Dessine un checkbox }
+Procedure Prefs_DrawCheckbox(X, Y: Integer; Checked: Boolean; Caption: String);
+Var
+ BoxSize: Integer;
+Begin
+ BoxSize := 12;
+
+ { Boite du checkbox }
+ SetFillStyle(SolidFill, White);
+ Bar(X, Y, X + BoxSize, Y + BoxSize);
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + BoxSize, Y + BoxSize);
+
+ { Coche }
+ If Checked Then Begin
+  SetColor(Black);
+  Line(X + 2, Y + 6, X + 5, Y + 10);
+  Line(X + 5, Y + 10, X + 10, Y + 2);
+ End;
+
+ { Texte }
+ SetColor(Black);
+ OutTextXY(X + BoxSize + 8, Y + 2, Caption);
+End;
+
+{ Dessine un champ de texte }
+Procedure Prefs_DrawTextfield(X, Y, Width: Integer; Value: String; Active: Boolean);
+Begin
+ If Active Then
+  SetFillStyle(SolidFill, Yellow)
+ Else
+  SetFillStyle(SolidFill, White);
+ Bar(X, Y, X + Width, Y + 18);
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + Width, Y + 18);
+ SetColor(Black);
+ OutTextXY(X + 4, Y + 4, Copy(Value, 1, (Width - 8) Div 8));
+End;
+
+{ Dessine un combobox }
+Procedure Prefs_DrawCombobox(X, Y, Width: Integer; Value: String);
+Begin
+ SetFillStyle(SolidFill, White);
+ Bar(X, Y, X + Width, Y + 18);
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + Width, Y + 18);
+
+ { Fleche }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + Width - 18, Y + 1, X + Width - 1, Y + 17);
+ SetColor(DarkGray);
+ Line(X + Width - 14, Y + 6, X + Width - 9, Y + 12);
+ Line(X + Width - 9, Y + 12, X + Width - 4, Y + 6);
+
+ { Texte }
+ SetColor(Black);
+ OutTextXY(X + 4, Y + 4, Copy(Value, 1, (Width - 26) Div 8));
+End;
+
+{ Dessine un slider/spin }
+Procedure Prefs_DrawSpinner(X, Y, Width, Value, Min, Max: Integer);
+Var
+ ValStr: String;
+Begin
+ SetFillStyle(SolidFill, White);
+ Bar(X, Y, X + Width - 36, Y + 18);
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + Width - 36, Y + 18);
+
+ Str(Value, ValStr);
+ SetColor(Black);
+ OutTextXY(X + 4, Y + 4, ValStr);
+
+ { Boutons + et - }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + Width - 34, Y, X + Width - 18, Y + 18);
+ Bar(X + Width - 16, Y, X + Width, Y + 18);
+ SetColor(DarkGray);
+ Rectangle(X + Width - 34, Y, X + Width - 18, Y + 18);
+ Rectangle(X + Width - 16, Y, X + Width, Y + 18);
+ SetColor(Black);
+ OutTextXY(X + Width - 30, Y + 4, '-');
+ OutTextXY(X + Width - 12, Y + 4, '+');
+End;
+
+{ Dessine l'onglet General }
+Procedure Prefs_DrawGeneralTab(X, Y, W, H: Integer);
+Var
+ CY: Integer;
+Begin
+ CY := Y + 10;
+
+ SetColor(Black);
+ OutTextXY(X, CY, 'Langue de l''interface:');
+ CY := CY + 18;
+ Prefs_DrawCombobox(X, CY, 180, PREFS_LANG_NAMES[Ord(UserPrefs.General.Language)]);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Dossier par defaut:');
+ CY := CY + 18;
+ Prefs_DrawTextfield(X, CY, W - 20, UserPrefs.General.DefaultFolder, PrefsEditingField = 0);
+ CY := CY + 30;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.General.StartMinimized, 'Demarrer minimise');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.General.CheckMailOnStart, 'Verifier le courrier au demarrage');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.General.EmptyTrashOnExit, 'Vider la corbeille en quittant');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.General.ShowSplash, 'Afficher l''ecran d''accueil');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.General.MinimizeToTray, 'Minimiser dans la barre des taches');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.General.ConfirmExit, 'Confirmer avant de quitter');
+End;
+
+{ Dessine l'onglet Lecture }
+Procedure Prefs_DrawReadingTab(X, Y, W, H: Integer);
+Var
+ CY: Integer;
+Begin
+ CY := Y + 10;
+
+ SetColor(Black);
+ OutTextXY(X, CY, 'Police d''affichage:');
+ CY := CY + 18;
+ Prefs_DrawTextfield(X, CY, 150, UserPrefs.Reading.FontName, PrefsEditingField = 1);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Taille de police:');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Reading.FontSize, 8, 24);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Encodage par defaut:');
+ CY := CY + 18;
+ Prefs_DrawCombobox(X, CY, 150, PREFS_ENCODING_NAMES[Ord(UserPrefs.Reading.DefaultEncoding)]);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Marquer comme lu apres (sec):');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Reading.MarkAsReadDelay, 0, 30);
+ CY := CY + 30;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.ShowPreviewPane, 'Afficher le volet de previsualisation');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.PreviewOnRight, 'Volet a droite (sinon en bas)');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.AutoExpandGroups, 'Developper automatiquement les groupes');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.UseAlternateRowColor, 'Utiliser des couleurs alternees');
+End;
+
+{ Dessine l'onglet Redaction }
+Procedure Prefs_DrawComposingTab(X, Y, W, H: Integer);
+Var
+ CY: Integer;
+Begin
+ CY := Y + 10;
+
+ SetColor(Black);
+ OutTextXY(X, CY, 'Format par defaut:');
+ CY := CY + 18;
+ Prefs_DrawCombobox(X, CY, 150, PREFS_FORMAT_NAMES[Ord(UserPrefs.Composing.DefaultFormat)]);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Police de redaction:');
+ CY := CY + 18;
+ Prefs_DrawTextfield(X, CY, 150, UserPrefs.Composing.FontName, PrefsEditingField = 2);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Retour a la ligne (colonnes):');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Composing.WrapTextAt, 40, 132);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Prefixe de citation:');
+ CY := CY + 18;
+ Prefs_DrawTextfield(X, CY, 80, UserPrefs.Composing.QuotePrefix, PrefsEditingField = 3);
+ CY := CY + 30;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.SpellCheckEnabled, 'Activer le correcteur orthographique');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.SpellCheckOnSend, 'Verifier avant l''envoi');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.AutoSaveDrafts, 'Sauvegarde automatique des brouillons');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.IncludeOriginal, 'Inclure le message original');
+End;
+
+{ Dessine l'onglet Connexion }
+Procedure Prefs_DrawConnectionTab(X, Y, W, H: Integer);
+Var
+ CY: Integer;
+Begin
+ CY := Y + 10;
+
+ SetColor(Black);
+ OutTextXY(X, CY, 'Verifier le courrier toutes les (min):');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.CheckInterval, 1, 60);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Delai de connexion (sec):');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.ConnectionTimeout, 10, 120);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Nombre de tentatives:');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.MaxRetries, 1, 10);
+ CY := CY + 30;
+
+ OutTextXY(X, CY, 'Delai entre tentatives (sec):');
+ CY := CY + 18;
+ Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.RetryDelay, 1, 30);
+ CY := CY + 30;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.OfflineMode, 'Mode hors ligne');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.AutoReconnect, 'Reconnexion automatique');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.SavePassword, 'Sauvegarder le mot de passe');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.UseSSL, 'Utiliser SSL/TLS');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.VerifyCertificates, 'Verifier les certificats');
+End;
+
+{ Dessine l'onglet Securite }
+Procedure Prefs_DrawSecurityTab(X, Y, W, H: Integer);
+Var
+ CY: Integer;
+Begin
+ CY := Y + 10;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.WarnOnExternal, 'Avertir pour les liens externes');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.BlockExternalImages, 'Bloquer les images externes');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.WarnOnAttachments, 'Avertir pour les pieces jointes');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.EnableVirusCheck, 'Activer la verification antivirus');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.WarnOnUnencrypted, 'Avertir si non chiffre');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.EnablePhishingFilter, 'Activer le filtre anti-hameconnage');
+ CY := CY + 22;
+
+ Prefs_DrawCheckbox(X, CY, UserPrefs.Security.TrustSenderImages, 'Faire confiance aux images des contacts');
+ CY := CY + 32;
+
+ SetColor(Black);
+ OutTextXY(X, CY, 'Extensions bloquees:');
+ CY := CY + 18;
+ Prefs_DrawTextfield(X, CY, W - 20, UserPrefs.Security.BlockedExtensions, PrefsEditingField = 4);
+End;
+
+{ Dessine la fenetre de preferences }
+Procedure Prefs_DrawWindow;
+Var
+ X1, Y1, X2, Y2: Integer;
+ TabX, TabY, TabI: Integer;
+ ContentX, ContentY, ContentW, ContentH: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+Begin
+ If Not PrefsVisible Then Exit;
+
+ X1 := PrefsWindowX;
+ Y1 := PrefsWindowY;
+ X2 := X1 + PREFS_WINDOW_WIDTH;
+ Y2 := Y1 + PREFS_WINDOW_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X1, Y1, X2, Y2);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1, Y1, X2, Y1 + 25);
+ SetColor(White);
+ OutTextXY(X1 + 10, Y1 + 7, 'Preferences - Options');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
+ SetColor(White);
+ OutTextXY(X2 - 18, Y1 + 7, 'X');
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X1, Y1, X2, Y2);
+
+ { Liste des onglets }
+ TabX := X1 + 5;
+ TabY := Y1 + 30;
+ For TabI := 0 To PREFS_TAB_COUNT - 1 Do Begin
+  If TabI = Ord(PrefsCurrentTab) Then Begin
+   SetFillStyle(SolidFill, White);
+   Bar(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
+  End
+  Else If TabI = PrefsHoveredTab Then Begin
+   SetFillStyle(SolidFill, Cyan);
+   Bar(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
+  End
+  Else Begin
+   SetFillStyle(SolidFill, LightGray);
+   Bar(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
+  End;
+  SetColor(DarkGray);
+  Rectangle(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
+  SetColor(Black);
+  OutTextXY(TabX + 10, TabY + 10, PREFS_TAB_NAMES[TabI]);
+  TabY := TabY + PREFS_TAB_HEIGHT + 2;
+ End;
+
+ { Zone de contenu }
+ ContentX := X1 + PREFS_TAB_WIDTH + 15;
+ ContentY := Y1 + 35;
+ ContentW := PREFS_WINDOW_WIDTH - PREFS_TAB_WIDTH - 25;
+ ContentH := PREFS_WINDOW_HEIGHT - 90;
+
+ SetFillStyle(SolidFill, White);
+ Bar(ContentX, ContentY, ContentX + ContentW, ContentY + ContentH);
+ SetColor(DarkGray);
+ Rectangle(ContentX, ContentY, ContentX + ContentW, ContentY + ContentH);
+
+ { Contenu de l'onglet }
+ Case PrefsCurrentTab Of
+  ptGeneral: Prefs_DrawGeneralTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
+  ptReading: Prefs_DrawReadingTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
+  ptComposing: Prefs_DrawComposingTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
+  ptConnection: Prefs_DrawConnectionTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
+  ptSecurity: Prefs_DrawSecurityTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
+ End;
+
+ { Boutons OK, Annuler, Appliquer }
+ BtnW := 80;
+ BtnH := 25;
+ BtnY := Y2 - 35;
+
+ { Bouton OK }
+ BtnX := X2 - 270;
+ SetFillStyle(SolidFill, Green);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(White);
+ OutTextXY(BtnX + 30, BtnY + 7, 'OK');
+
+ { Bouton Annuler }
+ BtnX := X2 - 180;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 18, BtnY + 7, 'Annuler');
+
+ { Bouton Appliquer }
+ BtnX := X2 - 90;
+ If PrefsNeedsSave Then
+  SetFillStyle(SolidFill, Yellow)
+ Else
+  SetFillStyle(SolidFill, LightGray);
+ Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(DarkGray);
+ Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+ SetColor(Black);
+ OutTextXY(BtnX + 12, BtnY + 7, 'Appliquer');
+End;
+
+{ Gere les clics dans la fenetre de preferences }
+Procedure Prefs_HandleClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+ TabX, TabY, TabI, ClickedTab: Integer;
+ ContentX, ContentY, ContentW, ContentH: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ RelY: Integer;
+Begin
+ If Not PrefsVisible Then Exit;
+
+ X1 := PrefsWindowX;
+ Y1 := PrefsWindowY;
+ X2 := X1 + PREFS_WINDOW_WIDTH;
+ Y2 := Y1 + PREFS_WINDOW_HEIGHT;
+ BtnW := 80;
+ BtnH := 25;
+
+ { Clic hors de la fenetre }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Exit;
+
+ { Bouton fermer (X) }
+ If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
+  PrefsVisible := False;
+  Exit;
+ End;
+
+ { Clic sur un onglet }
+ TabX := X1 + 5;
+ TabY := Y1 + 30;
+ ClickedTab := -1;
+ For TabI := 0 To PREFS_TAB_COUNT - 1 Do Begin
+  If (MX >= TabX) And (MX <= TabX + PREFS_TAB_WIDTH) And
+     (MY >= TabY) And (MY <= TabY + PREFS_TAB_HEIGHT) Then Begin
+   ClickedTab := TabI;
+   Break;
+  End;
+  TabY := TabY + PREFS_TAB_HEIGHT + 2;
+ End;
+ If ClickedTab >= 0 Then Begin
+  PrefsCurrentTab := TPrefsTab(ClickedTab);
+  PrefsEditingField := -1;
+  Exit;
+ End;
+
+ { Zone de contenu }
+ ContentX := X1 + PREFS_TAB_WIDTH + 15;
+ ContentY := Y1 + 35;
+ ContentW := PREFS_WINDOW_WIDTH - PREFS_TAB_WIDTH - 25;
+ ContentH := PREFS_WINDOW_HEIGHT - 90;
+
+ If (MX >= ContentX) And (MX <= ContentX + ContentW) And
+    (MY >= ContentY) And (MY <= ContentY + ContentH) Then Begin
+  RelY := MY - ContentY - 10;
+
+  { Gerer les clics sur les checkboxes selon l'onglet }
+  Case PrefsCurrentTab Of
+   ptGeneral: Begin
+    If (RelY >= 76) And (RelY < 98) Then Begin
+     UserPrefs.General.StartMinimized := Not UserPrefs.General.StartMinimized;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 98) And (RelY < 120) Then Begin
+     UserPrefs.General.CheckMailOnStart := Not UserPrefs.General.CheckMailOnStart;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 120) And (RelY < 142) Then Begin
+     UserPrefs.General.EmptyTrashOnExit := Not UserPrefs.General.EmptyTrashOnExit;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 142) And (RelY < 164) Then Begin
+     UserPrefs.General.ShowSplash := Not UserPrefs.General.ShowSplash;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 164) And (RelY < 186) Then Begin
+     UserPrefs.General.MinimizeToTray := Not UserPrefs.General.MinimizeToTray;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 186) And (RelY < 208) Then Begin
+     UserPrefs.General.ConfirmExit := Not UserPrefs.General.ConfirmExit;
+     PrefsNeedsSave := True;
+    End;
+   End;
+
+   ptReading: Begin
+    If (RelY >= 166) And (RelY < 188) Then Begin
+     UserPrefs.Reading.ShowPreviewPane := Not UserPrefs.Reading.ShowPreviewPane;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 188) And (RelY < 210) Then Begin
+     UserPrefs.Reading.PreviewOnRight := Not UserPrefs.Reading.PreviewOnRight;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 210) And (RelY < 232) Then Begin
+     UserPrefs.Reading.AutoExpandGroups := Not UserPrefs.Reading.AutoExpandGroups;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 232) And (RelY < 254) Then Begin
+     UserPrefs.Reading.UseAlternateRowColor := Not UserPrefs.Reading.UseAlternateRowColor;
+     PrefsNeedsSave := True;
+    End;
+   End;
+
+   ptComposing: Begin
+    If (RelY >= 136) And (RelY < 158) Then Begin
+     UserPrefs.Composing.SpellCheckEnabled := Not UserPrefs.Composing.SpellCheckEnabled;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 158) And (RelY < 180) Then Begin
+     UserPrefs.Composing.SpellCheckOnSend := Not UserPrefs.Composing.SpellCheckOnSend;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 180) And (RelY < 202) Then Begin
+     UserPrefs.Composing.AutoSaveDrafts := Not UserPrefs.Composing.AutoSaveDrafts;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 202) And (RelY < 224) Then Begin
+     UserPrefs.Composing.IncludeOriginal := Not UserPrefs.Composing.IncludeOriginal;
+     PrefsNeedsSave := True;
+    End;
+   End;
+
+   ptConnection: Begin
+    If (RelY >= 136) And (RelY < 158) Then Begin
+     UserPrefs.Connection.OfflineMode := Not UserPrefs.Connection.OfflineMode;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 158) And (RelY < 180) Then Begin
+     UserPrefs.Connection.AutoReconnect := Not UserPrefs.Connection.AutoReconnect;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 180) And (RelY < 202) Then Begin
+     UserPrefs.Connection.SavePassword := Not UserPrefs.Connection.SavePassword;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 202) And (RelY < 224) Then Begin
+     UserPrefs.Connection.UseSSL := Not UserPrefs.Connection.UseSSL;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 224) And (RelY < 246) Then Begin
+     UserPrefs.Connection.VerifyCertificates := Not UserPrefs.Connection.VerifyCertificates;
+     PrefsNeedsSave := True;
+    End;
+   End;
+
+   ptSecurity: Begin
+    If (RelY >= 0) And (RelY < 22) Then Begin
+     UserPrefs.Security.WarnOnExternal := Not UserPrefs.Security.WarnOnExternal;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 22) And (RelY < 44) Then Begin
+     UserPrefs.Security.BlockExternalImages := Not UserPrefs.Security.BlockExternalImages;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 44) And (RelY < 66) Then Begin
+     UserPrefs.Security.WarnOnAttachments := Not UserPrefs.Security.WarnOnAttachments;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 66) And (RelY < 88) Then Begin
+     UserPrefs.Security.EnableVirusCheck := Not UserPrefs.Security.EnableVirusCheck;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 88) And (RelY < 110) Then Begin
+     UserPrefs.Security.WarnOnUnencrypted := Not UserPrefs.Security.WarnOnUnencrypted;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 110) And (RelY < 132) Then Begin
+     UserPrefs.Security.EnablePhishingFilter := Not UserPrefs.Security.EnablePhishingFilter;
+     PrefsNeedsSave := True;
+    End
+    Else If (RelY >= 132) And (RelY < 154) Then Begin
+     UserPrefs.Security.TrustSenderImages := Not UserPrefs.Security.TrustSenderImages;
+     PrefsNeedsSave := True;
+    End;
+   End;
+  End;
+  Exit;
+ End;
+
+ { Boutons en bas }
+ BtnY := Y2 - 35;
+
+ { Bouton OK }
+ BtnX := X2 - 270;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  Prefs_Save;
+  PrefsVisible := False;
+  Exit;
+ End;
+
+ { Bouton Annuler }
+ BtnX := X2 - 180;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  If PrefsNeedsSave Then Begin
+   { Recharger les preferences depuis le fichier }
+   Prefs_Load;
+  End;
+  PrefsVisible := False;
+  Exit;
+ End;
+
+ { Bouton Appliquer }
+ BtnX := X2 - 90;
+ If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+  Prefs_Save;
+  Exit;
+ End;
+End;
+
+{ Affiche la fenetre de preferences }
+Procedure Prefs_Show;
+Begin
+ PrefsVisible := True;
+ PrefsCurrentTab := ptGeneral;
+ PrefsEditingField := -1;
+ PrefsNeedsSave := False;
+End;
+
+{ Masque la fenetre de preferences }
+Procedure Prefs_Hide;
+Begin
+ PrefsVisible := False;
+End;
+
+{ Initialise le systeme de preferences }
+Procedure Prefs_Init;
+Begin
+ { Initialiser avec les valeurs par defaut }
+ Prefs_InitDefaults;
+
+ { Tenter de charger depuis le fichier }
+ Prefs_Load;
+End;
+
+{ Applique les preferences de lecture }
+Procedure Prefs_ApplyReadingSettings;
+Begin
+ { Appliquer l'orientation du volet }
+ If UserPrefs.Reading.PreviewOnRight Then
+  PreviewOrientation := poVertical
+ Else
+  PreviewOrientation := poHorizontal;
+
+ { Appliquer la visibilite du volet }
+ PreviewVisible := UserPrefs.Reading.ShowPreviewPane;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DE LA CONFIGURATION DES PREFERENCES (TODO 23)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -19356,6 +20534,9 @@ BEGIN
 
  { Initialisation du systeme de sauvegarde (TODO 22) }
  Backup_Init;
+
+ { Initialisation du systeme de preferences (TODO 23) }
+ Prefs_Init;
 
  { Affichage de l'interface }
  ShowMouse;
