@@ -110,7 +110,7 @@
       - Support du CSS inline (style="...")
       - Attributs: align, color, bgcolor, width, height, border
 
-  15. [ ] Décodage MIME multi-parties (RFC 2045-2049)
+  15. [x] Décodage MIME multi-parties (RFC 2045-2049)
       - Détection du Content-Type et des limites
       - Décodage Base64 pour les pièces jointes
       - Décodage Quoted-Printable pour le texte
@@ -492,6 +492,80 @@ Type
   IsImage: Boolean;        { Placeholder d'image }
   ImageWidth: Integer;     { Largeur de l'image }
   ImageHeight: Integer;    { Hauteur de l'image }
+ End;
+
+ { ============================================================================
+   TYPES POUR LE DECODAGE MIME (TODO 15)
+   ============================================================================ }
+
+ { Type d'encodage de transfert }
+ TMIMETransferEncoding = (
+  mte7Bit,             { 7bit - texte ASCII }
+  mte8Bit,             { 8bit - texte avec caracteres etendus }
+  mteQuotedPrintable,  { Quoted-Printable }
+  mteBase64,           { Base64 }
+  mteBinary            { Binaire }
+ );
+
+ { Type de contenu principal }
+ TMIMEContentType = (
+  mctText,             { text/* }
+  mctMultipart,        { multipart/* }
+  mctApplication,      { application/* }
+  mctImage,            { image/* }
+  mctAudio,            { audio/* }
+  mctVideo,            { video/* }
+  mctMessage,          { message/* }
+  mctUnknown           { Type inconnu }
+ );
+
+ { Sous-type MIME }
+ TMIMESubType = (
+  mstPlain,            { text/plain }
+  mstHTML,             { text/html }
+  mstMixed,            { multipart/mixed }
+  mstAlternative,      { multipart/alternative }
+  mstRelated,          { multipart/related }
+  mstOctetStream,      { application/octet-stream }
+  mstPDF,              { application/pdf }
+  mstJPEG,             { image/jpeg }
+  mstPNG,              { image/png }
+  mstGIF,              { image/gif }
+  mstRFC822,           { message/rfc822 }
+  mstUnknown           { Sous-type inconnu }
+ );
+
+ { Jeu de caracteres }
+ TMIMECharset = (
+  mcsASCII,            { US-ASCII }
+  mcsUTF8,             { UTF-8 }
+  mcsISO8859_1,        { ISO-8859-1 (Latin-1) }
+  mcsWindows1252,      { Windows-1252 }
+  mcsISO8859_15,       { ISO-8859-15 (Latin-9) }
+  mcsUnknown           { Jeu inconnu }
+ );
+
+ { Structure pour un en-tete MIME }
+ TMIMEHeader = Record
+  Name: String[40];
+  Value: String[200];
+ End;
+
+ { Structure pour une partie MIME }
+ TMIMEPart = Record
+  ContentType: TMIMEContentType;
+  SubType: TMIMESubType;
+  ContentTypeStr: String[60];    { Content-Type complet }
+  Charset: TMIMECharset;
+  TransferEncoding: TMIMETransferEncoding;
+  Boundary: String[80];          { Pour multipart }
+  FileName: String[80];          { Nom du fichier si piece jointe }
+  ContentID: String[40];         { ID pour images inline }
+  IsAttachment: Boolean;         { Est une piece jointe }
+  DataOffset: LongInt;           { Position dans le flux }
+  DataLength: LongInt;           { Taille des donnees }
+  DecodedLength: LongInt;        { Taille une fois decode }
+  PartCount: Integer;            { Nombre de sous-parties }
  End;
 
  { Type de colonne pour la liste des messages }
@@ -1338,6 +1412,25 @@ Const
  { Nombre d'entites HTML supportees }
  HTML_ENTITY_COUNT = 15;
 
+ { ============================================================================
+   CONSTANTES POUR LE DECODAGE MIME (TODO 15)
+   ============================================================================ }
+
+ { Nombre maximum de parties MIME }
+ MAX_MIME_PARTS = 20;
+
+ { Nombre maximum d'en-tetes MIME }
+ MAX_MIME_HEADERS = 30;
+
+ { Taille maximale du buffer de decodage }
+ MIME_DECODE_BUFFER = 4096;
+
+ { Longueur maximale d'une ligne MIME }
+ MIME_MAX_LINE_LENGTH = 998;
+
+ { Table Base64 }
+ BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1491,6 +1584,18 @@ Var
  HTMLRenderX, HTMLRenderY: Integer;     { Position de rendu }
  HTMLRenderWidth: Integer;              { Largeur disponible }
  HTMLIsHTML: Boolean;                   { Le message est en HTML }
+
+ { Variables globales pour le decodage MIME (TODO 15) }
+ MIMEParts: Array[0..MAX_MIME_PARTS-1] of TMIMEPart;  { Parties MIME }
+ MIMEPartCount: Integer;                { Nombre de parties }
+ MIMEHeaders: Array[0..MAX_MIME_HEADERS-1] of TMIMEHeader; { En-tetes }
+ MIMEHeaderCount: Integer;              { Nombre d'en-tetes }
+ MIMERootPart: TMIMEPart;               { Partie racine }
+ MIMETextPart: String;                  { Contenu texte decode }
+ MIMEHTMLPart: String;                  { Contenu HTML decode }
+ MIMEHasText: Boolean;                  { Message contient du texte }
+ MIMEHasHTML: Boolean;                  { Message contient du HTML }
+ MIMEHasAttachments: Boolean;           { Message contient des pieces jointes }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -8656,6 +8761,970 @@ End;
   FIN DE L'IMPLEMENTATION DU MOTEUR DE RENDU HTML
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU DECODAGE MIME (TODO 15)
+  ============================================================================ }
+
+{ Convertit une chaine en majuscules pour MIME }
+Function MIME_UpperCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If (S[I] >= 'a') And (S[I] <= 'z') Then
+   S[I] := Chr(Ord(S[I]) - 32);
+ MIME_UpperCase := S;
+End;
+
+{ Convertit une chaine en minuscules pour MIME }
+Function MIME_LowerCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If (S[I] >= 'A') And (S[I] <= 'Z') Then
+   S[I] := Chr(Ord(S[I]) + 32);
+ MIME_LowerCase := S;
+End;
+
+{ Supprime les espaces en debut et fin de chaine }
+Function MIME_Trim(S: String): String;
+Begin
+ While (Length(S) > 0) And (S[1] <= ' ') Do
+  Delete(S, 1, 1);
+ While (Length(S) > 0) And (S[Length(S)] <= ' ') Do
+  Delete(S, Length(S), 1);
+ MIME_Trim := S;
+End;
+
+{ Decode un caractere Base64 en valeur 0-63 }
+Function MIME_Base64CharToValue(C: Char): Integer;
+Begin
+ If (C >= 'A') And (C <= 'Z') Then
+  MIME_Base64CharToValue := Ord(C) - Ord('A')
+ Else If (C >= 'a') And (C <= 'z') Then
+  MIME_Base64CharToValue := Ord(C) - Ord('a') + 26
+ Else If (C >= '0') And (C <= '9') Then
+  MIME_Base64CharToValue := Ord(C) - Ord('0') + 52
+ Else If C = '+' Then
+  MIME_Base64CharToValue := 62
+ Else If C = '/' Then
+  MIME_Base64CharToValue := 63
+ Else
+  MIME_Base64CharToValue := -1;
+End;
+
+{ Decode une chaine Base64 }
+Function MIME_DecodeBase64(Encoded: String): String;
+Var
+ I, J, Len: Integer;
+ A, B, C, D: Integer;
+ Output: String;
+ Bytes: Array[0..2] of Byte;
+Begin
+ Output := '';
+ I := 1;
+ Len := Length(Encoded);
+
+ While I <= Len Do Begin
+  { Sauter les espaces et retours a la ligne }
+  While (I <= Len) And (Encoded[I] <= ' ') Do
+   Inc(I);
+  If I > Len Then Break;
+
+  { Lire 4 caracteres Base64 }
+  A := MIME_Base64CharToValue(Encoded[I]);
+  Inc(I);
+  If I > Len Then Break;
+
+  While (I <= Len) And (Encoded[I] <= ' ') Do Inc(I);
+  If I > Len Then Break;
+  B := MIME_Base64CharToValue(Encoded[I]);
+  Inc(I);
+
+  While (I <= Len) And (Encoded[I] <= ' ') Do Inc(I);
+  If I > Len Then Begin
+   { Seulement 2 caracteres - 1 octet }
+   If (A >= 0) And (B >= 0) Then
+    Output := Output + Chr((A Shl 2) Or (B Shr 4));
+   Break;
+  End;
+
+  If Encoded[I] = '=' Then Begin
+   { Padding - seulement 1 octet }
+   If (A >= 0) And (B >= 0) Then
+    Output := Output + Chr((A Shl 2) Or (B Shr 4));
+   Break;
+  End;
+
+  C := MIME_Base64CharToValue(Encoded[I]);
+  Inc(I);
+
+  While (I <= Len) And (Encoded[I] <= ' ') Do Inc(I);
+  If I > Len Then Begin
+   { Seulement 3 caracteres - 2 octets }
+   If (A >= 0) And (B >= 0) And (C >= 0) Then Begin
+    Output := Output + Chr((A Shl 2) Or (B Shr 4));
+    Output := Output + Chr(((B And $0F) Shl 4) Or (C Shr 2));
+   End;
+   Break;
+  End;
+
+  If Encoded[I] = '=' Then Begin
+   { Padding - seulement 2 octets }
+   If (A >= 0) And (B >= 0) And (C >= 0) Then Begin
+    Output := Output + Chr((A Shl 2) Or (B Shr 4));
+    Output := Output + Chr(((B And $0F) Shl 4) Or (C Shr 2));
+   End;
+   Break;
+  End;
+
+  D := MIME_Base64CharToValue(Encoded[I]);
+  Inc(I);
+
+  { Decoder les 3 octets }
+  If (A >= 0) And (B >= 0) And (C >= 0) And (D >= 0) Then Begin
+   Output := Output + Chr((A Shl 2) Or (B Shr 4));
+   Output := Output + Chr(((B And $0F) Shl 4) Or (C Shr 2));
+   Output := Output + Chr(((C And $03) Shl 6) Or D);
+  End;
+ End;
+
+ MIME_DecodeBase64 := Output;
+End;
+
+{ Convertit un caractere hexa en valeur }
+Function MIME_HexToValue(C: Char): Integer;
+Begin
+ If (C >= '0') And (C <= '9') Then
+  MIME_HexToValue := Ord(C) - Ord('0')
+ Else If (C >= 'A') And (C <= 'F') Then
+  MIME_HexToValue := Ord(C) - Ord('A') + 10
+ Else If (C >= 'a') And (C <= 'f') Then
+  MIME_HexToValue := Ord(C) - Ord('a') + 10
+ Else
+  MIME_HexToValue := -1;
+End;
+
+{ Decode une chaine Quoted-Printable }
+Function MIME_DecodeQuotedPrintable(Encoded: String): String;
+Var
+ I, Len: Integer;
+ Output: String;
+ H1, H2: Integer;
+Begin
+ Output := '';
+ I := 1;
+ Len := Length(Encoded);
+
+ While I <= Len Do Begin
+  If Encoded[I] = '=' Then Begin
+   { Sequence encodee ou soft line break }
+   If I + 2 <= Len Then Begin
+    If (Encoded[I + 1] = #13) Or (Encoded[I + 1] = #10) Then Begin
+     { Soft line break - ignorer }
+     Inc(I);
+     If (I <= Len) And (Encoded[I] = #13) Then Inc(I);
+     If (I <= Len) And (Encoded[I] = #10) Then Inc(I);
+    End
+    Else Begin
+     { Caractere encode =XX }
+     H1 := MIME_HexToValue(Encoded[I + 1]);
+     H2 := MIME_HexToValue(Encoded[I + 2]);
+     If (H1 >= 0) And (H2 >= 0) Then
+      Output := Output + Chr((H1 * 16) + H2)
+     Else
+      Output := Output + Encoded[I];
+     Inc(I, 3);
+    End;
+   End
+   Else Begin
+    Output := Output + Encoded[I];
+    Inc(I);
+   End;
+  End
+  Else If Encoded[I] = '_' Then Begin
+   { Underscore represente espace dans les en-tetes encodes }
+   Output := Output + ' ';
+   Inc(I);
+  End
+  Else Begin
+   Output := Output + Encoded[I];
+   Inc(I);
+  End;
+ End;
+
+ MIME_DecodeQuotedPrintable := Output;
+End;
+
+{ Convertit UTF-8 en ASCII approximatif }
+Function MIME_DecodeUTF8(UTF8: String): String;
+Var
+ I, Len: Integer;
+ Output: String;
+ B1, B2, B3: Byte;
+ CodePoint: LongInt;
+Begin
+ Output := '';
+ I := 1;
+ Len := Length(UTF8);
+
+ While I <= Len Do Begin
+  B1 := Ord(UTF8[I]);
+
+  If B1 < 128 Then Begin
+   { ASCII }
+   Output := Output + UTF8[I];
+   Inc(I);
+  End
+  Else If (B1 And $E0) = $C0 Then Begin
+   { 2 octets UTF-8 }
+   If I + 1 <= Len Then Begin
+    B2 := Ord(UTF8[I + 1]);
+    CodePoint := ((B1 And $1F) Shl 6) Or (B2 And $3F);
+    { Conversion approximative des caracteres courants }
+    Case CodePoint Of
+     $C0..$C5: Output := Output + 'A';
+     $C8..$CB: Output := Output + 'E';
+     $CC..$CF: Output := Output + 'I';
+     $D2..$D6: Output := Output + 'O';
+     $D9..$DC: Output := Output + 'U';
+     $E0..$E5: Output := Output + 'a';
+     $E8..$EB: Output := Output + 'e';
+     $EC..$EF: Output := Output + 'i';
+     $F2..$F6: Output := Output + 'o';
+     $F9..$FC: Output := Output + 'u';
+     $C7: Output := Output + 'C';
+     $E7: Output := Output + 'c';
+     $D1: Output := Output + 'N';
+     $F1: Output := Output + 'n';
+     $DF: Output := Output + 'ss';
+     $AB: Output := Output + '<<';
+     $BB: Output := Output + '>>';
+     $A9: Output := Output + '(c)';
+     $AE: Output := Output + '(R)';
+     $B0: Output := Output + 'o';
+     Else Output := Output + '?';
+    End;
+    Inc(I, 2);
+   End
+   Else Begin
+    Output := Output + '?';
+    Inc(I);
+   End;
+  End
+  Else If (B1 And $F0) = $E0 Then Begin
+   { 3 octets UTF-8 }
+   If I + 2 <= Len Then Begin
+    CodePoint := ((B1 And $0F) Shl 12) Or
+                 ((Ord(UTF8[I + 1]) And $3F) Shl 6) Or
+                 (Ord(UTF8[I + 2]) And $3F);
+    { Quelques symboles courants }
+    Case CodePoint Of
+     $2018, $2019: Output := Output + '''';
+     $201C, $201D: Output := Output + '"';
+     $2013, $2014: Output := Output + '-';
+     $2026: Output := Output + '...';
+     $20AC: Output := Output + 'EUR';
+     Else Output := Output + '?';
+    End;
+    Inc(I, 3);
+   End
+   Else Begin
+    Output := Output + '?';
+    Inc(I);
+   End;
+  End
+  Else Begin
+   { Sequence plus longue ou invalide }
+   Output := Output + '?';
+   Inc(I);
+  End;
+ End;
+
+ MIME_DecodeUTF8 := Output;
+End;
+
+{ Convertit ISO-8859-1 en ASCII approximatif }
+Function MIME_DecodeISO8859_1(ISO: String): String;
+Var
+ I: Integer;
+ Output: String;
+ B: Byte;
+Begin
+ Output := '';
+ For I := 1 To Length(ISO) Do Begin
+  B := Ord(ISO[I]);
+  If B < 128 Then
+   Output := Output + ISO[I]
+  Else Begin
+   Case B Of
+    $C0..$C5: Output := Output + 'A';
+    $C8..$CB: Output := Output + 'E';
+    $CC..$CF: Output := Output + 'I';
+    $D2..$D6: Output := Output + 'O';
+    $D9..$DC: Output := Output + 'U';
+    $E0..$E5: Output := Output + 'a';
+    $E8..$EB: Output := Output + 'e';
+    $EC..$EF: Output := Output + 'i';
+    $F2..$F6: Output := Output + 'o';
+    $F9..$FC: Output := Output + 'u';
+    $C7: Output := Output + 'C';
+    $E7: Output := Output + 'c';
+    $D1: Output := Output + 'N';
+    $F1: Output := Output + 'n';
+    $DF: Output := Output + 'ss';
+    $AB: Output := Output + '<<';
+    $BB: Output := Output + '>>';
+    $A9: Output := Output + '(c)';
+    $AE: Output := Output + '(R)';
+    $B0: Output := Output + 'o';
+    $A0: Output := Output + ' ';
+    Else Output := Output + Chr(B);
+   End;
+  End;
+ End;
+ MIME_DecodeISO8859_1 := Output;
+End;
+
+{ Convertit Windows-1252 en ASCII approximatif }
+Function MIME_DecodeWindows1252(Win: String): String;
+Var
+ I: Integer;
+ Output: String;
+ B: Byte;
+Begin
+ Output := '';
+ For I := 1 To Length(Win) Do Begin
+  B := Ord(Win[I]);
+  If B < 128 Then
+   Output := Output + Win[I]
+  Else Begin
+   Case B Of
+    $80: Output := Output + 'EUR';
+    $82: Output := Output + ',';
+    $83: Output := Output + 'f';
+    $84: Output := Output + ',,';
+    $85: Output := Output + '...';
+    $86, $87: Output := Output + '+';
+    $88: Output := Output + '^';
+    $89: Output := Output + '%';
+    $8A: Output := Output + 'S';
+    $8B: Output := Output + '<';
+    $8C: Output := Output + 'OE';
+    $8E: Output := Output + 'Z';
+    $91: Output := Output + '''';
+    $92: Output := Output + '''';
+    $93: Output := Output + '"';
+    $94: Output := Output + '"';
+    $95: Output := Output + '*';
+    $96, $97: Output := Output + '-';
+    $98: Output := Output + '~';
+    $99: Output := Output + '(TM)';
+    $9A: Output := Output + 's';
+    $9B: Output := Output + '>';
+    $9C: Output := Output + 'oe';
+    $9E: Output := Output + 'z';
+    $9F: Output := Output + 'Y';
+    Else Output := Output + MIME_DecodeISO8859_1(Win[I]);
+   End;
+  End;
+ End;
+ MIME_DecodeWindows1252 := Output;
+End;
+
+{ Parse le type de contenu }
+Procedure MIME_ParseContentType(TypeStr: String; Var Part: TMIMEPart);
+Var
+ I, J: Integer;
+ Lower, ParamName, ParamValue: String;
+Begin
+ Lower := MIME_LowerCase(MIME_Trim(TypeStr));
+ Part.ContentTypeStr := TypeStr;
+
+ { Determiner le type principal }
+ If Copy(Lower, 1, 5) = 'text/' Then
+  Part.ContentType := mctText
+ Else If Copy(Lower, 1, 10) = 'multipart/' Then
+  Part.ContentType := mctMultipart
+ Else If Copy(Lower, 1, 12) = 'application/' Then
+  Part.ContentType := mctApplication
+ Else If Copy(Lower, 1, 6) = 'image/' Then
+  Part.ContentType := mctImage
+ Else If Copy(Lower, 1, 6) = 'audio/' Then
+  Part.ContentType := mctAudio
+ Else If Copy(Lower, 1, 6) = 'video/' Then
+  Part.ContentType := mctVideo
+ Else If Copy(Lower, 1, 8) = 'message/' Then
+  Part.ContentType := mctMessage
+ Else
+  Part.ContentType := mctUnknown;
+
+ { Determiner le sous-type }
+ If Pos('text/plain', Lower) > 0 Then
+  Part.SubType := mstPlain
+ Else If Pos('text/html', Lower) > 0 Then
+  Part.SubType := mstHTML
+ Else If Pos('multipart/mixed', Lower) > 0 Then
+  Part.SubType := mstMixed
+ Else If Pos('multipart/alternative', Lower) > 0 Then
+  Part.SubType := mstAlternative
+ Else If Pos('multipart/related', Lower) > 0 Then
+  Part.SubType := mstRelated
+ Else If Pos('application/octet-stream', Lower) > 0 Then
+  Part.SubType := mstOctetStream
+ Else If Pos('application/pdf', Lower) > 0 Then
+  Part.SubType := mstPDF
+ Else If Pos('image/jpeg', Lower) > 0 Then
+  Part.SubType := mstJPEG
+ Else If Pos('image/png', Lower) > 0 Then
+  Part.SubType := mstPNG
+ Else If Pos('image/gif', Lower) > 0 Then
+  Part.SubType := mstGIF
+ Else If Pos('message/rfc822', Lower) > 0 Then
+  Part.SubType := mstRFC822
+ Else
+  Part.SubType := mstUnknown;
+
+ { Extraire les parametres }
+ { Chercher le charset }
+ I := Pos('charset=', Lower);
+ If I > 0 Then Begin
+  ParamValue := '';
+  J := I + 8;
+  If (J <= Length(TypeStr)) And (TypeStr[J] = '"') Then Begin
+   Inc(J);
+   While (J <= Length(TypeStr)) And (TypeStr[J] <> '"') Do Begin
+    ParamValue := ParamValue + TypeStr[J];
+    Inc(J);
+   End;
+  End
+  Else Begin
+   While (J <= Length(TypeStr)) And (TypeStr[J] > ' ') And (TypeStr[J] <> ';') Do Begin
+    ParamValue := ParamValue + TypeStr[J];
+    Inc(J);
+   End;
+  End;
+  ParamValue := MIME_LowerCase(ParamValue);
+
+  If (ParamValue = 'utf-8') Or (ParamValue = 'utf8') Then
+   Part.Charset := mcsUTF8
+  Else If (ParamValue = 'iso-8859-1') Or (ParamValue = 'latin1') Then
+   Part.Charset := mcsISO8859_1
+  Else If (ParamValue = 'windows-1252') Or (ParamValue = 'cp1252') Then
+   Part.Charset := mcsWindows1252
+  Else If (ParamValue = 'iso-8859-15') Or (ParamValue = 'latin9') Then
+   Part.Charset := mcsISO8859_15
+  Else If (ParamValue = 'us-ascii') Or (ParamValue = 'ascii') Then
+   Part.Charset := mcsASCII
+  Else
+   Part.Charset := mcsUnknown;
+ End;
+
+ { Chercher le boundary }
+ I := Pos('boundary=', Lower);
+ If I > 0 Then Begin
+  Part.Boundary := '';
+  J := I + 9;
+  If (J <= Length(TypeStr)) And (TypeStr[J] = '"') Then Begin
+   Inc(J);
+   While (J <= Length(TypeStr)) And (TypeStr[J] <> '"') Do Begin
+    Part.Boundary := Part.Boundary + TypeStr[J];
+    Inc(J);
+   End;
+  End
+  Else Begin
+   While (J <= Length(TypeStr)) And (TypeStr[J] > ' ') And (TypeStr[J] <> ';') Do Begin
+    Part.Boundary := Part.Boundary + TypeStr[J];
+    Inc(J);
+   End;
+  End;
+ End;
+
+ { Chercher le name/filename }
+ I := Pos('name=', Lower);
+ If I > 0 Then Begin
+  Part.FileName := '';
+  J := I + 5;
+  If (J <= Length(TypeStr)) And (TypeStr[J] = '"') Then Begin
+   Inc(J);
+   While (J <= Length(TypeStr)) And (TypeStr[J] <> '"') Do Begin
+    Part.FileName := Part.FileName + TypeStr[J];
+    Inc(J);
+   End;
+  End
+  Else Begin
+   While (J <= Length(TypeStr)) And (TypeStr[J] > ' ') And (TypeStr[J] <> ';') Do Begin
+    Part.FileName := Part.FileName + TypeStr[J];
+    Inc(J);
+   End;
+  End;
+ End;
+End;
+
+{ Parse le Content-Transfer-Encoding }
+Procedure MIME_ParseTransferEncoding(EncStr: String; Var Part: TMIMEPart);
+Var
+ Lower: String;
+Begin
+ Lower := MIME_LowerCase(MIME_Trim(EncStr));
+
+ If Lower = 'base64' Then
+  Part.TransferEncoding := mteBase64
+ Else If Lower = 'quoted-printable' Then
+  Part.TransferEncoding := mteQuotedPrintable
+ Else If Lower = '7bit' Then
+  Part.TransferEncoding := mte7Bit
+ Else If Lower = '8bit' Then
+  Part.TransferEncoding := mte8Bit
+ Else If Lower = 'binary' Then
+  Part.TransferEncoding := mteBinary
+ Else
+  Part.TransferEncoding := mte7Bit;
+End;
+
+{ Parse le Content-Disposition }
+Procedure MIME_ParseContentDisposition(DispStr: String; Var Part: TMIMEPart);
+Var
+ Lower: String;
+ I, J: Integer;
+Begin
+ Lower := MIME_LowerCase(MIME_Trim(DispStr));
+
+ Part.IsAttachment := (Pos('attachment', Lower) > 0);
+
+ { Chercher filename }
+ I := Pos('filename=', Lower);
+ If I > 0 Then Begin
+  J := I + 9;
+  Part.FileName := '';
+  If (J <= Length(DispStr)) And (DispStr[J] = '"') Then Begin
+   Inc(J);
+   While (J <= Length(DispStr)) And (DispStr[J] <> '"') Do Begin
+    Part.FileName := Part.FileName + DispStr[J];
+    Inc(J);
+   End;
+  End
+  Else Begin
+   While (J <= Length(DispStr)) And (DispStr[J] > ' ') And (DispStr[J] <> ';') Do Begin
+    Part.FileName := Part.FileName + DispStr[J];
+    Inc(J);
+   End;
+  End;
+ End;
+End;
+
+{ Decode un en-tete encode (RFC 2047) }
+Function MIME_DecodeEncodedWord(Word: String): String;
+Var
+ I, J, K: Integer;
+ Charset, Encoding, Text, Decoded: String;
+Begin
+ MIME_DecodeEncodedWord := Word;
+
+ { Format: =?charset?encoding?text?= }
+ If (Copy(Word, 1, 2) <> '=?') Then Exit;
+ If (Copy(Word, Length(Word) - 1, 2) <> '?=') Then Exit;
+
+ { Extraire le charset }
+ I := 3;
+ Charset := '';
+ While (I <= Length(Word)) And (Word[I] <> '?') Do Begin
+  Charset := Charset + Word[I];
+  Inc(I);
+ End;
+ Inc(I); { Sauter le ? }
+
+ { Extraire l'encoding }
+ Encoding := '';
+ While (I <= Length(Word)) And (Word[I] <> '?') Do Begin
+  Encoding := Encoding + Word[I];
+  Inc(I);
+ End;
+ Inc(I); { Sauter le ? }
+
+ { Extraire le texte }
+ Text := '';
+ While (I <= Length(Word) - 2) Do Begin
+  Text := Text + Word[I];
+  Inc(I);
+ End;
+
+ { Decoder selon l'encoding }
+ Encoding := MIME_UpperCase(Encoding);
+ If Encoding = 'B' Then
+  Decoded := MIME_DecodeBase64(Text)
+ Else If Encoding = 'Q' Then
+  Decoded := MIME_DecodeQuotedPrintable(Text)
+ Else
+  Decoded := Text;
+
+ { Convertir le charset }
+ Charset := MIME_LowerCase(Charset);
+ If (Charset = 'utf-8') Or (Charset = 'utf8') Then
+  Decoded := MIME_DecodeUTF8(Decoded)
+ Else If (Charset = 'iso-8859-1') Or (Charset = 'latin1') Then
+  Decoded := MIME_DecodeISO8859_1(Decoded)
+ Else If (Charset = 'windows-1252') Or (Charset = 'cp1252') Then
+  Decoded := MIME_DecodeWindows1252(Decoded);
+
+ MIME_DecodeEncodedWord := Decoded;
+End;
+
+{ Decode un en-tete complet (peut contenir plusieurs mots encodes) }
+Function MIME_DecodeHeader(Header: String): String;
+Var
+ I, J, K: Integer;
+ Output, Word: String;
+Begin
+ Output := '';
+ I := 1;
+
+ While I <= Length(Header) Do Begin
+  If (I + 1 <= Length(Header)) And (Header[I] = '=') And (Header[I + 1] = '?') Then Begin
+   { Mot encode trouve }
+   Word := '=?';
+   J := I + 2;
+   While (J <= Length(Header)) And Not
+         ((J + 1 <= Length(Header)) And (Header[J] = '?') And (Header[J + 1] = '=')) Do Begin
+    Word := Word + Header[J];
+    Inc(J);
+   End;
+   If J + 1 <= Length(Header) Then Begin
+    Word := Word + '?=';
+    J := J + 2;
+   End;
+   Output := Output + MIME_DecodeEncodedWord(Word);
+   I := J;
+
+   { Sauter les espaces entre mots encodes consecutifs }
+   While (I <= Length(Header)) And (Header[I] <= ' ') And
+         (I + 1 <= Length(Header)) And (Header[I + 1] = '=') Do
+    Inc(I);
+  End
+  Else Begin
+   Output := Output + Header[I];
+   Inc(I);
+  End;
+ End;
+
+ MIME_DecodeHeader := Output;
+End;
+
+{ Initialise une partie MIME }
+Procedure MIME_InitPart(Var Part: TMIMEPart);
+Begin
+ Part.ContentType := mctText;
+ Part.SubType := mstPlain;
+ Part.ContentTypeStr := 'text/plain';
+ Part.Charset := mcsASCII;
+ Part.TransferEncoding := mte7Bit;
+ Part.Boundary := '';
+ Part.FileName := '';
+ Part.ContentID := '';
+ Part.IsAttachment := False;
+ Part.DataOffset := 0;
+ Part.DataLength := 0;
+ Part.DecodedLength := 0;
+ Part.PartCount := 0;
+End;
+
+{ Decode le contenu d'une partie MIME }
+Function MIME_DecodePart(Content: String; Part: TMIMEPart): String;
+Var
+ Decoded: String;
+Begin
+ { Decoder le transfert }
+ Case Part.TransferEncoding Of
+  mteBase64: Decoded := MIME_DecodeBase64(Content);
+  mteQuotedPrintable: Decoded := MIME_DecodeQuotedPrintable(Content);
+  Else Decoded := Content;
+ End;
+
+ { Convertir le charset pour les parties texte }
+ If Part.ContentType = mctText Then Begin
+  Case Part.Charset Of
+   mcsUTF8: Decoded := MIME_DecodeUTF8(Decoded);
+   mcsISO8859_1, mcsISO8859_15: Decoded := MIME_DecodeISO8859_1(Decoded);
+   mcsWindows1252: Decoded := MIME_DecodeWindows1252(Decoded);
+  End;
+ End;
+
+ MIME_DecodePart := Decoded;
+End;
+
+{ Parse les en-tetes d'un message }
+Procedure MIME_ParseHeaders(Headers: String);
+Var
+ I, J, LineStart: Integer;
+ Line, Name, Value: String;
+ ContinuedLine: Boolean;
+Begin
+ MIMEHeaderCount := 0;
+ I := 1;
+
+ While I <= Length(Headers) Do Begin
+  { Lire une ligne }
+  Line := '';
+  While (I <= Length(Headers)) And (Headers[I] <> #13) And (Headers[I] <> #10) Do Begin
+   Line := Line + Headers[I];
+   Inc(I);
+  End;
+
+  { Sauter le retour a la ligne }
+  If (I <= Length(Headers)) And (Headers[I] = #13) Then Inc(I);
+  If (I <= Length(Headers)) And (Headers[I] = #10) Then Inc(I);
+
+  { Ligne vide = fin des en-tetes }
+  If Length(Line) = 0 Then Break;
+
+  { Verifier si c'est une continuation }
+  If (Length(Line) > 0) And ((Line[1] = ' ') Or (Line[1] = #9)) Then Begin
+   { Continuation de la ligne precedente }
+   If MIMEHeaderCount > 0 Then
+    MIMEHeaders[MIMEHeaderCount - 1].Value :=
+     MIMEHeaders[MIMEHeaderCount - 1].Value + ' ' + MIME_Trim(Line);
+  End
+  Else Begin
+   { Nouvel en-tete }
+   J := Pos(':', Line);
+   If J > 0 Then Begin
+    Name := MIME_Trim(Copy(Line, 1, J - 1));
+    Value := MIME_Trim(Copy(Line, J + 1, Length(Line) - J));
+
+    If MIMEHeaderCount < MAX_MIME_HEADERS Then Begin
+     MIMEHeaders[MIMEHeaderCount].Name := MIME_LowerCase(Name);
+     MIMEHeaders[MIMEHeaderCount].Value := Value;
+     Inc(MIMEHeaderCount);
+    End;
+   End;
+  End;
+ End;
+End;
+
+{ Recupere la valeur d'un en-tete }
+Function MIME_GetHeader(Name: String): String;
+Var
+ I: Integer;
+ LowerName: String;
+Begin
+ MIME_GetHeader := '';
+ LowerName := MIME_LowerCase(Name);
+ For I := 0 To MIMEHeaderCount - 1 Do Begin
+  If MIMEHeaders[I].Name = LowerName Then Begin
+   MIME_GetHeader := MIMEHeaders[I].Value;
+   Exit;
+  End;
+ End;
+End;
+
+{ Parse un message MIME complet }
+Procedure MIME_ParseMessage(Message: String);
+Var
+ I, J, K, PartStart, PartEnd: Integer;
+ HeaderEnd: Integer;
+ Headers, Body, ContentType, Boundary: String;
+ BoundaryLine, EndBoundary: String;
+ PartHeaders, PartContent: String;
+Begin
+ MIMEPartCount := 0;
+ MIMEHasText := False;
+ MIMEHasHTML := False;
+ MIMEHasAttachments := False;
+ MIMETextPart := '';
+ MIMEHTMLPart := '';
+
+ { Trouver la fin des en-tetes }
+ HeaderEnd := Pos(#13#10#13#10, Message);
+ If HeaderEnd = 0 Then HeaderEnd := Pos(#10#10, Message);
+ If HeaderEnd = 0 Then Begin
+  { Pas d'en-tetes separes - tout est le corps }
+  MIMETextPart := Message;
+  MIMEHasText := True;
+  Exit;
+ End;
+
+ Headers := Copy(Message, 1, HeaderEnd - 1);
+ Body := Copy(Message, HeaderEnd + 4, Length(Message) - HeaderEnd - 3);
+ If Body = '' Then Body := Copy(Message, HeaderEnd + 2, Length(Message) - HeaderEnd - 1);
+
+ MIME_ParseHeaders(Headers);
+ MIME_InitPart(MIMERootPart);
+
+ { Analyser le Content-Type }
+ ContentType := MIME_GetHeader('content-type');
+ If Length(ContentType) > 0 Then
+  MIME_ParseContentType(ContentType, MIMERootPart);
+
+ { Analyser le Content-Transfer-Encoding }
+ ContentType := MIME_GetHeader('content-transfer-encoding');
+ If Length(ContentType) > 0 Then
+  MIME_ParseTransferEncoding(ContentType, MIMERootPart);
+
+ { Si multipart, parser les parties }
+ If MIMERootPart.ContentType = mctMultipart Then Begin
+  Boundary := MIMERootPart.Boundary;
+  If Length(Boundary) = 0 Then Begin
+   { Pas de boundary, traiter comme texte }
+   MIMETextPart := Body;
+   MIMEHasText := True;
+   Exit;
+  End;
+
+  BoundaryLine := '--' + Boundary;
+  EndBoundary := '--' + Boundary + '--';
+
+  { Trouver les parties }
+  I := Pos(BoundaryLine, Body);
+  While I > 0 Do Begin
+   { Passer apres le boundary }
+   J := I + Length(BoundaryLine);
+   While (J <= Length(Body)) And ((Body[J] = #13) Or (Body[J] = #10)) Do
+    Inc(J);
+
+   { Trouver le prochain boundary }
+   K := Pos(BoundaryLine, Copy(Body, J, Length(Body) - J + 1));
+   If K > 0 Then
+    PartEnd := J + K - 2
+   Else
+    PartEnd := Length(Body);
+
+   { Extraire cette partie }
+   PartContent := Copy(Body, J, PartEnd - J);
+
+   { Verifier si c'est le boundary final }
+   If Copy(Body, I, Length(EndBoundary)) = EndBoundary Then Break;
+
+   { Parser la partie }
+   If (MIMEPartCount < MAX_MIME_PARTS) And (Length(PartContent) > 0) Then Begin
+    { Trouver la separation en-tetes/corps de la partie }
+    HeaderEnd := Pos(#13#10#13#10, PartContent);
+    If HeaderEnd = 0 Then HeaderEnd := Pos(#10#10, PartContent);
+
+    If HeaderEnd > 0 Then Begin
+     PartHeaders := Copy(PartContent, 1, HeaderEnd - 1);
+     PartContent := Copy(PartContent, HeaderEnd + 4, Length(PartContent) - HeaderEnd - 3);
+     If PartContent = '' Then PartContent := Copy(PartContent, HeaderEnd + 2, Length(PartContent) - HeaderEnd - 1);
+    End
+    Else
+     PartHeaders := '';
+
+    MIME_InitPart(MIMEParts[MIMEPartCount]);
+
+    { Parser les en-tetes de la partie }
+    If Length(PartHeaders) > 0 Then Begin
+     MIME_ParseHeaders(PartHeaders);
+     ContentType := MIME_GetHeader('content-type');
+     If Length(ContentType) > 0 Then
+      MIME_ParseContentType(ContentType, MIMEParts[MIMEPartCount]);
+     ContentType := MIME_GetHeader('content-transfer-encoding');
+     If Length(ContentType) > 0 Then
+      MIME_ParseTransferEncoding(ContentType, MIMEParts[MIMEPartCount]);
+     ContentType := MIME_GetHeader('content-disposition');
+     If Length(ContentType) > 0 Then
+      MIME_ParseContentDisposition(ContentType, MIMEParts[MIMEPartCount]);
+     ContentType := MIME_GetHeader('content-id');
+     If Length(ContentType) > 0 Then Begin
+      MIMEParts[MIMEPartCount].ContentID := ContentType;
+      { Enlever les < > }
+      If (Length(MIMEParts[MIMEPartCount].ContentID) > 2) And
+         (MIMEParts[MIMEPartCount].ContentID[1] = '<') Then Begin
+       Delete(MIMEParts[MIMEPartCount].ContentID, 1, 1);
+       Delete(MIMEParts[MIMEPartCount].ContentID,
+              Length(MIMEParts[MIMEPartCount].ContentID), 1);
+      End;
+     End;
+    End;
+
+    { Decoder le contenu }
+    PartContent := MIME_DecodePart(PartContent, MIMEParts[MIMEPartCount]);
+
+    { Stocker selon le type }
+    If MIMEParts[MIMEPartCount].IsAttachment Then Begin
+     MIMEHasAttachments := True;
+    End
+    Else If MIMEParts[MIMEPartCount].SubType = mstPlain Then Begin
+     MIMETextPart := PartContent;
+     MIMEHasText := True;
+    End
+    Else If MIMEParts[MIMEPartCount].SubType = mstHTML Then Begin
+     MIMEHTMLPart := PartContent;
+     MIMEHasHTML := True;
+    End;
+
+    Inc(MIMEPartCount);
+   End;
+
+   { Chercher le prochain boundary }
+   I := Pos(BoundaryLine, Copy(Body, PartEnd, Length(Body) - PartEnd + 1));
+   If I > 0 Then I := PartEnd + I - 1
+   Else I := 0;
+  End;
+ End
+ Else Begin
+  { Message simple (non multipart) }
+  Body := MIME_DecodePart(Body, MIMERootPart);
+
+  If MIMERootPart.SubType = mstHTML Then Begin
+   MIMEHTMLPart := Body;
+   MIMEHasHTML := True;
+  End
+  Else Begin
+   MIMETextPart := Body;
+   MIMEHasText := True;
+  End;
+ End;
+End;
+
+{ Retourne le contenu texte d'un message MIME }
+Function MIME_GetTextContent: String;
+Begin
+ If MIMEHasText Then
+  MIME_GetTextContent := MIMETextPart
+ Else If MIMEHasHTML Then
+  MIME_GetTextContent := MIMEHTMLPart
+ Else
+  MIME_GetTextContent := '';
+End;
+
+{ Retourne le contenu HTML d'un message MIME }
+Function MIME_GetHTMLContent: String;
+Begin
+ If MIMEHasHTML Then
+  MIME_GetHTMLContent := MIMEHTMLPart
+ Else
+  MIME_GetHTMLContent := '';
+End;
+
+{ Verifie si un message contient des pieces jointes }
+Function MIME_HasAttachments: Boolean;
+Begin
+ MIME_HasAttachments := MIMEHasAttachments;
+End;
+
+{ Retourne le nombre de parties }
+Function MIME_GetPartCount: Integer;
+Begin
+ MIME_GetPartCount := MIMEPartCount;
+End;
+
+{ Initialise le decodeur MIME }
+Procedure MIME_Init;
+Begin
+ MIMEPartCount := 0;
+ MIMEHeaderCount := 0;
+ MIME_InitPart(MIMERootPart);
+ MIMETextPart := '';
+ MIMEHTMLPart := '';
+ MIMEHasText := False;
+ MIMEHasHTML := False;
+ MIMEHasAttachments := False;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU DECODAGE MIME
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -10432,6 +11501,9 @@ BEGIN
 
  { Initialisation du moteur de rendu HTML (TODO 14) }
  HTML_Init;
+
+ { Initialisation du decodeur MIME (TODO 15) }
+ MIME_Init;
 
  { Affichage de l'interface }
  ShowMouse;
