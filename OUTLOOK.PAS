@@ -2956,10 +2956,15 @@ Var
  DragState: TDragState;
  DragStartX, DragStartY: Integer;
  Running: Boolean;
+ {$IFDEF FPC}
+ MouseX, MouseY: LongInt;
+ MouseBtn: LongInt;
+ {$ELSE}
  MouseX, MouseY: Integer;
  MouseBtn: Integer;
+ {$ENDIF}
  {$IFDEF FPC}
-  MouseButtons: Word;
+  MouseButtons: LongInt;
  {$ENDIF}
 
  { Variables pour la détection du double-clic }
@@ -3307,8 +3312,16 @@ Var
  UseCustomStrings: Boolean;            { Utiliser les chaines personnalisees }
  LanguageFilePath: String[80];         { Chemin du fichier de langue }
 
-{ Déclaration avancée de DrawInterface pour utilisation dans les menus }
+{ Declarations avancees pour utilisation avant definition }
 Procedure DrawInterface; Forward;
+Procedure CalculateLayout; Forward;
+Procedure DrawFolderPane; Forward;
+Procedure OpenNewMessage; Forward;
+Procedure OpenReplyMessage(ReplyAll: Boolean); Forward;
+Procedure OpenForwardMessage; Forward;
+Procedure ShowAccountManagerDialog; Forward;
+Procedure Search_AddToHistory(SearchText: String; ResultCount: Integer); Forward;
+Procedure Offline_StartSync; Forward;
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -5529,6 +5542,53 @@ Begin
  IMAPClient.IdleActive := False;
 
  IMAP_Logout := IMAP_OK;
+End;
+
+{ Deconnecte du serveur IMAP }
+Procedure IMAP_Disconnect;
+Begin
+ IMAP_Logout;
+End;
+
+{ Supprime un message sur le serveur par son identifiant }
+Function IMAP_DeleteMessage(MsgID: String): Boolean;
+Var
+ SeqNum: LongInt;
+ Code: Integer;
+Begin
+ IMAP_DeleteMessage := False;
+ Val(MsgID, SeqNum, Code);
+ If Code <> 0 Then Exit;
+ If IMAP_MarkDeleted(SeqNum) = IMAP_OK Then
+  IMAP_DeleteMessage := True;
+End;
+
+{ Deplace un message vers un autre dossier }
+Function IMAP_MoveMessage(MsgID, TargetFolder: String): Boolean;
+Var
+ SeqNum: LongInt;
+ Code: Integer;
+Begin
+ IMAP_MoveMessage := False;
+ Val(MsgID, SeqNum, Code);
+ If Code <> 0 Then Exit;
+ If IMAP_Copy(SeqNum, TargetFolder) = IMAP_OK Then Begin
+  If IMAP_MarkDeleted(SeqNum) = IMAP_OK Then
+   IMAP_MoveMessage := True;
+ End;
+End;
+
+{ Modifie un drapeau sur un message }
+Function IMAP_SetFlag(MsgID, Flag: String; Value: Boolean): Boolean;
+Var
+ SeqNum: LongInt;
+ Code: Integer;
+Begin
+ IMAP_SetFlag := False;
+ Val(MsgID, SeqNum, Code);
+ If Code <> 0 Then Exit;
+ If IMAP_Store(SeqNum, Flag, Value) = IMAP_OK Then
+  IMAP_SetFlag := True;
 End;
 
 { Synchronise la liste des messages avec le serveur }
@@ -9696,8 +9756,8 @@ Begin
  HideMouse;
 
  { Position sous les en-tetes }
- X := Layout.PreviewRect.X1 + 10;
- Y := Layout.PreviewRect.Y1 + PreviewHeaderHeight + 5;
+ X := Layout.PreviewPaneRect.X1 + 10;
+ Y := Layout.PreviewPaneRect.Y1 + PreviewHeaderHeight + 5;
 
  SetColor(COLOR_MENU_TEXT);
  OutTextXY(X, Y, 'Pieces jointes:');
@@ -14623,22 +14683,22 @@ Begin
  If Not Signatures[SigIndex].IsActive Then Exit;
 
  { Ajouter une ligne vide avant la signature }
- If ComposerState.BodyLineCount < 18 Then Begin
-  ComposerState.Body[ComposerState.BodyLineCount] := '';
-  Inc(ComposerState.BodyLineCount);
+ If Composer.LineCount < 498 Then Begin
+  Composer.Lines[Composer.LineCount].Text := '';
+  Inc(Composer.LineCount);
  End;
 
  { Ajouter le separateur si configure }
- If Signatures[SigIndex].IncludeSeparator And (ComposerState.BodyLineCount < 19) Then Begin
-  ComposerState.Body[ComposerState.BodyLineCount] := SIG_SEPARATOR;
-  Inc(ComposerState.BodyLineCount);
+ If Signatures[SigIndex].IncludeSeparator And (Composer.LineCount < 499) Then Begin
+  Composer.Lines[Composer.LineCount].Text := SIG_SEPARATOR;
+  Inc(Composer.LineCount);
  End;
 
  { Ajouter les lignes de la signature }
  For LineIndex := 0 To Signatures[SigIndex].PlainTextLines - 1 Do Begin
-  If ComposerState.BodyLineCount >= 20 Then Break;
-  ComposerState.Body[ComposerState.BodyLineCount] := Signatures[SigIndex].PlainText[LineIndex];
-  Inc(ComposerState.BodyLineCount);
+  If Composer.LineCount >= 500 Then Break;
+  Composer.Lines[Composer.LineCount].Text := Signatures[SigIndex].PlainText[LineIndex];
+  Inc(Composer.LineCount);
  End;
 End;
 
@@ -19373,7 +19433,7 @@ Begin
 
  { Tentative de connexion }
  {$I-}
- IMAP_Connect(IMAPClient.Server, IMAPClient.Port);
+ IMAP_Connect;
  {$I+}
 
  Offline_CheckConnectivity := IMAPClient.Connected;
