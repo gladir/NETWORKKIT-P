@@ -91,7 +91,7 @@
       - Vérification orthographique intégrée
       - Boutons: Envoyer, Enregistrer brouillon, Annuler
 
-  13. [ ] Support des pièces jointes
+  13. [x] Support des pièces jointes
       - Ajouter des fichiers depuis le système de fichiers
       - Afficher les pièces jointes avec icônes par type
       - Enregistrer les pièces jointes sur disque
@@ -364,6 +364,34 @@ Type
  { Priorité d'un message }
  TMessagePriority = (mpLow, mpNormal, mpHigh);
 
+ { ============================================================================
+   TYPES POUR LES PIECES JOINTES (TODO 13) - Declaration anticipee
+   ============================================================================ }
+
+ { Type de fichier pour l'icone }
+ TAttachmentType = (
+  atUnknown,    { Type inconnu }
+  atDocument,   { Document texte (DOC, TXT, RTF) }
+  atSpreadsheet,{ Tableur (XLS, CSV) }
+  atImage,      { Image (JPG, PNG, GIF, BMP) }
+  atArchive,    { Archive (ZIP, RAR, 7Z) }
+  atExecutable, { Executable (EXE, COM, BAT) - DANGEREUX }
+  atAudio,      { Audio (MP3, WAV) }
+  atVideo,      { Video (AVI, MPG, MP4) }
+  atPDF         { PDF }
+ );
+
+ { Structure pour une piece jointe }
+ TAttachment = Record
+  FileName: String[80];        { Nom du fichier }
+  FilePath: String[200];       { Chemin complet sur disque }
+  FileSize: LongInt;           { Taille en octets }
+  FileType: TAttachmentType;   { Type de fichier }
+  IsEmbedded: Boolean;         { Integre dans le message (non externe) }
+  ContentID: String[40];       { ID pour les images integrees }
+  IsDangerous: Boolean;        { Extension dangereuse }
+ End;
+
  { Type de colonne pour la liste des messages }
  TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
 
@@ -391,6 +419,9 @@ Type
   Y: Integer;               { Position Y pour le clic }
   Body: Array[0..19] of String[80]; { Corps du message (max 20 lignes) }
   BodyLineCount: Integer;   { Nombre de lignes du corps }
+  { Pieces jointes (TODO 13) }
+  Attachments: Array[0..9] of TAttachment; { Liste des pieces jointes (max 10) }
+  AttachmentCount: Integer;  { Nombre de pieces jointes }
  End;
 
  { Orientation du volet de previsualisation }
@@ -870,6 +901,10 @@ Type
   State: TComposerState;       { Etat du compositeur }
   Modified: Boolean;           { Message modifie }
   OriginalMsgID: String[20];   { ID du message original (reponse/transfert) }
+
+  { Pieces jointes du message (TODO 13) }
+  Attachments: Array[0..19] of TAttachment; { Liste des pieces jointes }
+  AttachmentCount: Integer;    { Nombre de pieces jointes }
  End;
 
 Const
@@ -1150,6 +1185,28 @@ Const
  FORMAT_COLOR_GREEN = 2;
  FORMAT_COLOR_BLUE = 1;
 
+ { ============================================================================
+   CONSTANTES POUR LES PIECES JOINTES (TODO 13)
+   ============================================================================ }
+
+ { Nombre maximum de pieces jointes par message }
+ MAX_ATTACHMENTS = 20;
+
+ { Taille maximale totale des pieces jointes (10 Mo par defaut) }
+ MAX_ATTACHMENT_SIZE = 10485760;
+
+ { Taille maximale d'un seul fichier (5 Mo) }
+ MAX_SINGLE_FILE_SIZE = 5242880;
+
+ { Zone d'affichage des pieces jointes dans le compositeur }
+ ATTACH_PANEL_HEIGHT = 50;
+ ATTACH_ICON_SIZE = 32;
+ ATTACH_ICON_SPACING = 40;
+ ATTACH_PANEL_Y = COMPOSER_Y + COMPOSER_HEADER_HEIGHT - ATTACH_PANEL_HEIGHT - 5;
+
+ { Extensions dangereuses (executables) }
+ DANGEROUS_EXT_COUNT = 12;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1282,6 +1339,17 @@ Var
  ComposerFormatBold: Boolean;           { Bouton gras actif }
  ComposerFormatItalic: Boolean;         { Bouton italique actif }
  ComposerFormatUnderline: Boolean;      { Bouton souligne actif }
+
+ { Variables globales pour les pieces jointes (TODO 13) }
+ AttachPanelVisible: Boolean;           { Panneau de pieces jointes visible }
+ SelectedAttachment: Integer;           { Index de la piece jointe selectionnee }
+ AttachFileBrowserVisible: Boolean;     { Navigateur de fichiers visible }
+ AttachCurrentPath: String[200];        { Chemin courant dans le navigateur }
+ AttachFileList: Array[0..49] of String[80]; { Liste des fichiers }
+ AttachFileCount: Integer;              { Nombre de fichiers }
+ AttachSelectedFile: Integer;           { Fichier selectionne }
+ AttachTotalSize: LongInt;              { Taille totale des pieces jointes }
+ DangerousExtensions: Array[0..11] of String[4]; { Extensions dangereuses }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -6517,6 +6585,11 @@ Begin
  Composer.CurrentFormat.Underline := False;
  Composer.CurrentFormat.FontColor := COLOR_MENU_TEXT;
 
+ { Initialiser les pieces jointes (TODO 13) }
+ Composer.AttachmentCount := 0;
+ AttachTotalSize := 0;
+ SelectedAttachment := -1;
+
  { Initialiser les lignes vides }
  For I := 0 To COMPOSER_MAX_LINES - 1 Do Begin
   Composer.Lines[I].Text := '';
@@ -7248,6 +7321,492 @@ End;
   FIN DE L'IMPLEMENTATION DU COMPOSITEUR DE MESSAGES
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU SUPPORT DES PIECES JOINTES (TODO 13)
+  ============================================================================ }
+
+{ Initialise les extensions dangereuses }
+Procedure InitDangerousExtensions;
+Begin
+ DangerousExtensions[0] := 'EXE';
+ DangerousExtensions[1] := 'COM';
+ DangerousExtensions[2] := 'BAT';
+ DangerousExtensions[3] := 'CMD';
+ DangerousExtensions[4] := 'SCR';
+ DangerousExtensions[5] := 'PIF';
+ DangerousExtensions[6] := 'VBS';
+ DangerousExtensions[7] := 'JS';
+ DangerousExtensions[8] := 'WSF';
+ DangerousExtensions[9] := 'MSI';
+ DangerousExtensions[10] := 'DLL';
+ DangerousExtensions[11] := 'SYS';
+End;
+
+{ Initialise le gestionnaire de pieces jointes }
+Procedure InitAttachmentManager;
+Begin
+ AttachPanelVisible := False;
+ SelectedAttachment := -1;
+ AttachFileBrowserVisible := False;
+ AttachCurrentPath := '';
+ AttachFileCount := 0;
+ AttachSelectedFile := -1;
+ AttachTotalSize := 0;
+ InitDangerousExtensions;
+End;
+
+{ Extrait l'extension d'un nom de fichier }
+Function GetFileExtension(FileName: String): String;
+Var
+ I: Integer;
+ Ext: String;
+Begin
+ Ext := '';
+ For I := Length(FileName) DownTo 1 Do Begin
+  If FileName[I] = '.' Then Begin
+   Ext := Copy(FileName, I + 1, Length(FileName) - I);
+   Break;
+  End;
+ End;
+ { Convertir en majuscules }
+ For I := 1 To Length(Ext) Do
+  If (Ext[I] >= 'a') And (Ext[I] <= 'z') Then
+   Ext[I] := Chr(Ord(Ext[I]) - 32);
+ GetFileExtension := Ext;
+End;
+
+{ Verifie si une extension est dangereuse }
+Function IsDangerousExtension(Ext: String): Boolean;
+Var
+ I: Integer;
+ UpperExt: String;
+Begin
+ IsDangerousExtension := False;
+ UpperExt := Ext;
+ { Convertir en majuscules }
+ For I := 1 To Length(UpperExt) Do
+  If (UpperExt[I] >= 'a') And (UpperExt[I] <= 'z') Then
+   UpperExt[I] := Chr(Ord(UpperExt[I]) - 32);
+ { Verifier contre la liste }
+ For I := 0 To DANGEROUS_EXT_COUNT - 1 Do Begin
+  If UpperExt = DangerousExtensions[I] Then Begin
+   IsDangerousExtension := True;
+   Exit;
+  End;
+ End;
+End;
+
+{ Determine le type de fichier d'apres l'extension }
+Function GetAttachmentType(FileName: String): TAttachmentType;
+Var
+ Ext: String;
+Begin
+ Ext := GetFileExtension(FileName);
+
+ { Documents }
+ If (Ext = 'DOC') Or (Ext = 'DOCX') Or (Ext = 'TXT') Or
+    (Ext = 'RTF') Or (Ext = 'ODT') Then
+  GetAttachmentType := atDocument
+ { Tableurs }
+ Else If (Ext = 'XLS') Or (Ext = 'XLSX') Or (Ext = 'CSV') Or
+         (Ext = 'ODS') Then
+  GetAttachmentType := atSpreadsheet
+ { Images }
+ Else If (Ext = 'JPG') Or (Ext = 'JPEG') Or (Ext = 'PNG') Or
+         (Ext = 'GIF') Or (Ext = 'BMP') Or (Ext = 'ICO') Then
+  GetAttachmentType := atImage
+ { Archives }
+ Else If (Ext = 'ZIP') Or (Ext = 'RAR') Or (Ext = '7Z') Or
+         (Ext = 'TAR') Or (Ext = 'GZ') Then
+  GetAttachmentType := atArchive
+ { Executables }
+ Else If (Ext = 'EXE') Or (Ext = 'COM') Or (Ext = 'BAT') Or
+         (Ext = 'CMD') Or (Ext = 'SCR') Then
+  GetAttachmentType := atExecutable
+ { Audio }
+ Else If (Ext = 'MP3') Or (Ext = 'WAV') Or (Ext = 'OGG') Or
+         (Ext = 'WMA') Or (Ext = 'FLAC') Then
+  GetAttachmentType := atAudio
+ { Video }
+ Else If (Ext = 'AVI') Or (Ext = 'MPG') Or (Ext = 'MPEG') Or
+         (Ext = 'MP4') Or (Ext = 'WMV') Or (Ext = 'MKV') Then
+  GetAttachmentType := atVideo
+ { PDF }
+ Else If Ext = 'PDF' Then
+  GetAttachmentType := atPDF
+ Else
+  GetAttachmentType := atUnknown;
+End;
+
+{ Formate une taille de fichier }
+Function FormatFileSize(Size: LongInt): String;
+Var
+ S: String;
+Begin
+ If Size < 1024 Then
+  Str(Size, S)
+ Else If Size < 1048576 Then Begin
+  Str(Size Div 1024, S);
+  S := S + ' Ko';
+ End
+ Else Begin
+  Str(Size Div 1048576, S);
+  S := S + ' Mo';
+ End;
+ FormatFileSize := S;
+End;
+
+{ Dessine une icone de piece jointe selon son type }
+Procedure DrawAttachmentIcon(X, Y: Integer; AttType: TAttachmentType);
+Var
+ IconColor: Word;
+Begin
+ { Couleur selon le type }
+ Case AttType Of
+  atDocument:   IconColor := LightCyan;
+  atSpreadsheet: IconColor := LightGreen;
+  atImage:      IconColor := LightMagenta;
+  atArchive:    IconColor := Yellow;
+  atExecutable: IconColor := LightRed;
+  atAudio:      IconColor := LightBlue;
+  atVideo:      IconColor := Cyan;
+  atPDF:        IconColor := Red;
+  Else          IconColor := LightGray;
+ End;
+
+ { Dessiner l'icone (rectangle avec coin plie) }
+ SetFillStyle(SolidFill, IconColor);
+ Bar(X, Y, X + 24, Y + 28);
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(X, Y, X + 24, Y + 28);
+
+ { Coin plie }
+ SetFillStyle(SolidFill, COLOR_WINDOW_BG);
+ SetColor(COLOR_BUTTON_DARK);
+ Line(X + 18, Y, X + 24, Y + 6);
+ Line(X + 18, Y, X + 18, Y + 6);
+ Line(X + 18, Y + 6, X + 24, Y + 6);
+
+ { Symbole selon le type }
+ SetColor(Black);
+ Case AttType Of
+  atDocument:   OutTextXY(X + 5, Y + 10, 'DOC');
+  atSpreadsheet: OutTextXY(X + 5, Y + 10, 'XLS');
+  atImage:      OutTextXY(X + 5, Y + 10, 'IMG');
+  atArchive:    OutTextXY(X + 5, Y + 10, 'ZIP');
+  atExecutable: OutTextXY(X + 5, Y + 10, 'EXE');
+  atAudio:      OutTextXY(X + 5, Y + 10, 'MP3');
+  atVideo:      OutTextXY(X + 5, Y + 10, 'VID');
+  atPDF:        OutTextXY(X + 5, Y + 10, 'PDF');
+  Else          OutTextXY(X + 5, Y + 10, '???');
+ End;
+End;
+
+{ Dessine le panneau des pieces jointes dans le compositeur }
+Procedure DrawAttachmentPanel;
+Var
+ PanelX, PanelY, PanelW, I: Integer;
+ SizeStr: String;
+Begin
+ If Not ComposerVisible Then Exit;
+ If Composer.AttachmentCount = 0 Then Exit;
+
+ HideMouse;
+
+ { Position du panneau }
+ PanelX := COMPOSER_X + 4;
+ PanelY := COMPOSER_Y + COMPOSER_HEADER_HEIGHT - ATTACH_PANEL_HEIGHT - 2;
+ PanelW := COMPOSER_WIDTH - 8;
+
+ { Fond du panneau }
+ SetFillStyle(SolidFill, COLOR_WINDOW_BG);
+ Bar(PanelX, PanelY, PanelX + PanelW, PanelY + ATTACH_PANEL_HEIGHT);
+
+ { Bordure }
+ SetColor(COLOR_BUTTON_DARK);
+ Rectangle(PanelX, PanelY, PanelX + PanelW, PanelY + ATTACH_PANEL_HEIGHT);
+
+ { Titre }
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(PanelX + 4, PanelY + 2, 'Pieces jointes:');
+
+ { Dessiner les icones des pieces jointes }
+ For I := 0 To Composer.AttachmentCount - 1 Do Begin
+  DrawAttachmentIcon(PanelX + 90 + I * ATTACH_ICON_SPACING, PanelY + 2,
+                     Composer.Attachments[I].FileType);
+
+  { Avertissement si dangereux }
+  If Composer.Attachments[I].IsDangerous Then Begin
+   SetColor(LightRed);
+   OutTextXY(PanelX + 90 + I * ATTACH_ICON_SPACING + 8, PanelY + 32, '!');
+  End;
+ End;
+
+ { Taille totale }
+ SizeStr := 'Total: ' + FormatFileSize(AttachTotalSize);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(PanelX + PanelW - TextWidth(SizeStr) - 10, PanelY + ATTACH_PANEL_HEIGHT - 14, SizeStr);
+
+ ShowMouse;
+End;
+
+{ Ajoute une piece jointe au compositeur }
+Function AddAttachment(FilePath: String): Boolean;
+Var
+ F: File;
+ FileName: String;
+ I: Integer;
+ Ext: String;
+Begin
+ AddAttachment := False;
+
+ { Verifier le nombre maximum }
+ If Composer.AttachmentCount >= MAX_ATTACHMENTS Then Exit;
+
+ { Extraire le nom du fichier }
+ FileName := FilePath;
+ For I := Length(FilePath) DownTo 1 Do Begin
+  If (FilePath[I] = '\') Or (FilePath[I] = '/') Then Begin
+   FileName := Copy(FilePath, I + 1, Length(FilePath) - I);
+   Break;
+  End;
+ End;
+
+ { Verifier si le fichier existe et obtenir sa taille }
+ {$I-}
+ Assign(F, FilePath);
+ Reset(F, 1);
+ {$I+}
+ If IOResult <> 0 Then Exit;
+
+ { Verifier la taille }
+ If FileSize(F) > MAX_SINGLE_FILE_SIZE Then Begin
+  Close(F);
+  { Afficher avertissement taille }
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(LightRed);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Erreur: Fichier trop volumineux (max 5 Mo)');
+  ShowMouse;
+  Exit;
+ End;
+
+ { Verifier la taille totale }
+ If AttachTotalSize + FileSize(F) > MAX_ATTACHMENT_SIZE Then Begin
+  Close(F);
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(LightRed);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Erreur: Taille totale des pieces jointes depassee');
+  ShowMouse;
+  Exit;
+ End;
+
+ { Ajouter la piece jointe }
+ With Composer.Attachments[Composer.AttachmentCount] Do Begin
+  FileName := FileName;
+  Composer.Attachments[Composer.AttachmentCount].FileName := FileName;
+  Composer.Attachments[Composer.AttachmentCount].FilePath := FilePath;
+  Composer.Attachments[Composer.AttachmentCount].FileSize := FileSize(F);
+  Composer.Attachments[Composer.AttachmentCount].FileType := GetAttachmentType(FileName);
+  Composer.Attachments[Composer.AttachmentCount].IsEmbedded := False;
+  Composer.Attachments[Composer.AttachmentCount].ContentID := '';
+
+  { Verifier si extension dangereuse }
+  Ext := GetFileExtension(FileName);
+  Composer.Attachments[Composer.AttachmentCount].IsDangerous := IsDangerousExtension(Ext);
+ End;
+
+ AttachTotalSize := AttachTotalSize + FileSize(F);
+ Close(F);
+
+ Inc(Composer.AttachmentCount);
+ Composer.Modified := True;
+
+ { Afficher avertissement si dangereux }
+ If Composer.Attachments[Composer.AttachmentCount - 1].IsDangerous Then Begin
+  HideMouse;
+  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+  SetColor(Yellow);
+  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+            'Attention: Extension potentiellement dangereuse!');
+  ShowMouse;
+ End;
+
+ AddAttachment := True;
+ DrawAttachmentPanel;
+End;
+
+{ Supprime une piece jointe du compositeur }
+Procedure RemoveAttachment(Index: Integer);
+Var
+ I: Integer;
+Begin
+ If (Index < 0) Or (Index >= Composer.AttachmentCount) Then Exit;
+
+ AttachTotalSize := AttachTotalSize - Composer.Attachments[Index].FileSize;
+
+ { Decaler les pieces jointes suivantes }
+ For I := Index To Composer.AttachmentCount - 2 Do
+  Composer.Attachments[I] := Composer.Attachments[I + 1];
+
+ Dec(Composer.AttachmentCount);
+ Composer.Modified := True;
+
+ If SelectedAttachment >= Composer.AttachmentCount Then
+  SelectedAttachment := Composer.AttachmentCount - 1;
+
+ DrawAttachmentPanel;
+End;
+
+{ Enregistre une piece jointe sur disque }
+Function SaveAttachmentToDisk(Index: Integer; DestPath: String): Boolean;
+Var
+ SrcFile, DstFile: File;
+ Buffer: Array[0..4095] of Byte;
+ BytesRead: Integer;
+Begin
+ SaveAttachmentToDisk := False;
+
+ If (Index < 0) Or (Index >= Composer.AttachmentCount) Then Exit;
+
+ { Ouvrir le fichier source }
+ {$I-}
+ Assign(SrcFile, Composer.Attachments[Index].FilePath);
+ Reset(SrcFile, 1);
+ {$I+}
+ If IOResult <> 0 Then Exit;
+
+ { Creer le fichier destination }
+ {$I-}
+ Assign(DstFile, DestPath + '\' + Composer.Attachments[Index].FileName);
+ Rewrite(DstFile, 1);
+ {$I+}
+ If IOResult <> 0 Then Begin
+  Close(SrcFile);
+  Exit;
+ End;
+
+ { Copier le contenu }
+ Repeat
+  BlockRead(SrcFile, Buffer, SizeOf(Buffer), BytesRead);
+  If BytesRead > 0 Then
+   BlockWrite(DstFile, Buffer, BytesRead);
+ Until BytesRead = 0;
+
+ Close(SrcFile);
+ Close(DstFile);
+
+ SaveAttachmentToDisk := True;
+
+ { Confirmation }
+ HideMouse;
+ FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+          Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+ SetColor(LightGreen);
+ OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+           'Piece jointe enregistree avec succes');
+ ShowMouse;
+End;
+
+{ Enregistre une piece jointe d'un message recu }
+Function SaveReceivedAttachment(MsgIndex, AttachIndex: Integer; DestPath: String): Boolean;
+Begin
+ SaveReceivedAttachment := False;
+
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+ If (AttachIndex < 0) Or (AttachIndex >= Messages[MsgIndex].AttachmentCount) Then Exit;
+
+ { Note: Pour un vrai client, on telechargerait d'abord depuis le serveur }
+ { Ici on simule l'operation }
+
+ HideMouse;
+ FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
+          Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
+ SetColor(LightGreen);
+ OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
+           'Piece jointe enregistree: ' + Messages[MsgIndex].Attachments[AttachIndex].FileName);
+ ShowMouse;
+
+ SaveReceivedAttachment := True;
+End;
+
+{ Dessine les pieces jointes d'un message dans le volet de preview }
+Procedure DrawMessageAttachments(MsgIndex: Integer);
+Var
+ X, Y, I: Integer;
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+ If Not Messages[MsgIndex].HasAttachment Then Exit;
+ If Messages[MsgIndex].AttachmentCount = 0 Then Exit;
+
+ HideMouse;
+
+ { Position sous les en-tetes }
+ X := Layout.PreviewRect.X1 + 10;
+ Y := Layout.PreviewRect.Y1 + PreviewHeaderHeight + 5;
+
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(X, Y, 'Pieces jointes:');
+ Y := Y + 16;
+
+ { Dessiner les icones }
+ For I := 0 To Messages[MsgIndex].AttachmentCount - 1 Do Begin
+  DrawAttachmentIcon(X + I * ATTACH_ICON_SPACING, Y,
+                     Messages[MsgIndex].Attachments[I].FileType);
+
+  { Nom sous l'icone }
+  SetColor(COLOR_MENU_TEXT);
+  If Length(Messages[MsgIndex].Attachments[I].FileName) > 6 Then
+   OutTextXY(X + I * ATTACH_ICON_SPACING - 5, Y + 32,
+             Copy(Messages[MsgIndex].Attachments[I].FileName, 1, 6) + '..')
+  Else
+   OutTextXY(X + I * ATTACH_ICON_SPACING, Y + 32,
+             Messages[MsgIndex].Attachments[I].FileName);
+ End;
+
+ ShowMouse;
+End;
+
+{ Gere le clic sur une piece jointe dans le compositeur }
+Procedure HandleAttachmentClick(X, Y: Integer);
+Var
+ PanelX, PanelY, I, IconX: Integer;
+Begin
+ If Composer.AttachmentCount = 0 Then Exit;
+
+ PanelX := COMPOSER_X + 4;
+ PanelY := COMPOSER_Y + COMPOSER_HEADER_HEIGHT - ATTACH_PANEL_HEIGHT - 2;
+
+ { Verifier le clic sur chaque icone }
+ For I := 0 To Composer.AttachmentCount - 1 Do Begin
+  IconX := PanelX + 90 + I * ATTACH_ICON_SPACING;
+  If (X >= IconX) And (X <= IconX + 24) And
+     (Y >= PanelY + 2) And (Y <= PanelY + 30) Then Begin
+   SelectedAttachment := I;
+   DrawAttachmentPanel;
+   Exit;
+  End;
+ End;
+End;
+
+{ Reinitialise les pieces jointes du compositeur }
+Procedure ClearComposerAttachments;
+Begin
+ Composer.AttachmentCount := 0;
+ AttachTotalSize := 0;
+ SelectedAttachment := -1;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU SUPPORT DES PIECES JOINTES
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -7302,6 +7861,15 @@ Begin
  Messages[0].Body[4] := '';
  Messages[0].Body[5] := 'Cordialement,';
  Messages[0].Body[6] := 'Jean Dupont';
+ { Pieces jointes pour Message 1 (TODO 13) }
+ Messages[0].AttachmentCount := 1;
+ Messages[0].Attachments[0].FileName := 'ordre_du_jour.pdf';
+ Messages[0].Attachments[0].FilePath := '';
+ Messages[0].Attachments[0].FileSize := 125000;
+ Messages[0].Attachments[0].FileType := atPDF;
+ Messages[0].Attachments[0].IsEmbedded := False;
+ Messages[0].Attachments[0].ContentID := '';
+ Messages[0].Attachments[0].IsDangerous := False;
 
  { Message 2 - Lu }
  Messages[1].MsgID := 'MSG002';
@@ -7331,6 +7899,22 @@ Begin
  Messages[1].Body[7] := 'Voir le document joint pour les details.';
  Messages[1].Body[8] := '';
  Messages[1].Body[9] := 'Marie';
+ { Pieces jointes pour Message 2 (TODO 13) }
+ Messages[1].AttachmentCount := 2;
+ Messages[1].Attachments[0].FileName := 'rapport_alpha.docx';
+ Messages[1].Attachments[0].FilePath := '';
+ Messages[1].Attachments[0].FileSize := 85400;
+ Messages[1].Attachments[0].FileType := atDocument;
+ Messages[1].Attachments[0].IsEmbedded := False;
+ Messages[1].Attachments[0].ContentID := '';
+ Messages[1].Attachments[0].IsDangerous := False;
+ Messages[1].Attachments[1].FileName := 'planning.xlsx';
+ Messages[1].Attachments[1].FilePath := '';
+ Messages[1].Attachments[1].FileSize := 42300;
+ Messages[1].Attachments[1].FileType := atSpreadsheet;
+ Messages[1].Attachments[1].IsEmbedded := False;
+ Messages[1].Attachments[1].ContentID := '';
+ Messages[1].Attachments[1].IsDangerous := False;
 
  { Message 3 - Lu }
  Messages[2].MsgID := 'MSG003';
@@ -7349,6 +7933,7 @@ Begin
  Messages[2].IsRead := True;
  Messages[2].IsFlagged := False;
  Messages[2].IsSelected := False;
+ Messages[2].AttachmentCount := 0;
  Messages[2].BodyLineCount := 8;
  Messages[2].Body[0] := 'Cher client,';
  Messages[2].Body[1] := '';
@@ -8992,6 +9577,9 @@ BEGIN
 
  { Initialisation du compositeur de messages (TODO 12) }
  InitializeComposer;
+
+ { Initialisation du gestionnaire de pieces jointes (TODO 13) }
+ InitAttachmentManager;
 
  { Affichage de l'interface }
  ShowMouse;
