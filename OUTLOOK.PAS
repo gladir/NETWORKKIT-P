@@ -139,7 +139,7 @@
       - Mise en surbrillance des résultats
       - Historique des recherches récentes
 
-  19. [ ] Gestion des signatures de courriels
+  19. [x] Gestion des signatures de courriels
       - Éditeur de signatures multiples
       - Signature par défaut par compte
       - Insertion automatique dans les nouveaux messages
@@ -779,6 +779,87 @@ Type
   swsAdvanced,                   { Recherche avancee }
   swsResults                     { Affichage des resultats }
  );
+
+ { ============================================================================
+   TYPES POUR LA GESTION DES SIGNATURES (TODO 19)
+   ============================================================================ }
+
+ { Type de contenu de signature }
+ TSignatureContentType = (
+  sctPlainText,                  { Texte brut }
+  sctHTML,                       { Texte HTML formate }
+  sctRichText                    { Texte enrichi }
+ );
+
+ { Mode d'insertion de la signature }
+ TSignatureInsertMode = (
+  simNone,                       { Pas de signature }
+  simNewMessages,                { Nouveaux messages seulement }
+  simRepliesForwards,            { Reponses et transferts seulement }
+  simAll                         { Tous les messages }
+ );
+
+ { Position de la signature dans le message }
+ TSignaturePosition = (
+  spAfterText,                   { Apres le texte du message }
+  spBeforeQuote,                 { Avant le texte cite }
+  spAtEnd                        { A la fin du message }
+ );
+
+ { Structure d'une signature de courriel }
+ TEmailSignature = Record
+  ID: Integer;                   { Identifiant unique }
+  Name: String[40];              { Nom de la signature }
+  Description: String[80];       { Description }
+  IsDefault: Boolean;            { Signature par defaut }
+  AccountID: Integer;            { ID du compte associe (0=tous) }
+  ContentType: TSignatureContentType; { Type de contenu }
+  PlainText: Array[0..19] of String[80]; { Texte brut (max 20 lignes) }
+  PlainTextLines: Integer;       { Nombre de lignes de texte }
+  HTMLContent: Array[0..29] of String[80]; { Contenu HTML (max 30 lignes) }
+  HTMLContentLines: Integer;     { Nombre de lignes HTML }
+  InsertMode: TSignatureInsertMode; { Mode d'insertion }
+  Position: TSignaturePosition;  { Position dans le message }
+  IncludeSeparator: Boolean;     { Inclure "-- " avant la signature }
+  UseForReplies: Boolean;        { Utiliser pour les reponses }
+  UseForForwards: Boolean;       { Utiliser pour les transferts }
+  ReplySignatureID: Integer;     { ID signature pour reponses (-1=meme) }
+  ForwardSignatureID: Integer;   { ID signature pour transferts (-1=meme) }
+  CreatedDate: LongInt;          { Date de creation }
+  ModifiedDate: LongInt;         { Date de derniere modification }
+  IsActive: Boolean;             { Signature active }
+ End;
+
+ { Parametres de signature par compte }
+ TAccountSignatureSettings = Record
+  AccountID: Integer;            { ID du compte }
+  DefaultSignatureID: Integer;   { Signature par defaut pour ce compte }
+  ReplySignatureID: Integer;     { Signature pour reponses }
+  ForwardSignatureID: Integer;   { Signature pour transferts }
+  AutoInsert: Boolean;           { Insertion automatique }
+  InsertPosition: TSignaturePosition; { Position d'insertion }
+ End;
+
+ { Etat de la fenetre d'edition de signature }
+ TSignatureWindowState = (
+  sigwsHidden,                   { Fenetre cachee }
+  sigwsList,                     { Liste des signatures }
+  sigwsEdit,                     { Edition d'une signature }
+  sigwsNew,                      { Nouvelle signature }
+  sigwsPreview                   { Apercu de la signature }
+ );
+
+ { Etat de l'editeur de signature }
+ TSignatureEditorState = Record
+  EditingSignature: TEmailSignature; { Signature en cours d'edition }
+  CursorLine: Integer;           { Ligne du curseur }
+  CursorCol: Integer;            { Colonne du curseur }
+  SelectionStart: Integer;       { Debut de selection (ligne) }
+  SelectionEnd: Integer;         { Fin de selection (ligne) }
+  IsModified: Boolean;           { Modifications non sauvegardees }
+  CurrentTab: Integer;           { Onglet actuel (0=Texte, 1=HTML, 2=Parametres) }
+  ScrollOffset: Integer;         { Defilement vertical }
+ End;
 
  { Type de colonne pour la liste des messages }
  TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
@@ -1718,6 +1799,39 @@ Const
  { Nombre de resultats visibles }
  SEARCH_RESULTS_VISIBLE = 10;
 
+ { ============================================================================
+   CONSTANTES POUR LA GESTION DES SIGNATURES (TODO 19)
+   ============================================================================ }
+
+ { Nombre maximum de signatures }
+ MAX_SIGNATURES = 20;
+
+ { Nombre maximum de parametres par compte }
+ MAX_ACCOUNT_SIG_SETTINGS = 10;
+
+ { Dimensions de la fenetre de signatures }
+ SIG_WINDOW_WIDTH = 550;
+ SIG_WINDOW_HEIGHT = 420;
+
+ { Dimensions de l'editeur de signature }
+ SIG_EDITOR_WIDTH = 400;
+ SIG_EDITOR_HEIGHT = 250;
+
+ { Nombre maximum de lignes de texte }
+ SIG_MAX_TEXT_LINES = 20;
+
+ { Nombre maximum de lignes HTML }
+ SIG_MAX_HTML_LINES = 30;
+
+ { Nombre de signatures visibles dans la liste }
+ SIG_LIST_VISIBLE = 8;
+
+ { Hauteur d'une ligne dans la liste }
+ SIG_LIST_ITEM_HEIGHT = 24;
+
+ { Separateur standard de signature }
+ SIG_SEPARATOR = '-- ';
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1937,6 +2051,24 @@ Var
  SearchInProgress: Boolean;             { Recherche en cours }
  HighlightResults: Boolean;             { Mise en surbrillance active }
  CurrentHighlightIndex: Integer;        { Index de surbrillance actuel }
+
+ { ============================================================================
+   VARIABLES POUR LA GESTION DES SIGNATURES (TODO 19)
+   ============================================================================ }
+
+ Signatures: Array[0..MAX_SIGNATURES-1] of TEmailSignature; { Liste des signatures }
+ SignatureCount: Integer;              { Nombre de signatures }
+ AccountSigSettings: Array[0..MAX_ACCOUNT_SIG_SETTINGS-1] of TAccountSignatureSettings;
+ AccountSigSettingsCount: Integer;     { Nombre de parametres par compte }
+ SignatureWindowState: TSignatureWindowState; { Etat de la fenetre }
+ SignatureWindowX, SignatureWindowY: Integer; { Position de la fenetre }
+ SignatureVisible: Boolean;            { Visibilite de la fenetre }
+ SignatureScrollOffset: Integer;       { Decalage de defilement }
+ SignatureSelectedIndex: Integer;      { Signature selectionnee }
+ SignatureEditorState: TSignatureEditorState; { Etat de l'editeur }
+ SignaturePreviewMode: Boolean;        { Mode apercu actif }
+ CurrentSignatureID: Integer;          { ID de la signature en cours }
+ NextSignatureID: Integer;             { Prochain ID disponible }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -12848,6 +12980,1045 @@ End;
   FIN DE L'IMPLEMENTATION DE LA RECHERCHE AVANCEE
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DE LA GESTION DES SIGNATURES (TODO 19)
+  ============================================================================ }
+
+{ Initialise le systeme de signatures }
+Procedure Sig_Init;
+Var
+ I, J: Integer;
+Begin
+ SignatureCount := 0;
+ AccountSigSettingsCount := 0;
+ SignatureWindowState := sigwsHidden;
+ SignatureWindowX := (GetMaxX - SIG_WINDOW_WIDTH) Div 2;
+ SignatureWindowY := (GetMaxY - SIG_WINDOW_HEIGHT) Div 2;
+ SignatureVisible := False;
+ SignatureScrollOffset := 0;
+ SignatureSelectedIndex := 0;
+ SignaturePreviewMode := False;
+ CurrentSignatureID := -1;
+ NextSignatureID := 1;
+
+ { Initialiser le tableau des signatures }
+ For I := 0 To MAX_SIGNATURES - 1 Do Begin
+  Signatures[I].ID := 0;
+  Signatures[I].Name := '';
+  Signatures[I].Description := '';
+  Signatures[I].IsDefault := False;
+  Signatures[I].AccountID := 0;
+  Signatures[I].ContentType := sctPlainText;
+  Signatures[I].PlainTextLines := 0;
+  Signatures[I].HTMLContentLines := 0;
+  Signatures[I].InsertMode := simAll;
+  Signatures[I].Position := spAfterText;
+  Signatures[I].IncludeSeparator := True;
+  Signatures[I].UseForReplies := True;
+  Signatures[I].UseForForwards := True;
+  Signatures[I].ReplySignatureID := -1;
+  Signatures[I].ForwardSignatureID := -1;
+  Signatures[I].CreatedDate := 0;
+  Signatures[I].ModifiedDate := 0;
+  Signatures[I].IsActive := False;
+  For J := 0 To SIG_MAX_TEXT_LINES - 1 Do
+   Signatures[I].PlainText[J] := '';
+  For J := 0 To SIG_MAX_HTML_LINES - 1 Do
+   Signatures[I].HTMLContent[J] := '';
+ End;
+
+ { Initialiser les parametres par compte }
+ For I := 0 To MAX_ACCOUNT_SIG_SETTINGS - 1 Do Begin
+  AccountSigSettings[I].AccountID := 0;
+  AccountSigSettings[I].DefaultSignatureID := -1;
+  AccountSigSettings[I].ReplySignatureID := -1;
+  AccountSigSettings[I].ForwardSignatureID := -1;
+  AccountSigSettings[I].AutoInsert := True;
+  AccountSigSettings[I].InsertPosition := spAfterText;
+ End;
+
+ { Initialiser l'etat de l'editeur }
+ SignatureEditorState.CursorLine := 0;
+ SignatureEditorState.CursorCol := 0;
+ SignatureEditorState.SelectionStart := -1;
+ SignatureEditorState.SelectionEnd := -1;
+ SignatureEditorState.IsModified := False;
+ SignatureEditorState.CurrentTab := 0;
+ SignatureEditorState.ScrollOffset := 0;
+End;
+
+{ Cree une nouvelle signature vide }
+Function Sig_Create(AName: String): Integer;
+Var
+ NewIndex: Integer;
+Begin
+ Sig_Create := -1;
+ If SignatureCount >= MAX_SIGNATURES Then Exit;
+
+ NewIndex := SignatureCount;
+ Inc(SignatureCount);
+
+ Signatures[NewIndex].ID := NextSignatureID;
+ Inc(NextSignatureID);
+ Signatures[NewIndex].Name := AName;
+ Signatures[NewIndex].Description := '';
+ Signatures[NewIndex].IsDefault := (SignatureCount = 1);
+ Signatures[NewIndex].AccountID := 0;
+ Signatures[NewIndex].ContentType := sctPlainText;
+ Signatures[NewIndex].PlainTextLines := 0;
+ Signatures[NewIndex].HTMLContentLines := 0;
+ Signatures[NewIndex].InsertMode := simAll;
+ Signatures[NewIndex].Position := spAfterText;
+ Signatures[NewIndex].IncludeSeparator := True;
+ Signatures[NewIndex].UseForReplies := True;
+ Signatures[NewIndex].UseForForwards := True;
+ Signatures[NewIndex].ReplySignatureID := -1;
+ Signatures[NewIndex].ForwardSignatureID := -1;
+ Signatures[NewIndex].CreatedDate := 1743465600;
+ Signatures[NewIndex].ModifiedDate := 1743465600;
+ Signatures[NewIndex].IsActive := True;
+
+ Sig_Create := Signatures[NewIndex].ID;
+End;
+
+{ Supprime une signature par son ID }
+Function Sig_Delete(SigID: Integer): Boolean;
+Var
+ I, J, Index: Integer;
+Begin
+ Sig_Delete := False;
+ Index := -1;
+
+ { Trouver l'index de la signature }
+ For I := 0 To SignatureCount - 1 Do Begin
+  If Signatures[I].ID = SigID Then Begin
+   Index := I;
+   Break;
+  End;
+ End;
+
+ If Index < 0 Then Exit;
+
+ { Decaler les signatures suivantes }
+ For I := Index To SignatureCount - 2 Do
+  Signatures[I] := Signatures[I + 1];
+
+ Dec(SignatureCount);
+ Sig_Delete := True;
+
+ { Si c'etait la signature par defaut, definir la premiere comme defaut }
+ If SignatureCount > 0 Then Begin
+  For I := 0 To SignatureCount - 1 Do Begin
+   If Signatures[I].IsDefault Then Exit;
+  End;
+  Signatures[0].IsDefault := True;
+ End;
+End;
+
+{ Trouve une signature par son ID }
+Function Sig_FindByID(SigID: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ Sig_FindByID := -1;
+ For I := 0 To SignatureCount - 1 Do Begin
+  If Signatures[I].ID = SigID Then Begin
+   Sig_FindByID := I;
+   Exit;
+  End;
+ End;
+End;
+
+{ Retourne la signature par defaut pour un compte }
+Function Sig_GetDefaultForAccount(AccountID: Integer): Integer;
+Var
+ I: Integer;
+Begin
+ Sig_GetDefaultForAccount := -1;
+
+ { Chercher dans les parametres par compte }
+ For I := 0 To AccountSigSettingsCount - 1 Do Begin
+  If AccountSigSettings[I].AccountID = AccountID Then Begin
+   Sig_GetDefaultForAccount := AccountSigSettings[I].DefaultSignatureID;
+   Exit;
+  End;
+ End;
+
+ { Sinon chercher la signature par defaut globale }
+ For I := 0 To SignatureCount - 1 Do Begin
+  If Signatures[I].IsDefault And Signatures[I].IsActive Then Begin
+   Sig_GetDefaultForAccount := Signatures[I].ID;
+   Exit;
+  End;
+ End;
+
+ { Sinon retourner la premiere signature active }
+ For I := 0 To SignatureCount - 1 Do Begin
+  If Signatures[I].IsActive Then Begin
+   Sig_GetDefaultForAccount := Signatures[I].ID;
+   Exit;
+  End;
+ End;
+End;
+
+{ Retourne la signature pour les reponses }
+Function Sig_GetReplySignature(AccountID: Integer): Integer;
+Var
+ I: Integer;
+ DefaultID: Integer;
+Begin
+ Sig_GetReplySignature := -1;
+
+ { Chercher dans les parametres par compte }
+ For I := 0 To AccountSigSettingsCount - 1 Do Begin
+  If AccountSigSettings[I].AccountID = AccountID Then Begin
+   If AccountSigSettings[I].ReplySignatureID >= 0 Then Begin
+    Sig_GetReplySignature := AccountSigSettings[I].ReplySignatureID;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Sinon utiliser la signature par defaut }
+ DefaultID := Sig_GetDefaultForAccount(AccountID);
+ If DefaultID >= 0 Then Begin
+  I := Sig_FindByID(DefaultID);
+  If I >= 0 Then Begin
+   If Signatures[I].UseForReplies Then Begin
+    If Signatures[I].ReplySignatureID >= 0 Then
+     Sig_GetReplySignature := Signatures[I].ReplySignatureID
+    Else
+     Sig_GetReplySignature := DefaultID;
+   End;
+  End;
+ End;
+End;
+
+{ Retourne la signature pour les transferts }
+Function Sig_GetForwardSignature(AccountID: Integer): Integer;
+Var
+ I: Integer;
+ DefaultID: Integer;
+Begin
+ Sig_GetForwardSignature := -1;
+
+ { Chercher dans les parametres par compte }
+ For I := 0 To AccountSigSettingsCount - 1 Do Begin
+  If AccountSigSettings[I].AccountID = AccountID Then Begin
+   If AccountSigSettings[I].ForwardSignatureID >= 0 Then Begin
+    Sig_GetForwardSignature := AccountSigSettings[I].ForwardSignatureID;
+    Exit;
+   End;
+  End;
+ End;
+
+ { Sinon utiliser la signature par defaut }
+ DefaultID := Sig_GetDefaultForAccount(AccountID);
+ If DefaultID >= 0 Then Begin
+  I := Sig_FindByID(DefaultID);
+  If I >= 0 Then Begin
+   If Signatures[I].UseForForwards Then Begin
+    If Signatures[I].ForwardSignatureID >= 0 Then
+     Sig_GetForwardSignature := Signatures[I].ForwardSignatureID
+    Else
+     Sig_GetForwardSignature := DefaultID;
+   End;
+  End;
+ End;
+End;
+
+{ Definit la signature par defaut }
+Procedure Sig_SetDefault(SigID: Integer);
+Var
+ I, Index: Integer;
+Begin
+ { Retirer le statut par defaut de toutes les signatures }
+ For I := 0 To SignatureCount - 1 Do
+  Signatures[I].IsDefault := False;
+
+ { Definir la nouvelle signature par defaut }
+ Index := Sig_FindByID(SigID);
+ If Index >= 0 Then
+  Signatures[Index].IsDefault := True;
+End;
+
+{ Ajoute une ligne de texte a une signature }
+Function Sig_AddTextLine(SigIndex: Integer; Line: String): Boolean;
+Begin
+ Sig_AddTextLine := False;
+ If (SigIndex < 0) Or (SigIndex >= SignatureCount) Then Exit;
+ If Signatures[SigIndex].PlainTextLines >= SIG_MAX_TEXT_LINES Then Exit;
+
+ Signatures[SigIndex].PlainText[Signatures[SigIndex].PlainTextLines] := Line;
+ Inc(Signatures[SigIndex].PlainTextLines);
+ Signatures[SigIndex].ModifiedDate := 1743465600;
+ Sig_AddTextLine := True;
+End;
+
+{ Ajoute une ligne HTML a une signature }
+Function Sig_AddHTMLLine(SigIndex: Integer; Line: String): Boolean;
+Begin
+ Sig_AddHTMLLine := False;
+ If (SigIndex < 0) Or (SigIndex >= SignatureCount) Then Exit;
+ If Signatures[SigIndex].HTMLContentLines >= SIG_MAX_HTML_LINES Then Exit;
+
+ Signatures[SigIndex].HTMLContent[Signatures[SigIndex].HTMLContentLines] := Line;
+ Inc(Signatures[SigIndex].HTMLContentLines);
+ Signatures[SigIndex].ContentType := sctHTML;
+ Signatures[SigIndex].ModifiedDate := 1743465600;
+ Sig_AddHTMLLine := True;
+End;
+
+{ Vide le texte d'une signature }
+Procedure Sig_ClearText(SigIndex: Integer);
+Var
+ I: Integer;
+Begin
+ If (SigIndex < 0) Or (SigIndex >= SignatureCount) Then Exit;
+
+ For I := 0 To SIG_MAX_TEXT_LINES - 1 Do
+  Signatures[SigIndex].PlainText[I] := '';
+ Signatures[SigIndex].PlainTextLines := 0;
+ Signatures[SigIndex].ModifiedDate := 1743465600;
+End;
+
+{ Vide le contenu HTML d'une signature }
+Procedure Sig_ClearHTML(SigIndex: Integer);
+Var
+ I: Integer;
+Begin
+ If (SigIndex < 0) Or (SigIndex >= SignatureCount) Then Exit;
+
+ For I := 0 To SIG_MAX_HTML_LINES - 1 Do
+  Signatures[SigIndex].HTMLContent[I] := '';
+ Signatures[SigIndex].HTMLContentLines := 0;
+ Signatures[SigIndex].ModifiedDate := 1743465600;
+End;
+
+{ Genere le texte de la signature avec separateur optionnel }
+Function Sig_GenerateText(SigIndex: Integer): String;
+Var
+ I: Integer;
+ Result: String;
+Begin
+ Sig_GenerateText := '';
+ If (SigIndex < 0) Or (SigIndex >= SignatureCount) Then Exit;
+
+ Result := '';
+
+ { Ajouter le separateur si configure }
+ If Signatures[SigIndex].IncludeSeparator Then
+  Result := SIG_SEPARATOR + #13#10;
+
+ { Ajouter les lignes de texte }
+ For I := 0 To Signatures[SigIndex].PlainTextLines - 1 Do Begin
+  Result := Result + Signatures[SigIndex].PlainText[I];
+  If I < Signatures[SigIndex].PlainTextLines - 1 Then
+   Result := Result + #13#10;
+ End;
+
+ Sig_GenerateText := Result;
+End;
+
+{ Genere le contenu HTML de la signature }
+Function Sig_GenerateHTML(SigIndex: Integer): String;
+Var
+ I: Integer;
+ Result: String;
+Begin
+ Sig_GenerateHTML := '';
+ If (SigIndex < 0) Or (SigIndex >= SignatureCount) Then Exit;
+ If Signatures[SigIndex].ContentType <> sctHTML Then Exit;
+
+ Result := '';
+
+ { Ajouter le separateur si configure }
+ If Signatures[SigIndex].IncludeSeparator Then
+  Result := '<p>' + SIG_SEPARATOR + '</p>';
+
+ { Ajouter les lignes HTML }
+ For I := 0 To Signatures[SigIndex].HTMLContentLines - 1 Do
+  Result := Result + Signatures[SigIndex].HTMLContent[I];
+
+ Sig_GenerateHTML := Result;
+End;
+
+{ Configure les parametres de signature pour un compte }
+Procedure Sig_SetAccountSettings(AccountID, DefaultSig, ReplySig, ForwardSig: Integer;
+                                 AutoInsert: Boolean; InsertPos: TSignaturePosition);
+Var
+ I, Index: Integer;
+Begin
+ { Chercher si les parametres existent deja }
+ Index := -1;
+ For I := 0 To AccountSigSettingsCount - 1 Do Begin
+  If AccountSigSettings[I].AccountID = AccountID Then Begin
+   Index := I;
+   Break;
+  End;
+ End;
+
+ { Creer une nouvelle entree si necessaire }
+ If Index < 0 Then Begin
+  If AccountSigSettingsCount >= MAX_ACCOUNT_SIG_SETTINGS Then Exit;
+  Index := AccountSigSettingsCount;
+  Inc(AccountSigSettingsCount);
+ End;
+
+ { Configurer les parametres }
+ AccountSigSettings[Index].AccountID := AccountID;
+ AccountSigSettings[Index].DefaultSignatureID := DefaultSig;
+ AccountSigSettings[Index].ReplySignatureID := ReplySig;
+ AccountSigSettings[Index].ForwardSignatureID := ForwardSig;
+ AccountSigSettings[Index].AutoInsert := AutoInsert;
+ AccountSigSettings[Index].InsertPosition := InsertPos;
+End;
+
+{ Insere la signature dans le corps du message du compositeur }
+Procedure Sig_InsertInComposer(SigID: Integer; IsReply, IsForward: Boolean);
+Var
+ SigIndex, LineIndex: Integer;
+ SigText: String;
+Begin
+ { Trouver la signature appropriee }
+ If IsReply Then
+  SigID := Sig_GetReplySignature(0)
+ Else If IsForward Then
+  SigID := Sig_GetForwardSignature(0);
+
+ If SigID < 0 Then SigID := Sig_GetDefaultForAccount(0);
+ If SigID < 0 Then Exit;
+
+ SigIndex := Sig_FindByID(SigID);
+ If SigIndex < 0 Then Exit;
+ If Not Signatures[SigIndex].IsActive Then Exit;
+
+ { Ajouter une ligne vide avant la signature }
+ If ComposerState.BodyLineCount < 18 Then Begin
+  ComposerState.Body[ComposerState.BodyLineCount] := '';
+  Inc(ComposerState.BodyLineCount);
+ End;
+
+ { Ajouter le separateur si configure }
+ If Signatures[SigIndex].IncludeSeparator And (ComposerState.BodyLineCount < 19) Then Begin
+  ComposerState.Body[ComposerState.BodyLineCount] := SIG_SEPARATOR;
+  Inc(ComposerState.BodyLineCount);
+ End;
+
+ { Ajouter les lignes de la signature }
+ For LineIndex := 0 To Signatures[SigIndex].PlainTextLines - 1 Do Begin
+  If ComposerState.BodyLineCount >= 20 Then Break;
+  ComposerState.Body[ComposerState.BodyLineCount] := Signatures[SigIndex].PlainText[LineIndex];
+  Inc(ComposerState.BodyLineCount);
+ End;
+End;
+
+{ Affiche la fenetre de gestion des signatures }
+Procedure Sig_DrawWindow;
+Var
+ X1, Y1, X2, Y2: Integer;
+ I, Y, ItemY: Integer;
+ DisplayStr: String;
+ IsSelected: Boolean;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+Begin
+ If Not SignatureVisible Then Exit;
+
+ X1 := SignatureWindowX;
+ Y1 := SignatureWindowY;
+ X2 := X1 + SIG_WINDOW_WIDTH;
+ Y2 := Y1 + SIG_WINDOW_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X1, Y1, X2, Y2);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X1, Y1, X2, Y1 + 25);
+ SetColor(White);
+ OutTextXY(X1 + 10, Y1 + 7, 'Gestion des signatures');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
+ SetColor(White);
+ OutTextXY(X2 - 18, Y1 + 7, 'X');
+
+ { Bordure de la fenetre }
+ SetColor(DarkGray);
+ Rectangle(X1, Y1, X2, Y2);
+ SetColor(White);
+ Line(X1 + 1, Y1 + 26, X2 - 1, Y1 + 26);
+
+ Y := Y1 + 35;
+
+ Case SignatureWindowState Of
+  sigwsHidden: Exit;
+
+  sigwsList: Begin
+   { Titre de la liste }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Signatures disponibles:');
+   Y := Y + 25;
+
+   { Liste des signatures }
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 20, Y + SIG_LIST_VISIBLE * SIG_LIST_ITEM_HEIGHT);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 20, Y + SIG_LIST_VISIBLE * SIG_LIST_ITEM_HEIGHT);
+
+   For I := 0 To SIG_LIST_VISIBLE - 1 Do Begin
+    If I + SignatureScrollOffset >= SignatureCount Then Break;
+
+    ItemY := Y + I * SIG_LIST_ITEM_HEIGHT;
+    IsSelected := (I + SignatureScrollOffset = SignatureSelectedIndex);
+
+    If IsSelected Then Begin
+     SetFillStyle(SolidFill, Blue);
+     Bar(X1 + 21, ItemY + 1, X2 - 21, ItemY + SIG_LIST_ITEM_HEIGHT - 1);
+     SetColor(White);
+    End Else Begin
+     SetColor(Black);
+    End;
+
+    { Nom de la signature }
+    DisplayStr := Signatures[I + SignatureScrollOffset].Name;
+    If Signatures[I + SignatureScrollOffset].IsDefault Then
+     DisplayStr := DisplayStr + ' (Par defaut)';
+    If Not Signatures[I + SignatureScrollOffset].IsActive Then
+     DisplayStr := DisplayStr + ' [Inactive]';
+    OutTextXY(X1 + 25, ItemY + 5, DisplayStr);
+   End;
+
+   { Boutons }
+   BtnY := Y + SIG_LIST_VISIBLE * SIG_LIST_ITEM_HEIGHT + 20;
+   BtnW := 100;
+   BtnH := 25;
+
+   { Bouton Nouvelle }
+   BtnX := X1 + 20;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 20, BtnY + 7, 'Nouvelle');
+
+   { Bouton Modifier }
+   BtnX := X1 + 130;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 22, BtnY + 7, 'Modifier');
+
+   { Bouton Supprimer }
+   BtnX := X1 + 240;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 15, BtnY + 7, 'Supprimer');
+
+   { Bouton Par defaut }
+   BtnX := X1 + 350;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 10, BtnY + 7, 'Par defaut');
+
+   { Apercu de la signature selectionnee }
+   BtnY := BtnY + BtnH + 20;
+   SetColor(Black);
+   OutTextXY(X1 + 20, BtnY, 'Apercu:');
+   BtnY := BtnY + 20;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, BtnY, X2 - 20, BtnY + 80);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, BtnY, X2 - 20, BtnY + 80);
+
+   If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then Begin
+    SetColor(Black);
+    For I := 0 To Signatures[SignatureSelectedIndex].PlainTextLines - 1 Do Begin
+     If I > 4 Then Break;
+     OutTextXY(X1 + 25, BtnY + 5 + I * 14, Signatures[SignatureSelectedIndex].PlainText[I]);
+    End;
+   End;
+  End;
+
+  sigwsEdit, sigwsNew: Begin
+   { Titre }
+   SetColor(Black);
+   If SignatureWindowState = sigwsNew Then
+    OutTextXY(X1 + 20, Y, 'Nouvelle signature:')
+   Else
+    OutTextXY(X1 + 20, Y, 'Modifier la signature:');
+   Y := Y + 25;
+
+   { Champ Nom }
+   OutTextXY(X1 + 20, Y, 'Nom:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 80, Y - 3, X1 + 300, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 80, Y - 3, X1 + 300, Y + 15);
+   SetColor(Black);
+   OutTextXY(X1 + 85, Y, SignatureEditorState.EditingSignature.Name);
+   Y := Y + 25;
+
+   { Description }
+   OutTextXY(X1 + 20, Y, 'Description:');
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 100, Y - 3, X2 - 20, Y + 15);
+   SetColor(DarkGray);
+   Rectangle(X1 + 100, Y - 3, X2 - 20, Y + 15);
+   SetColor(Black);
+   OutTextXY(X1 + 105, Y, SignatureEditorState.EditingSignature.Description);
+   Y := Y + 30;
+
+   { Zone d'edition du texte }
+   OutTextXY(X1 + 20, Y, 'Contenu de la signature:');
+   Y := Y + 18;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 20, Y + 120);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 20, Y + 120);
+
+   SetColor(Black);
+   For I := 0 To 7 Do Begin
+    If I + SignatureEditorState.ScrollOffset >= SIG_MAX_TEXT_LINES Then Break;
+    If I + SignatureEditorState.ScrollOffset < SignatureEditorState.EditingSignature.PlainTextLines Then
+     OutTextXY(X1 + 25, Y + 5 + I * 14,
+               SignatureEditorState.EditingSignature.PlainText[I + SignatureEditorState.ScrollOffset]);
+   End;
+
+   Y := Y + 130;
+
+   { Options }
+   If SignatureEditorState.EditingSignature.IncludeSeparator Then
+    DisplayStr := '[X]'
+   Else
+    DisplayStr := '[ ]';
+   OutTextXY(X1 + 20, Y, DisplayStr + ' Inclure le separateur "-- "');
+   Y := Y + 18;
+
+   If SignatureEditorState.EditingSignature.UseForReplies Then
+    DisplayStr := '[X]'
+   Else
+    DisplayStr := '[ ]';
+   OutTextXY(X1 + 20, Y, DisplayStr + ' Utiliser pour les reponses');
+
+   If SignatureEditorState.EditingSignature.UseForForwards Then
+    DisplayStr := '[X]'
+   Else
+    DisplayStr := '[ ]';
+   OutTextXY(X1 + 250, Y, DisplayStr + ' Utiliser pour les transferts');
+   Y := Y + 25;
+
+   { Boutons OK et Annuler }
+   BtnW := 80;
+   BtnH := 25;
+   BtnY := Y2 - 40;
+
+   { Bouton OK }
+   BtnX := X2 - 180;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 30, BtnY + 7, 'OK');
+
+   { Bouton Annuler }
+   BtnX := X2 - 90;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 15, BtnY + 7, 'Annuler');
+  End;
+
+  sigwsPreview: Begin
+   { Apercu plein ecran de la signature }
+   SetColor(Black);
+   OutTextXY(X1 + 20, Y, 'Apercu de la signature:');
+   Y := Y + 25;
+
+   SetFillStyle(SolidFill, White);
+   Bar(X1 + 20, Y, X2 - 20, Y2 - 60);
+   SetColor(DarkGray);
+   Rectangle(X1 + 20, Y, X2 - 20, Y2 - 60);
+
+   If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then Begin
+    SetColor(DarkGray);
+    OutTextXY(X1 + 25, Y + 5, SIG_SEPARATOR);
+    SetColor(Black);
+    For I := 0 To Signatures[SignatureSelectedIndex].PlainTextLines - 1 Do Begin
+     OutTextXY(X1 + 25, Y + 20 + I * 14, Signatures[SignatureSelectedIndex].PlainText[I]);
+    End;
+   End;
+
+   { Bouton Fermer }
+   BtnW := 80;
+   BtnH := 25;
+   BtnX := X2 - 100;
+   BtnY := Y2 - 40;
+   SetFillStyle(SolidFill, LightGray);
+   Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(DarkGray);
+   Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+   SetColor(Black);
+   OutTextXY(BtnX + 18, BtnY + 7, 'Fermer');
+  End;
+ End;
+End;
+
+{ Gere les clics dans la fenetre de signatures }
+Procedure Sig_HandleClick(MX, MY: Integer);
+Var
+ X1, Y1, X2, Y2: Integer;
+ ListY, ItemY, I: Integer;
+ BtnX, BtnY, BtnW, BtnH: Integer;
+ ClickedIndex: Integer;
+Begin
+ If Not SignatureVisible Then Exit;
+
+ X1 := SignatureWindowX;
+ Y1 := SignatureWindowY;
+ X2 := X1 + SIG_WINDOW_WIDTH;
+ Y2 := Y1 + SIG_WINDOW_HEIGHT;
+
+ { Verifier si clic hors de la fenetre }
+ If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Begin
+  SignatureVisible := False;
+  SignatureWindowState := sigwsHidden;
+  Exit;
+ End;
+
+ { Bouton fermer }
+ If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
+  SignatureVisible := False;
+  SignatureWindowState := sigwsHidden;
+  Exit;
+ End;
+
+ Case SignatureWindowState Of
+  sigwsList: Begin
+   ListY := Y1 + 60;
+
+   { Clic dans la liste }
+   If (MX >= X1 + 20) And (MX <= X2 - 20) And
+      (MY >= ListY) And (MY <= ListY + SIG_LIST_VISIBLE * SIG_LIST_ITEM_HEIGHT) Then Begin
+    ClickedIndex := (MY - ListY) Div SIG_LIST_ITEM_HEIGHT + SignatureScrollOffset;
+    If ClickedIndex < SignatureCount Then
+     SignatureSelectedIndex := ClickedIndex;
+    Exit;
+   End;
+
+   { Boutons }
+   BtnY := ListY + SIG_LIST_VISIBLE * SIG_LIST_ITEM_HEIGHT + 20;
+   BtnW := 100;
+   BtnH := 25;
+
+   { Bouton Nouvelle }
+   BtnX := X1 + 20;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    SignatureWindowState := sigwsNew;
+    SignatureEditorState.EditingSignature.ID := 0;
+    SignatureEditorState.EditingSignature.Name := 'Nouvelle signature';
+    SignatureEditorState.EditingSignature.Description := '';
+    SignatureEditorState.EditingSignature.PlainTextLines := 0;
+    SignatureEditorState.EditingSignature.IncludeSeparator := True;
+    SignatureEditorState.EditingSignature.UseForReplies := True;
+    SignatureEditorState.EditingSignature.UseForForwards := True;
+    SignatureEditorState.IsModified := False;
+    SignatureEditorState.ScrollOffset := 0;
+    Exit;
+   End;
+
+   { Bouton Modifier }
+   BtnX := X1 + 130;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then Begin
+     SignatureWindowState := sigwsEdit;
+     SignatureEditorState.EditingSignature := Signatures[SignatureSelectedIndex];
+     SignatureEditorState.IsModified := False;
+     SignatureEditorState.ScrollOffset := 0;
+    End;
+    Exit;
+   End;
+
+   { Bouton Supprimer }
+   BtnX := X1 + 240;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then Begin
+     Sig_Delete(Signatures[SignatureSelectedIndex].ID);
+     If SignatureSelectedIndex >= SignatureCount Then
+      SignatureSelectedIndex := SignatureCount - 1;
+     If SignatureSelectedIndex < 0 Then
+      SignatureSelectedIndex := 0;
+    End;
+    Exit;
+   End;
+
+   { Bouton Par defaut }
+   BtnX := X1 + 350;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then
+     Sig_SetDefault(Signatures[SignatureSelectedIndex].ID);
+    Exit;
+   End;
+  End;
+
+  sigwsEdit, sigwsNew: Begin
+   BtnW := 80;
+   BtnH := 25;
+   BtnY := Y2 - 40;
+
+   { Options checkboxes }
+   If (MY >= Y1 + 295) And (MY <= Y1 + 310) Then Begin
+    If (MX >= X1 + 20) And (MX <= X1 + 240) Then Begin
+     SignatureEditorState.EditingSignature.IncludeSeparator :=
+       Not SignatureEditorState.EditingSignature.IncludeSeparator;
+     Exit;
+    End;
+   End;
+
+   If (MY >= Y1 + 313) And (MY <= Y1 + 328) Then Begin
+    If (MX >= X1 + 20) And (MX <= X1 + 230) Then Begin
+     SignatureEditorState.EditingSignature.UseForReplies :=
+       Not SignatureEditorState.EditingSignature.UseForReplies;
+     Exit;
+    End;
+    If (MX >= X1 + 250) And (MX <= X1 + 480) Then Begin
+     SignatureEditorState.EditingSignature.UseForForwards :=
+       Not SignatureEditorState.EditingSignature.UseForForwards;
+     Exit;
+    End;
+   End;
+
+   { Bouton OK }
+   BtnX := X2 - 180;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    If SignatureWindowState = sigwsNew Then Begin
+     { Creer la nouvelle signature }
+     I := SignatureCount;
+     If I < MAX_SIGNATURES Then Begin
+      Signatures[I] := SignatureEditorState.EditingSignature;
+      Signatures[I].ID := NextSignatureID;
+      Inc(NextSignatureID);
+      Signatures[I].IsActive := True;
+      Signatures[I].CreatedDate := 1743465600;
+      Signatures[I].ModifiedDate := 1743465600;
+      Inc(SignatureCount);
+      SignatureSelectedIndex := I;
+     End;
+    End Else Begin
+     { Mettre a jour la signature existante }
+     Signatures[SignatureSelectedIndex] := SignatureEditorState.EditingSignature;
+     Signatures[SignatureSelectedIndex].ModifiedDate := 1743465600;
+    End;
+    SignatureWindowState := sigwsList;
+    Exit;
+   End;
+
+   { Bouton Annuler }
+   BtnX := X2 - 90;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    SignatureWindowState := sigwsList;
+    Exit;
+   End;
+  End;
+
+  sigwsPreview: Begin
+   { Bouton Fermer }
+   BtnW := 80;
+   BtnH := 25;
+   BtnX := X2 - 100;
+   BtnY := Y2 - 40;
+   If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
+    SignatureWindowState := sigwsList;
+    Exit;
+   End;
+  End;
+ End;
+End;
+
+{ Gere les touches clavier dans la fenetre de signatures }
+Procedure Sig_HandleKey(Key: Char);
+Var
+ I: Integer;
+Begin
+ If Not SignatureVisible Then Exit;
+
+ Case SignatureWindowState Of
+  sigwsList: Begin
+   Case Key Of
+    #27: Begin { Echap }
+     SignatureVisible := False;
+     SignatureWindowState := sigwsHidden;
+    End;
+    #72: Begin { Fleche haut }
+     If SignatureSelectedIndex > 0 Then
+      Dec(SignatureSelectedIndex);
+     If SignatureSelectedIndex < SignatureScrollOffset Then
+      SignatureScrollOffset := SignatureSelectedIndex;
+    End;
+    #80: Begin { Fleche bas }
+     If SignatureSelectedIndex < SignatureCount - 1 Then
+      Inc(SignatureSelectedIndex);
+     If SignatureSelectedIndex >= SignatureScrollOffset + SIG_LIST_VISIBLE Then
+      SignatureScrollOffset := SignatureSelectedIndex - SIG_LIST_VISIBLE + 1;
+    End;
+    #13: Begin { Entree - modifier }
+     If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then Begin
+      SignatureWindowState := sigwsEdit;
+      SignatureEditorState.EditingSignature := Signatures[SignatureSelectedIndex];
+      SignatureEditorState.IsModified := False;
+      SignatureEditorState.ScrollOffset := 0;
+     End;
+    End;
+    'n', 'N': Begin { Nouvelle signature }
+     SignatureWindowState := sigwsNew;
+     SignatureEditorState.EditingSignature.ID := 0;
+     SignatureEditorState.EditingSignature.Name := 'Nouvelle signature';
+     SignatureEditorState.EditingSignature.Description := '';
+     SignatureEditorState.EditingSignature.PlainTextLines := 0;
+     SignatureEditorState.EditingSignature.IncludeSeparator := True;
+     SignatureEditorState.EditingSignature.UseForReplies := True;
+     SignatureEditorState.EditingSignature.UseForForwards := True;
+     SignatureEditorState.IsModified := False;
+    End;
+    'd', 'D': Begin { Par defaut }
+     If (SignatureSelectedIndex >= 0) And (SignatureSelectedIndex < SignatureCount) Then
+      Sig_SetDefault(Signatures[SignatureSelectedIndex].ID);
+    End;
+   End;
+  End;
+
+  sigwsEdit, sigwsNew: Begin
+   Case Key Of
+    #27: Begin { Echap - annuler }
+     SignatureWindowState := sigwsList;
+    End;
+    #8: Begin { Backspace }
+     If Length(SignatureEditorState.EditingSignature.Name) > 0 Then Begin
+      Delete(SignatureEditorState.EditingSignature.Name,
+             Length(SignatureEditorState.EditingSignature.Name), 1);
+      SignatureEditorState.IsModified := True;
+     End;
+    End;
+    #13: Begin { Entree - sauvegarder }
+     If SignatureWindowState = sigwsNew Then Begin
+      I := SignatureCount;
+      If I < MAX_SIGNATURES Then Begin
+       Signatures[I] := SignatureEditorState.EditingSignature;
+       Signatures[I].ID := NextSignatureID;
+       Inc(NextSignatureID);
+       Signatures[I].IsActive := True;
+       Inc(SignatureCount);
+       SignatureSelectedIndex := I;
+      End;
+     End Else Begin
+      Signatures[SignatureSelectedIndex] := SignatureEditorState.EditingSignature;
+     End;
+     SignatureWindowState := sigwsList;
+    End;
+    Else Begin
+     If (Key >= ' ') And (Key <= '~') Then Begin
+      If Length(SignatureEditorState.EditingSignature.Name) < 38 Then Begin
+       SignatureEditorState.EditingSignature.Name :=
+         SignatureEditorState.EditingSignature.Name + Key;
+       SignatureEditorState.IsModified := True;
+      End;
+     End;
+    End;
+   End;
+  End;
+
+  sigwsPreview: Begin
+   If Key = #27 Then
+    SignatureWindowState := sigwsList;
+  End;
+ End;
+End;
+
+{ Affiche la fenetre de gestion des signatures }
+Procedure Sig_ShowWindow;
+Begin
+ SignatureVisible := True;
+ SignatureWindowState := sigwsList;
+ SignatureScrollOffset := 0;
+ If SignatureSelectedIndex >= SignatureCount Then
+  SignatureSelectedIndex := 0;
+End;
+
+{ Masque la fenetre de gestion des signatures }
+Procedure Sig_HideWindow;
+Begin
+ SignatureVisible := False;
+ SignatureWindowState := sigwsHidden;
+End;
+
+{ Ajoute des signatures de demonstration }
+Procedure Sig_AddDemoSignatures;
+Var
+ SigID, SigIndex: Integer;
+Begin
+ { Signature professionnelle }
+ SigID := Sig_Create('Professionnelle');
+ SigIndex := Sig_FindByID(SigID);
+ If SigIndex >= 0 Then Begin
+  Sig_AddTextLine(SigIndex, 'Cordialement,');
+  Sig_AddTextLine(SigIndex, '');
+  Sig_AddTextLine(SigIndex, 'Jean Dupont');
+  Sig_AddTextLine(SigIndex, 'Directeur technique');
+  Sig_AddTextLine(SigIndex, 'Entreprise ABC');
+  Sig_AddTextLine(SigIndex, 'Tel: +1 514 555-1234');
+  Sig_AddTextLine(SigIndex, 'jean.dupont@entreprise-abc.com');
+  Signatures[SigIndex].IsDefault := True;
+ End;
+
+ { Signature personnelle }
+ SigID := Sig_Create('Personnelle');
+ SigIndex := Sig_FindByID(SigID);
+ If SigIndex >= 0 Then Begin
+  Sig_AddTextLine(SigIndex, 'A bientot!');
+  Sig_AddTextLine(SigIndex, '');
+  Sig_AddTextLine(SigIndex, 'Jean');
+  Signatures[SigIndex].UseForReplies := True;
+  Signatures[SigIndex].UseForForwards := False;
+ End;
+
+ { Signature courte pour reponses }
+ SigID := Sig_Create('Reponse courte');
+ SigIndex := Sig_FindByID(SigID);
+ If SigIndex >= 0 Then Begin
+  Sig_AddTextLine(SigIndex, 'Merci,');
+  Sig_AddTextLine(SigIndex, 'Jean Dupont');
+  Signatures[SigIndex].IncludeSeparator := False;
+  Signatures[SigIndex].UseForReplies := True;
+  Signatures[SigIndex].UseForForwards := True;
+ End;
+
+ { Configurer la premiere signature comme celle pour les reponses }
+ If SignatureCount >= 3 Then Begin
+  Signatures[0].ReplySignatureID := Signatures[2].ID;
+  Signatures[0].ForwardSignatureID := Signatures[2].ID;
+ End;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DE LA GESTION DES SIGNATURES (TODO 19)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -14638,6 +15809,10 @@ BEGIN
 
  { Initialisation de la recherche avancee (TODO 18) }
  Search_Init;
+
+ { Initialisation du systeme de signatures (TODO 19) }
+ Sig_Init;
+ Sig_AddDemoSignatures;
 
  { Affichage de l'interface }
  ShowMouse;
