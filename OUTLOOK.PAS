@@ -125,7 +125,7 @@
       - Import/Export au format vCard et CSV
       - Auto-complétion dans les champs À, Cc, Cci
 
-  17. [ ] Système de règles de filtrage des messages
+  17. [x] Système de règles de filtrage des messages
       - Conditions: Expéditeur, Objet, Corps, Taille, Date
       - Actions: Déplacer vers dossier, Marquer comme lu, Supprimer
       - Actions: Transférer, Répondre automatiquement
@@ -635,6 +635,96 @@ Type
   Email: String[80];
   MatchScore: Integer;           { Score de correspondance }
  End;
+
+ { ============================================================================
+   TYPES POUR LE SYSTEME DE REGLES DE FILTRAGE (TODO 17)
+   ============================================================================ }
+
+ { Type de condition pour une regle }
+ TRuleConditionType = (
+  rctSenderContains,             { Expediteur contient }
+  rctSenderEquals,               { Expediteur egal a }
+  rctSubjectContains,            { Objet contient }
+  rctSubjectStartsWith,          { Objet commence par }
+  rctBodyContains,               { Corps contient }
+  rctSizeGreaterThan,            { Taille superieure a }
+  rctSizeLessThan,               { Taille inferieure a }
+  rctHasAttachment,              { Contient piece jointe }
+  rctPriorityEquals,             { Priorite egale a }
+  rctDateOlderThan,              { Date plus ancienne que (jours) }
+  rctDateNewerThan,              { Date plus recente que (jours) }
+  rctToContains,                 { Destinataire contient }
+  rctCcContains                  { Copie contient }
+ );
+
+ { Type d'action pour une regle }
+ TRuleActionType = (
+  ratMoveToFolder,               { Deplacer vers dossier }
+  ratCopyToFolder,               { Copier vers dossier }
+  ratMarkAsRead,                 { Marquer comme lu }
+  ratMarkAsUnread,               { Marquer comme non lu }
+  ratSetFlag,                    { Marquer d'un drapeau }
+  ratClearFlag,                  { Retirer le drapeau }
+  ratSetPriority,                { Definir la priorite }
+  ratDelete,                     { Supprimer }
+  ratForwardTo,                  { Transferer a }
+  ratAutoReply,                  { Repondre automatiquement }
+  ratPlaySound,                  { Jouer un son }
+  ratStopProcessing              { Arreter le traitement des regles }
+ );
+
+ { Operateur logique pour combiner les conditions }
+ TRuleOperator = (
+  roAnd,                         { Toutes les conditions doivent etre vraies }
+  roOr                           { Au moins une condition doit etre vraie }
+ );
+
+ { Condition d'une regle }
+ TRuleCondition = Record
+  ConditionType: TRuleConditionType;
+  Value: String[80];             { Valeur a comparer }
+  NumericValue: LongInt;         { Valeur numerique (taille, jours) }
+  CaseSensitive: Boolean;        { Respecter la casse }
+ End;
+
+ { Action d'une regle }
+ TRuleAction = Record
+  ActionType: TRuleActionType;
+  TargetFolder: String[40];      { Dossier cible }
+  TargetEmail: String[80];       { Email pour transfert }
+  ReplyText: String[200];        { Texte de reponse automatique }
+  PriorityValue: TMessagePriority; { Priorite a definir }
+  SoundFile: String[40];         { Fichier son }
+ End;
+
+ { Structure complete d'une regle de filtrage }
+ TFilterRule = Record
+  ID: Integer;                   { Identifiant unique }
+  Name: String[40];              { Nom de la regle }
+  Description: String[80];       { Description }
+  Enabled: Boolean;              { Regle active }
+  Order: Integer;                { Ordre d'execution }
+  ApplyToIncoming: Boolean;      { Appliquer aux messages entrants }
+  ApplyToOutgoing: Boolean;      { Appliquer aux messages sortants }
+  RuleOperator: TRuleOperator;   { Operateur AND/OR }
+  Conditions: Array[0..4] of TRuleCondition; { Max 5 conditions }
+  ConditionCount: Integer;       { Nombre de conditions }
+  Actions: Array[0..2] of TRuleAction; { Max 3 actions }
+  ActionCount: Integer;          { Nombre d'actions }
+  CreatedDate: LongInt;          { Date de creation }
+  LastTriggered: LongInt;        { Derniere execution }
+  TriggerCount: LongInt;         { Nombre de fois declenchee }
+ End;
+
+ { Etat de la fenetre des regles }
+ TRulesWindowState = (
+  rwsHidden,                     { Fenetre cachee }
+  rwsList,                       { Liste des regles }
+  rwsEdit,                       { Edition d'une regle }
+  rwsNew,                        { Nouvelle regle }
+  rwsConditions,                 { Edition des conditions }
+  rwsActions                     { Edition des actions }
+ );
 
  { Type de colonne pour la liste des messages }
  TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
@@ -1528,6 +1618,32 @@ Const
  { Fichier de sauvegarde }
  ADDRESSBOOK_FILE = 'ADDRBOOK.DAT';
 
+ { ============================================================================
+   CONSTANTES POUR LE SYSTEME DE REGLES (TODO 17)
+   ============================================================================ }
+
+ { Nombre maximum de regles }
+ MAX_RULES = 50;
+
+ { Nombre maximum de conditions par regle }
+ MAX_RULE_CONDITIONS = 5;
+
+ { Nombre maximum d'actions par regle }
+ MAX_RULE_ACTIONS = 3;
+
+ { Dimensions de la fenetre des regles }
+ RULES_WINDOW_WIDTH = 520;
+ RULES_WINDOW_HEIGHT = 400;
+
+ { Hauteur d'une ligne de regle }
+ RULE_LINE_HEIGHT = 22;
+
+ { Nombre de regles visibles }
+ RULES_VISIBLE = 12;
+
+ { Fichier de sauvegarde des regles }
+ RULES_FILE = 'RULES.DAT';
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1718,6 +1834,20 @@ Var
  AutoCompleteField: TAutoCompleteField; { Champ actif }
  AutoCompleteX, AutoCompleteY: Integer; { Position du popup }
  AutoCompleteText: String[40];          { Texte tape }
+
+ { Variables globales pour le systeme de regles (TODO 17) }
+ FilterRules: Array[0..MAX_RULES-1] of TFilterRule;  { Liste des regles }
+ RuleCount: Integer;                    { Nombre de regles }
+ RuleNextID: Integer;                   { Prochain ID disponible }
+ RulesWindowState: TRulesWindowState;   { Etat de la fenetre }
+ RulesWindowX, RulesWindowY: Integer;   { Position de la fenetre }
+ RulesVisible: Boolean;                 { Visibilite de la fenetre }
+ RulesScrollOffset: Integer;            { Decalage de defilement }
+ RulesSelectedIndex: Integer;           { Regle selectionnee }
+ EditingRule: TFilterRule;              { Regle en cours d'edition }
+ EditingRuleIndex: Integer;             { Index de la regle en edition }
+ EditingConditionIndex: Integer;        { Index de la condition en edition }
+ EditingActionIndex: Integer;           { Index de l'action en edition }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -10984,6 +11114,851 @@ End;
   FIN DE L'IMPLEMENTATION DU CARNET D'ADRESSES
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU SYSTEME DE REGLES DE FILTRAGE (TODO 17)
+  ============================================================================ }
+
+{ Initialise une condition vide }
+Procedure Rules_InitCondition(Var Cond: TRuleCondition);
+Begin
+ Cond.ConditionType := rctSenderContains;
+ Cond.Value := '';
+ Cond.NumericValue := 0;
+ Cond.CaseSensitive := False;
+End;
+
+{ Initialise une action vide }
+Procedure Rules_InitAction(Var Act: TRuleAction);
+Begin
+ Act.ActionType := ratMarkAsRead;
+ Act.TargetFolder := '';
+ Act.TargetEmail := '';
+ Act.ReplyText := '';
+ Act.PriorityValue := mpNormal;
+ Act.SoundFile := '';
+End;
+
+{ Initialise une regle vide }
+Procedure Rules_InitRule(Var Rule: TFilterRule);
+Var
+ I: Integer;
+Begin
+ Rule.ID := 0;
+ Rule.Name := '';
+ Rule.Description := '';
+ Rule.Enabled := True;
+ Rule.Order := 0;
+ Rule.ApplyToIncoming := True;
+ Rule.ApplyToOutgoing := False;
+ Rule.RuleOperator := roAnd;
+ Rule.ConditionCount := 0;
+ Rule.ActionCount := 0;
+ Rule.CreatedDate := 0;
+ Rule.LastTriggered := 0;
+ Rule.TriggerCount := 0;
+
+ For I := 0 To MAX_RULE_CONDITIONS - 1 Do
+  Rules_InitCondition(Rule.Conditions[I]);
+ For I := 0 To MAX_RULE_ACTIONS - 1 Do
+  Rules_InitAction(Rule.Actions[I]);
+End;
+
+{ Initialise le systeme de regles }
+Procedure Rules_Init;
+Var
+ I: Integer;
+Begin
+ RuleCount := 0;
+ RuleNextID := 1;
+ RulesWindowState := rwsHidden;
+ RulesWindowX := (640 - RULES_WINDOW_WIDTH) Div 2;
+ RulesWindowY := (480 - RULES_WINDOW_HEIGHT) Div 2;
+ RulesVisible := False;
+ RulesScrollOffset := 0;
+ RulesSelectedIndex := -1;
+ EditingRuleIndex := -1;
+ EditingConditionIndex := -1;
+ EditingActionIndex := -1;
+
+ For I := 0 To MAX_RULES - 1 Do
+  Rules_InitRule(FilterRules[I]);
+End;
+
+{ Compare deux chaines sans tenir compte de la casse }
+Function Rules_StrContains(Haystack, Needle: String; CaseSensitive: Boolean): Boolean;
+Var
+ I, J: Integer;
+ H, N: String;
+Begin
+ Rules_StrContains := False;
+ If Length(Needle) = 0 Then Begin
+  Rules_StrContains := True;
+  Exit;
+ End;
+ If Length(Needle) > Length(Haystack) Then Exit;
+
+ H := Haystack;
+ N := Needle;
+
+ If Not CaseSensitive Then Begin
+  For I := 1 To Length(H) Do
+   If (H[I] >= 'A') And (H[I] <= 'Z') Then
+    H[I] := Chr(Ord(H[I]) + 32);
+  For I := 1 To Length(N) Do
+   If (N[I] >= 'A') And (N[I] <= 'Z') Then
+    N[I] := Chr(Ord(N[I]) + 32);
+ End;
+
+ Rules_StrContains := Pos(N, H) > 0;
+End;
+
+{ Verifie si une chaine commence par une autre }
+Function Rules_StrStartsWith(Haystack, Needle: String; CaseSensitive: Boolean): Boolean;
+Var
+ I: Integer;
+ H, N: String;
+Begin
+ Rules_StrStartsWith := False;
+ If Length(Needle) = 0 Then Begin
+  Rules_StrStartsWith := True;
+  Exit;
+ End;
+ If Length(Needle) > Length(Haystack) Then Exit;
+
+ H := Copy(Haystack, 1, Length(Needle));
+ N := Needle;
+
+ If Not CaseSensitive Then Begin
+  For I := 1 To Length(H) Do
+   If (H[I] >= 'A') And (H[I] <= 'Z') Then
+    H[I] := Chr(Ord(H[I]) + 32);
+  For I := 1 To Length(N) Do
+   If (N[I] >= 'A') And (N[I] <= 'Z') Then
+    N[I] := Chr(Ord(N[I]) + 32);
+ End;
+
+ Rules_StrStartsWith := H = N;
+End;
+
+{ Verifie si deux chaines sont egales }
+Function Rules_StrEquals(S1, S2: String; CaseSensitive: Boolean): Boolean;
+Var
+ I: Integer;
+ A, B: String;
+Begin
+ A := S1;
+ B := S2;
+
+ If Not CaseSensitive Then Begin
+  For I := 1 To Length(A) Do
+   If (A[I] >= 'A') And (A[I] <= 'Z') Then
+    A[I] := Chr(Ord(A[I]) + 32);
+  For I := 1 To Length(B) Do
+   If (B[I] >= 'A') And (B[I] <= 'Z') Then
+    B[I] := Chr(Ord(B[I]) + 32);
+ End;
+
+ Rules_StrEquals := A = B;
+End;
+
+{ Obtient le corps du message comme une seule chaine }
+Function Rules_GetMessageBody(MsgIndex: Integer): String;
+Var
+ I: Integer;
+ Body: String;
+Begin
+ Body := '';
+ If (MsgIndex >= 0) And (MsgIndex < MessageCount) Then Begin
+  For I := 0 To Messages[MsgIndex].BodyLineCount - 1 Do Begin
+   If Length(Body) + Length(Messages[MsgIndex].Body[I]) < 250 Then
+    Body := Body + Messages[MsgIndex].Body[I] + ' ';
+  End;
+ End;
+ Rules_GetMessageBody := Body;
+End;
+
+{ Evalue une condition sur un message }
+Function Rules_EvaluateCondition(MsgIndex: Integer;
+                                  Const Cond: TRuleCondition): Boolean;
+Var
+ Body: String;
+ PriorityStr: String;
+Begin
+ Rules_EvaluateCondition := False;
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ Case Cond.ConditionType Of
+  rctSenderContains:
+   Rules_EvaluateCondition := Rules_StrContains(
+    Messages[MsgIndex].FromName + ' ' + Messages[MsgIndex].FromEmail,
+    Cond.Value, Cond.CaseSensitive);
+
+  rctSenderEquals:
+   Rules_EvaluateCondition := Rules_StrEquals(
+    Messages[MsgIndex].FromEmail, Cond.Value, Cond.CaseSensitive);
+
+  rctSubjectContains:
+   Rules_EvaluateCondition := Rules_StrContains(
+    Messages[MsgIndex].Subject, Cond.Value, Cond.CaseSensitive);
+
+  rctSubjectStartsWith:
+   Rules_EvaluateCondition := Rules_StrStartsWith(
+    Messages[MsgIndex].Subject, Cond.Value, Cond.CaseSensitive);
+
+  rctBodyContains: Begin
+   Body := Rules_GetMessageBody(MsgIndex);
+   Rules_EvaluateCondition := Rules_StrContains(Body, Cond.Value, Cond.CaseSensitive);
+  End;
+
+  rctSizeGreaterThan:
+   Rules_EvaluateCondition := Messages[MsgIndex].Size > Cond.NumericValue;
+
+  rctSizeLessThan:
+   Rules_EvaluateCondition := Messages[MsgIndex].Size < Cond.NumericValue;
+
+  rctHasAttachment:
+   Rules_EvaluateCondition := Messages[MsgIndex].HasAttachment;
+
+  rctPriorityEquals: Begin
+   Case Messages[MsgIndex].Priority Of
+    mpHigh: PriorityStr := 'HIGH';
+    mpNormal: PriorityStr := 'NORMAL';
+    mpLow: PriorityStr := 'LOW';
+   End;
+   Rules_EvaluateCondition := Rules_StrEquals(PriorityStr, Cond.Value, False);
+  End;
+
+  rctDateOlderThan:
+   { TODO: Implementer avec calcul de date reelle }
+   Rules_EvaluateCondition := False;
+
+  rctDateNewerThan:
+   { TODO: Implementer avec calcul de date reelle }
+   Rules_EvaluateCondition := False;
+
+  rctToContains:
+   Rules_EvaluateCondition := Rules_StrContains(
+    Messages[MsgIndex].ToName + ' ' + Messages[MsgIndex].ToEmail,
+    Cond.Value, Cond.CaseSensitive);
+
+  rctCcContains:
+   Rules_EvaluateCondition := Rules_StrContains(
+    Messages[MsgIndex].CcEmail, Cond.Value, Cond.CaseSensitive);
+ End;
+End;
+
+{ Evalue toutes les conditions d'une regle sur un message }
+Function Rules_EvaluateAllConditions(MsgIndex: Integer;
+                                      Const Rule: TFilterRule): Boolean;
+Var
+ I: Integer;
+ Result: Boolean;
+ CondResult: Boolean;
+Begin
+ Rules_EvaluateAllConditions := False;
+ If Rule.ConditionCount = 0 Then Begin
+  { Pas de conditions = toujours vrai }
+  Rules_EvaluateAllConditions := True;
+  Exit;
+ End;
+
+ { Evaluer selon l'operateur }
+ If Rule.RuleOperator = roAnd Then Begin
+  Result := True;
+  For I := 0 To Rule.ConditionCount - 1 Do Begin
+   CondResult := Rules_EvaluateCondition(MsgIndex, Rule.Conditions[I]);
+   Result := Result And CondResult;
+   If Not Result Then Break;
+  End;
+ End
+ Else Begin { roOr }
+  Result := False;
+  For I := 0 To Rule.ConditionCount - 1 Do Begin
+   CondResult := Rules_EvaluateCondition(MsgIndex, Rule.Conditions[I]);
+   Result := Result Or CondResult;
+   If Result Then Break;
+  End;
+ End;
+
+ Rules_EvaluateAllConditions := Result;
+End;
+
+{ Execute une action sur un message }
+Procedure Rules_ExecuteAction(MsgIndex: Integer; Const Act: TRuleAction);
+Begin
+ If (MsgIndex < 0) Or (MsgIndex >= MessageCount) Then Exit;
+
+ Case Act.ActionType Of
+  ratMoveToFolder: Begin
+   { TODO: Implementer le deplacement vers dossier }
+   { Pour l'instant, on marque juste le message }
+  End;
+
+  ratCopyToFolder: Begin
+   { TODO: Implementer la copie vers dossier }
+  End;
+
+  ratMarkAsRead:
+   Messages[MsgIndex].IsRead := True;
+
+  ratMarkAsUnread:
+   Messages[MsgIndex].IsRead := False;
+
+  ratSetFlag:
+   Messages[MsgIndex].IsFlagged := True;
+
+  ratClearFlag:
+   Messages[MsgIndex].IsFlagged := False;
+
+  ratSetPriority:
+   Messages[MsgIndex].Priority := Act.PriorityValue;
+
+  ratDelete: Begin
+   { TODO: Deplacer vers corbeille }
+   Messages[MsgIndex].IsRead := True;
+  End;
+
+  ratForwardTo: Begin
+   { TODO: Implementer le transfert }
+  End;
+
+  ratAutoReply: Begin
+   { TODO: Implementer la reponse automatique }
+  End;
+
+  ratPlaySound: Begin
+   { TODO: Jouer un son }
+  End;
+
+  ratStopProcessing: Begin
+   { Gere dans la boucle principale }
+  End;
+ End;
+End;
+
+{ Execute toutes les actions d'une regle sur un message }
+Function Rules_ExecuteAllActions(MsgIndex: Integer;
+                                  Var Rule: TFilterRule): Boolean;
+Var
+ I: Integer;
+ StopProcessing: Boolean;
+Begin
+ StopProcessing := False;
+
+ For I := 0 To Rule.ActionCount - 1 Do Begin
+  If Rule.Actions[I].ActionType = ratStopProcessing Then
+   StopProcessing := True
+  Else
+   Rules_ExecuteAction(MsgIndex, Rule.Actions[I]);
+ End;
+
+ { Mettre a jour les statistiques }
+ Inc(Rule.TriggerCount);
+ Rule.LastTriggered := 0; { TODO: Date actuelle }
+
+ Rules_ExecuteAllActions := StopProcessing;
+End;
+
+{ Applique toutes les regles a un message }
+Procedure Rules_ApplyToMessage(MsgIndex: Integer; IsIncoming: Boolean);
+Var
+ I: Integer;
+ StopProcessing: Boolean;
+Begin
+ StopProcessing := False;
+
+ For I := 0 To RuleCount - 1 Do Begin
+  If StopProcessing Then Break;
+  If Not FilterRules[I].Enabled Then Continue;
+
+  { Verifier si la regle s'applique a ce type de message }
+  If IsIncoming And (Not FilterRules[I].ApplyToIncoming) Then Continue;
+  If (Not IsIncoming) And (Not FilterRules[I].ApplyToOutgoing) Then Continue;
+
+  { Evaluer les conditions }
+  If Rules_EvaluateAllConditions(MsgIndex, FilterRules[I]) Then
+   StopProcessing := Rules_ExecuteAllActions(MsgIndex, FilterRules[I]);
+ End;
+End;
+
+{ Applique toutes les regles a tous les messages }
+Procedure Rules_ApplyToAllMessages;
+Var
+ I: Integer;
+Begin
+ For I := 0 To MessageCount - 1 Do
+  Rules_ApplyToMessage(I, True);
+End;
+
+{ Ajoute une nouvelle regle }
+Function Rules_AddRule(Var NewRule: TFilterRule): Integer;
+Begin
+ Rules_AddRule := -1;
+ If RuleCount >= MAX_RULES Then Exit;
+
+ NewRule.ID := RuleNextID;
+ Inc(RuleNextID);
+ NewRule.Order := RuleCount;
+ NewRule.CreatedDate := 0; { TODO: Date actuelle }
+
+ FilterRules[RuleCount] := NewRule;
+ Rules_AddRule := RuleCount;
+ Inc(RuleCount);
+End;
+
+{ Modifie une regle existante }
+Function Rules_UpdateRule(Index: Integer; Const UpdatedRule: TFilterRule): Boolean;
+Begin
+ Rules_UpdateRule := False;
+ If (Index < 0) Or (Index >= RuleCount) Then Exit;
+
+ FilterRules[Index] := UpdatedRule;
+ Rules_UpdateRule := True;
+End;
+
+{ Supprime une regle }
+Function Rules_DeleteRule(Index: Integer): Boolean;
+Var
+ I: Integer;
+Begin
+ Rules_DeleteRule := False;
+ If (Index < 0) Or (Index >= RuleCount) Then Exit;
+
+ For I := Index To RuleCount - 2 Do Begin
+  FilterRules[I] := FilterRules[I + 1];
+  FilterRules[I].Order := I;
+ End;
+
+ Dec(RuleCount);
+ Rules_InitRule(FilterRules[RuleCount]);
+
+ If RulesSelectedIndex >= RuleCount Then
+  RulesSelectedIndex := RuleCount - 1;
+
+ Rules_DeleteRule := True;
+End;
+
+{ Deplace une regle vers le haut }
+Function Rules_MoveUp(Index: Integer): Boolean;
+Var
+ Temp: TFilterRule;
+Begin
+ Rules_MoveUp := False;
+ If (Index <= 0) Or (Index >= RuleCount) Then Exit;
+
+ Temp := FilterRules[Index];
+ FilterRules[Index] := FilterRules[Index - 1];
+ FilterRules[Index - 1] := Temp;
+
+ FilterRules[Index].Order := Index;
+ FilterRules[Index - 1].Order := Index - 1;
+
+ Rules_MoveUp := True;
+End;
+
+{ Deplace une regle vers le bas }
+Function Rules_MoveDown(Index: Integer): Boolean;
+Var
+ Temp: TFilterRule;
+Begin
+ Rules_MoveDown := False;
+ If (Index < 0) Or (Index >= RuleCount - 1) Then Exit;
+
+ Temp := FilterRules[Index];
+ FilterRules[Index] := FilterRules[Index + 1];
+ FilterRules[Index + 1] := Temp;
+
+ FilterRules[Index].Order := Index;
+ FilterRules[Index + 1].Order := Index + 1;
+
+ Rules_MoveDown := True;
+End;
+
+{ Active/desactive une regle }
+Procedure Rules_ToggleEnabled(Index: Integer);
+Begin
+ If (Index >= 0) And (Index < RuleCount) Then
+  FilterRules[Index].Enabled := Not FilterRules[Index].Enabled;
+End;
+
+{ Retourne le nom d'un type de condition }
+Function Rules_GetConditionTypeName(CT: TRuleConditionType): String;
+Begin
+ Case CT Of
+  rctSenderContains: Rules_GetConditionTypeName := 'Expediteur contient';
+  rctSenderEquals: Rules_GetConditionTypeName := 'Expediteur egal a';
+  rctSubjectContains: Rules_GetConditionTypeName := 'Objet contient';
+  rctSubjectStartsWith: Rules_GetConditionTypeName := 'Objet commence par';
+  rctBodyContains: Rules_GetConditionTypeName := 'Corps contient';
+  rctSizeGreaterThan: Rules_GetConditionTypeName := 'Taille > (octets)';
+  rctSizeLessThan: Rules_GetConditionTypeName := 'Taille < (octets)';
+  rctHasAttachment: Rules_GetConditionTypeName := 'Contient piece jointe';
+  rctPriorityEquals: Rules_GetConditionTypeName := 'Priorite egale a';
+  rctDateOlderThan: Rules_GetConditionTypeName := 'Date plus ancienne (jours)';
+  rctDateNewerThan: Rules_GetConditionTypeName := 'Date plus recente (jours)';
+  rctToContains: Rules_GetConditionTypeName := 'Destinataire contient';
+  rctCcContains: Rules_GetConditionTypeName := 'Copie contient';
+  Else Rules_GetConditionTypeName := 'Inconnu';
+ End;
+End;
+
+{ Retourne le nom d'un type d'action }
+Function Rules_GetActionTypeName(AT: TRuleActionType): String;
+Begin
+ Case AT Of
+  ratMoveToFolder: Rules_GetActionTypeName := 'Deplacer vers dossier';
+  ratCopyToFolder: Rules_GetActionTypeName := 'Copier vers dossier';
+  ratMarkAsRead: Rules_GetActionTypeName := 'Marquer comme lu';
+  ratMarkAsUnread: Rules_GetActionTypeName := 'Marquer comme non lu';
+  ratSetFlag: Rules_GetActionTypeName := 'Ajouter un drapeau';
+  ratClearFlag: Rules_GetActionTypeName := 'Retirer le drapeau';
+  ratSetPriority: Rules_GetActionTypeName := 'Definir priorite';
+  ratDelete: Rules_GetActionTypeName := 'Supprimer';
+  ratForwardTo: Rules_GetActionTypeName := 'Transferer a';
+  ratAutoReply: Rules_GetActionTypeName := 'Repondre auto';
+  ratPlaySound: Rules_GetActionTypeName := 'Jouer un son';
+  ratStopProcessing: Rules_GetActionTypeName := 'Arreter traitement';
+  Else Rules_GetActionTypeName := 'Inconnu';
+ End;
+End;
+
+{ Dessine la fenetre des regles }
+Procedure Rules_DrawWindow;
+Var
+ X, Y, W, H: Integer;
+ I, Y1: Integer;
+ DisplayStr: String;
+ EnabledStr: String;
+Begin
+ If Not RulesVisible Then Exit;
+
+ X := RulesWindowX;
+ Y := RulesWindowY;
+ W := RULES_WINDOW_WIDTH;
+ H := RULES_WINDOW_HEIGHT;
+
+ { Fond de la fenetre }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X, Y, X + W, Y + H);
+
+ { Bordure }
+ SetColor(DarkGray);
+ Rectangle(X, Y, X + W, Y + H);
+ SetColor(White);
+ Line(X + 1, Y + 1, X + W - 1, Y + 1);
+ Line(X + 1, Y + 1, X + 1, Y + H - 1);
+
+ { Barre de titre }
+ SetFillStyle(SolidFill, Blue);
+ Bar(X + 2, Y + 2, X + W - 2, Y + 22);
+ SetColor(White);
+ OutTextXY(X + 10, Y + 7, 'Regles de filtrage des messages');
+
+ { Bouton fermer }
+ SetFillStyle(SolidFill, Red);
+ Bar(X + W - 20, Y + 4, X + W - 4, Y + 20);
+ SetColor(White);
+ OutTextXY(X + W - 16, Y + 7, 'X');
+
+ { Boutons de gestion }
+ Y1 := Y + 30;
+
+ { Bouton Nouvelle regle }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + 100, Y1 + 22);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + 100, Y1 + 22);
+ OutTextXY(X + 18, Y1 + 6, 'Nouveau');
+
+ { Bouton Modifier }
+ Bar(X + 110, Y1, X + 190, Y1 + 22);
+ Rectangle(X + 110, Y1, X + 190, Y1 + 22);
+ OutTextXY(X + 118, Y1 + 6, 'Modifier');
+
+ { Bouton Supprimer }
+ Bar(X + 200, Y1, X + 290, Y1 + 22);
+ Rectangle(X + 200, Y1, X + 290, Y1 + 22);
+ OutTextXY(X + 206, Y1 + 6, 'Supprimer');
+
+ { Bouton Monter }
+ Bar(X + W - 170, Y1, X + W - 90, Y1 + 22);
+ Rectangle(X + W - 170, Y1, X + W - 90, Y1 + 22);
+ OutTextXY(X + W - 162, Y1 + 6, 'Monter');
+
+ { Bouton Descendre }
+ Bar(X + W - 80, Y1, X + W - 10, Y1 + 22);
+ Rectangle(X + W - 80, Y1, X + W - 10, Y1 + 22);
+ OutTextXY(X + W - 72, Y1 + 6, 'Descendre');
+
+ { En-tetes de colonnes }
+ Y1 := Y + 60;
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + W - 10, Y1 + 18);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + W - 10, Y1 + 18);
+ OutTextXY(X + 15, Y1 + 4, 'Act');
+ OutTextXY(X + 50, Y1 + 4, 'Nom de la regle');
+ OutTextXY(X + 250, Y1 + 4, 'Conditions');
+ OutTextXY(X + 370, Y1 + 4, 'Actions');
+ OutTextXY(X + 460, Y1 + 4, 'Exec.');
+
+ { Liste des regles }
+ Y1 := Y + 80;
+ For I := 0 To RULES_VISIBLE - 1 Do Begin
+  If I + RulesScrollOffset >= RuleCount Then Break;
+
+  { Fond de la ligne }
+  If I + RulesScrollOffset = RulesSelectedIndex Then
+   SetFillStyle(SolidFill, Blue)
+  Else If (I Mod 2) = 0 Then
+   SetFillStyle(SolidFill, White)
+  Else
+   SetFillStyle(SolidFill, LightGray);
+
+  Bar(X + 10, Y1 + I * RULE_LINE_HEIGHT,
+      X + W - 10, Y1 + (I + 1) * RULE_LINE_HEIGHT - 1);
+
+  If I + RulesScrollOffset = RulesSelectedIndex Then
+   SetColor(White)
+  Else
+   SetColor(Black);
+
+  { Case a cocher Active }
+  If FilterRules[I + RulesScrollOffset].Enabled Then
+   EnabledStr := '[X]'
+  Else
+   EnabledStr := '[ ]';
+  OutTextXY(X + 15, Y1 + I * RULE_LINE_HEIGHT + 5, EnabledStr);
+
+  { Nom de la regle }
+  DisplayStr := FilterRules[I + RulesScrollOffset].Name;
+  If Length(DisplayStr) > 24 Then
+   DisplayStr := Copy(DisplayStr, 1, 22) + '..';
+  OutTextXY(X + 50, Y1 + I * RULE_LINE_HEIGHT + 5, DisplayStr);
+
+  { Nombre de conditions }
+  Str(FilterRules[I + RulesScrollOffset].ConditionCount, DisplayStr);
+  DisplayStr := DisplayStr + ' cond.';
+  OutTextXY(X + 250, Y1 + I * RULE_LINE_HEIGHT + 5, DisplayStr);
+
+  { Nombre d'actions }
+  Str(FilterRules[I + RulesScrollOffset].ActionCount, DisplayStr);
+  DisplayStr := DisplayStr + ' act.';
+  OutTextXY(X + 370, Y1 + I * RULE_LINE_HEIGHT + 5, DisplayStr);
+
+  { Nombre d'executions }
+  Str(FilterRules[I + RulesScrollOffset].TriggerCount, DisplayStr);
+  OutTextXY(X + 460, Y1 + I * RULE_LINE_HEIGHT + 5, DisplayStr);
+ End;
+
+ { Boutons du bas }
+ Y1 := Y + H - 40;
+
+ { Bouton Appliquer aux messages }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + 10, Y1, X + 180, Y1 + 28);
+ SetColor(Black);
+ Rectangle(X + 10, Y1, X + 180, Y1 + 28);
+ OutTextXY(X + 18, Y1 + 9, 'Appliquer maintenant');
+
+ { Compteur }
+ SetColor(DarkGray);
+ Str(RuleCount, DisplayStr);
+ DisplayStr := DisplayStr + ' regle(s)';
+ OutTextXY(X + W Div 2 - 20, Y1 + 9, DisplayStr);
+
+ { Bouton Fermer }
+ SetFillStyle(SolidFill, LightGray);
+ Bar(X + W - 80, Y1, X + W - 10, Y1 + 28);
+ SetColor(Black);
+ Rectangle(X + W - 80, Y1, X + W - 10, Y1 + 28);
+ OutTextXY(X + W - 62, Y1 + 9, 'Fermer');
+End;
+
+{ Affiche la fenetre des regles }
+Procedure Rules_Show;
+Begin
+ RulesVisible := True;
+ RulesWindowState := rwsList;
+ RulesSelectedIndex := -1;
+ RulesScrollOffset := 0;
+End;
+
+{ Cache la fenetre des regles }
+Procedure Rules_Hide;
+Begin
+ RulesVisible := False;
+ RulesWindowState := rwsHidden;
+End;
+
+{ Gere un clic dans la fenetre des regles }
+Function Rules_HandleClick(MX, MY: Integer): Boolean;
+Var
+ X, Y, W, H: Integer;
+ I, Y1: Integer;
+Begin
+ Rules_HandleClick := False;
+ If Not RulesVisible Then Exit;
+
+ X := RulesWindowX;
+ Y := RulesWindowY;
+ W := RULES_WINDOW_WIDTH;
+ H := RULES_WINDOW_HEIGHT;
+
+ { Verifier si clic dans la fenetre }
+ If (MX < X) Or (MX > X + W) Or (MY < Y) Or (MY > Y + H) Then Exit;
+
+ Rules_HandleClick := True;
+
+ { Bouton fermer }
+ If (MX >= X + W - 20) And (MX <= X + W - 4) And (MY >= Y + 4) And (MY <= Y + 20) Then Begin
+  Rules_Hide;
+  Exit;
+ End;
+
+ Y1 := Y + 30;
+
+ { Bouton Nouveau }
+ If (MX >= X + 10) And (MX <= X + 100) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
+  Rules_InitRule(EditingRule);
+  EditingRule.Name := 'Nouvelle regle';
+  EditingRuleIndex := -1;
+  RulesWindowState := rwsNew;
+  Exit;
+ End;
+
+ { Bouton Modifier }
+ If (MX >= X + 110) And (MX <= X + 190) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
+  If RulesSelectedIndex >= 0 Then Begin
+   EditingRule := FilterRules[RulesSelectedIndex];
+   EditingRuleIndex := RulesSelectedIndex;
+   RulesWindowState := rwsEdit;
+  End;
+  Exit;
+ End;
+
+ { Bouton Supprimer }
+ If (MX >= X + 200) And (MX <= X + 290) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
+  If RulesSelectedIndex >= 0 Then
+   Rules_DeleteRule(RulesSelectedIndex);
+  Exit;
+ End;
+
+ { Bouton Monter }
+ If (MX >= X + W - 170) And (MX <= X + W - 90) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
+  If RulesSelectedIndex > 0 Then Begin
+   Rules_MoveUp(RulesSelectedIndex);
+   Dec(RulesSelectedIndex);
+  End;
+  Exit;
+ End;
+
+ { Bouton Descendre }
+ If (MX >= X + W - 80) And (MX <= X + W - 10) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
+  If (RulesSelectedIndex >= 0) And (RulesSelectedIndex < RuleCount - 1) Then Begin
+   Rules_MoveDown(RulesSelectedIndex);
+   Inc(RulesSelectedIndex);
+  End;
+  Exit;
+ End;
+
+ { Liste des regles }
+ Y1 := Y + 80;
+ For I := 0 To RULES_VISIBLE - 1 Do Begin
+  If I + RulesScrollOffset >= RuleCount Then Break;
+
+  If (MY >= Y1 + I * RULE_LINE_HEIGHT) And
+     (MY < Y1 + (I + 1) * RULE_LINE_HEIGHT) Then Begin
+
+   { Clic sur la case a cocher }
+   If (MX >= X + 15) And (MX <= X + 45) Then Begin
+    Rules_ToggleEnabled(I + RulesScrollOffset);
+   End
+   Else Begin
+    RulesSelectedIndex := I + RulesScrollOffset;
+   End;
+   Exit;
+  End;
+ End;
+
+ { Boutons du bas }
+ Y1 := Y + H - 40;
+
+ { Bouton Appliquer maintenant }
+ If (MX >= X + 10) And (MX <= X + 180) And (MY >= Y1) And (MY <= Y1 + 28) Then Begin
+  Rules_ApplyToAllMessages;
+  Exit;
+ End;
+
+ { Bouton Fermer }
+ If (MX >= X + W - 80) And (MX <= X + W - 10) And (MY >= Y1) And (MY <= Y1 + 28) Then Begin
+  Rules_Hide;
+  Exit;
+ End;
+End;
+
+{ Ajoute des regles de demonstration }
+Procedure Rules_AddDemoRules;
+Var
+ R: TFilterRule;
+Begin
+ { Regle 1: Marquer les newsletters comme lues }
+ Rules_InitRule(R);
+ R.Name := 'Newsletters';
+ R.Description := 'Marque les newsletters comme lues';
+ R.Enabled := True;
+ R.ApplyToIncoming := True;
+
+ R.Conditions[0].ConditionType := rctSubjectContains;
+ R.Conditions[0].Value := 'newsletter';
+ R.Conditions[0].CaseSensitive := False;
+ R.ConditionCount := 1;
+
+ R.Actions[0].ActionType := ratMarkAsRead;
+ R.ActionCount := 1;
+
+ Rules_AddRule(R);
+
+ { Regle 2: Flaguer les messages importants }
+ Rules_InitRule(R);
+ R.Name := 'Messages importants';
+ R.Description := 'Marque les messages urgents';
+ R.Enabled := True;
+ R.ApplyToIncoming := True;
+
+ R.Conditions[0].ConditionType := rctSubjectContains;
+ R.Conditions[0].Value := 'URGENT';
+ R.Conditions[0].CaseSensitive := False;
+ R.ConditionCount := 1;
+
+ R.Actions[0].ActionType := ratSetFlag;
+ R.Actions[1].ActionType := ratSetPriority;
+ R.Actions[1].PriorityValue := mpHigh;
+ R.ActionCount := 2;
+
+ Rules_AddRule(R);
+
+ { Regle 3: Gros fichiers }
+ Rules_InitRule(R);
+ R.Name := 'Gros messages';
+ R.Description := 'Marque les gros messages';
+ R.Enabled := True;
+ R.ApplyToIncoming := True;
+
+ R.Conditions[0].ConditionType := rctSizeGreaterThan;
+ R.Conditions[0].NumericValue := 1000000; { 1 Mo }
+ R.ConditionCount := 1;
+
+ R.Actions[0].ActionType := ratSetFlag;
+ R.ActionCount := 1;
+
+ Rules_AddRule(R);
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU SYSTEME DE REGLES
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -12767,6 +13742,10 @@ BEGIN
  { Initialisation du carnet d'adresses (TODO 16) }
  AB_Init;
  AB_AddDemoContacts;
+
+ { Initialisation du systeme de regles (TODO 17) }
+ Rules_Init;
+ Rules_AddDemoRules;
 
  { Affichage de l'interface }
  ShowMouse;
