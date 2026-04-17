@@ -98,7 +98,7 @@
       - Limite de taille configurable
       - Avertissement pour les extensions dangereuses
 
-  14. [ ] Moteur de rendu HTML pour courriels (HTMLRenderer)
+  14. [x] Moteur de rendu HTML pour courriels (HTMLRenderer)
       - Analyse et tokenisation du HTML (lexer/parser)
       - Support des balises: html, body, head, title, meta
       - Balises de structure: div, span, p, br, hr
@@ -390,6 +390,108 @@ Type
   IsEmbedded: Boolean;         { Integre dans le message (non externe) }
   ContentID: String[40];       { ID pour les images integrees }
   IsDangerous: Boolean;        { Extension dangereuse }
+ End;
+
+ { ============================================================================
+   TYPES POUR LE MOTEUR DE RENDU HTML (TODO 14)
+   ============================================================================ }
+
+ { Types de balises HTML supportees }
+ THTMLTagType = (
+  htUnknown,     { Balise inconnue }
+  htHTML,        { <html> }
+  htHead,        { <head> }
+  htTitle,       { <title> }
+  htMeta,        { <meta> }
+  htBody,        { <body> }
+  htDiv,         { <div> }
+  htSpan,        { <span> }
+  htP,           { <p> }
+  htBr,          { <br> }
+  htHr,          { <hr> }
+  htB,           { <b> }
+  htI,           { <i> }
+  htU,           { <u> }
+  htStrong,      { <strong> }
+  htEm,          { <em> }
+  htFont,        { <font> }
+  htUL,          { <ul> }
+  htOL,          { <ol> }
+  htLI,          { <li> }
+  htTable,       { <table> }
+  htTR,          { <tr> }
+  htTD,          { <td> }
+  htTH,          { <th> }
+  htA,           { <a> }
+  htImg,         { <img> }
+  htH1,          { <h1> }
+  htH2,          { <h2> }
+  htH3,          { <h3> }
+  htCenter,      { <center> }
+  htBlockquote,  { <blockquote> }
+  htPre,         { <pre> }
+  htCode         { <code> }
+ );
+
+ { Type de token HTML }
+ THTMLTokenType = (
+  ttText,        { Texte brut }
+  ttOpenTag,     { <balise> }
+  ttCloseTag,    { </balise> }
+  ttSelfClose,   { <balise /> }
+  ttComment,     { <!-- --> }
+  ttDoctype,     { <!DOCTYPE> }
+  ttEntity       { &entity; }
+ );
+
+ { Alignement du texte }
+ THTMLAlign = (haLeft, haCenter, haRight, haJustify);
+
+ { Structure d'un attribut HTML }
+ THTMLAttribute = Record
+  Name: String[20];
+  Value: String[80];
+ End;
+
+ { Structure d'un token HTML }
+ THTMLToken = Record
+  TokenType: THTMLTokenType;
+  TagType: THTMLTagType;
+  TagName: String[20];
+  Content: String[250];
+  Attributes: Array[0..7] of THTMLAttribute;
+  AttrCount: Integer;
+ End;
+
+ { Style de rendu courant }
+ THTMLRenderStyle = Record
+  Bold: Boolean;
+  Italic: Boolean;
+  Underline: Boolean;
+  FontColor: Word;
+  BGColor: Word;
+  FontSize: Integer;       { 1-7 comme HTML, 3 = normal }
+  Align: THTMLAlign;
+  InPre: Boolean;          { Dans un bloc <pre> }
+  ListLevel: Integer;      { Niveau d'imbrication des listes }
+  ListOrdered: Boolean;    { Liste ordonnee ou non }
+  ListItemNum: Integer;    { Numero de l'item courant }
+  InTable: Boolean;        { Dans un tableau }
+  InLink: Boolean;         { Dans un lien }
+  LinkURL: String[200];    { URL du lien courant }
+ End;
+
+ { Element de rendu HTML }
+ THTMLRenderElement = Record
+  X, Y: Integer;           { Position }
+  Width, Height: Integer;  { Dimensions }
+  Text: String[80];        { Texte a afficher }
+  Style: THTMLRenderStyle; { Style applique }
+  IsLink: Boolean;         { Element cliquable }
+  LinkURL: String[200];    { URL si lien }
+  IsImage: Boolean;        { Placeholder d'image }
+  ImageWidth: Integer;     { Largeur de l'image }
+  ImageHeight: Integer;    { Hauteur de l'image }
  End;
 
  { Type de colonne pour la liste des messages }
@@ -1207,6 +1309,35 @@ Const
  { Extensions dangereuses (executables) }
  DANGEROUS_EXT_COUNT = 12;
 
+ { ============================================================================
+   CONSTANTES POUR LE MOTEUR DE RENDU HTML (TODO 14)
+   ============================================================================ }
+
+ { Nombre maximum de tokens HTML }
+ MAX_HTML_TOKENS = 500;
+
+ { Nombre maximum d'elements de rendu }
+ MAX_HTML_ELEMENTS = 200;
+
+ { Taille de police par defaut (equivalent HTML size=3) }
+ HTML_DEFAULT_FONT_SIZE = 3;
+
+ { Couleurs HTML par defaut }
+ HTML_COLOR_LINK = LightBlue;      { Couleur des liens }
+ HTML_COLOR_VISITED = Magenta;      { Liens visites }
+ HTML_COLOR_TEXT = White;           { Texte par defaut }
+ HTML_COLOR_BG = Black;             { Fond par defaut }
+
+ { Indentation pour les listes }
+ HTML_LIST_INDENT = 20;
+
+ { Espacement des tableaux }
+ HTML_TABLE_PADDING = 4;
+ HTML_TABLE_BORDER = 1;
+
+ { Nombre d'entites HTML supportees }
+ HTML_ENTITY_COUNT = 15;
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -1350,6 +1481,16 @@ Var
  AttachSelectedFile: Integer;           { Fichier selectionne }
  AttachTotalSize: LongInt;              { Taille totale des pieces jointes }
  DangerousExtensions: Array[0..11] of String[4]; { Extensions dangereuses }
+
+ { Variables globales pour le moteur HTML (TODO 14) }
+ HTMLTokens: Array[0..MAX_HTML_TOKENS-1] of THTMLToken;  { Buffer de tokens }
+ HTMLTokenCount: Integer;               { Nombre de tokens }
+ HTMLElements: Array[0..MAX_HTML_ELEMENTS-1] of THTMLRenderElement; { Elements de rendu }
+ HTMLElementCount: Integer;             { Nombre d'elements }
+ HTMLCurrentStyle: THTMLRenderStyle;    { Style courant }
+ HTMLRenderX, HTMLRenderY: Integer;     { Position de rendu }
+ HTMLRenderWidth: Integer;              { Largeur disponible }
+ HTMLIsHTML: Boolean;                   { Le message est en HTML }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -7807,6 +7948,714 @@ End;
   FIN DE L'IMPLEMENTATION DU SUPPORT DES PIECES JOINTES
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU MOTEUR DE RENDU HTML (TODO 14)
+  ============================================================================ }
+
+{ Convertit une chaine en majuscules }
+Function HTML_UpperCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If (S[I] >= 'a') And (S[I] <= 'z') Then
+   S[I] := Chr(Ord(S[I]) - 32);
+ HTML_UpperCase := S;
+End;
+
+{ Convertit une chaine en minuscules }
+Function HTML_LowerCase(S: String): String;
+Var
+ I: Integer;
+Begin
+ For I := 1 To Length(S) Do
+  If (S[I] >= 'A') And (S[I] <= 'Z') Then
+   S[I] := Chr(Ord(S[I]) + 32);
+ HTML_LowerCase := S;
+End;
+
+{ Supprime les espaces en debut et fin de chaine }
+Function HTML_Trim(S: String): String;
+Begin
+ While (Length(S) > 0) And (S[1] <= ' ') Do
+  Delete(S, 1, 1);
+ While (Length(S) > 0) And (S[Length(S)] <= ' ') Do
+  Delete(S, Length(S), 1);
+ HTML_Trim := S;
+End;
+
+{ Detecte le type de balise a partir de son nom }
+Function HTML_GetTagType(TagName: String): THTMLTagType;
+Var
+ Upper: String;
+Begin
+ Upper := HTML_UpperCase(HTML_Trim(TagName));
+ If Upper = 'HTML' Then HTML_GetTagType := htHTML
+ Else If Upper = 'HEAD' Then HTML_GetTagType := htHead
+ Else If Upper = 'TITLE' Then HTML_GetTagType := htTitle
+ Else If Upper = 'META' Then HTML_GetTagType := htMeta
+ Else If Upper = 'BODY' Then HTML_GetTagType := htBody
+ Else If Upper = 'DIV' Then HTML_GetTagType := htDiv
+ Else If Upper = 'SPAN' Then HTML_GetTagType := htSpan
+ Else If Upper = 'P' Then HTML_GetTagType := htP
+ Else If Upper = 'BR' Then HTML_GetTagType := htBr
+ Else If Upper = 'HR' Then HTML_GetTagType := htHr
+ Else If Upper = 'B' Then HTML_GetTagType := htB
+ Else If Upper = 'I' Then HTML_GetTagType := htI
+ Else If Upper = 'U' Then HTML_GetTagType := htU
+ Else If Upper = 'STRONG' Then HTML_GetTagType := htStrong
+ Else If Upper = 'EM' Then HTML_GetTagType := htEm
+ Else If Upper = 'FONT' Then HTML_GetTagType := htFont
+ Else If Upper = 'UL' Then HTML_GetTagType := htUL
+ Else If Upper = 'OL' Then HTML_GetTagType := htOL
+ Else If Upper = 'LI' Then HTML_GetTagType := htLI
+ Else If Upper = 'TABLE' Then HTML_GetTagType := htTable
+ Else If Upper = 'TR' Then HTML_GetTagType := htTR
+ Else If Upper = 'TD' Then HTML_GetTagType := htTD
+ Else If Upper = 'TH' Then HTML_GetTagType := htTH
+ Else If Upper = 'A' Then HTML_GetTagType := htA
+ Else If Upper = 'IMG' Then HTML_GetTagType := htImg
+ Else If Upper = 'H1' Then HTML_GetTagType := htH1
+ Else If Upper = 'H2' Then HTML_GetTagType := htH2
+ Else If Upper = 'H3' Then HTML_GetTagType := htH3
+ Else If Upper = 'CENTER' Then HTML_GetTagType := htCenter
+ Else If Upper = 'BLOCKQUOTE' Then HTML_GetTagType := htBlockquote
+ Else If Upper = 'PRE' Then HTML_GetTagType := htPre
+ Else If Upper = 'CODE' Then HTML_GetTagType := htCode
+ Else HTML_GetTagType := htUnknown;
+End;
+
+{ Decode une entite HTML }
+Function HTML_DecodeEntity(Entity: String): String;
+Var
+ Upper: String;
+Begin
+ Upper := HTML_LowerCase(Entity);
+ If Upper = 'nbsp' Then HTML_DecodeEntity := ' '
+ Else If Upper = 'lt' Then HTML_DecodeEntity := '<'
+ Else If Upper = 'gt' Then HTML_DecodeEntity := '>'
+ Else If Upper = 'amp' Then HTML_DecodeEntity := '&'
+ Else If Upper = 'quot' Then HTML_DecodeEntity := '"'
+ Else If Upper = 'apos' Then HTML_DecodeEntity := ''''
+ Else If Upper = 'copy' Then HTML_DecodeEntity := '(c)'
+ Else If Upper = 'reg' Then HTML_DecodeEntity := '(R)'
+ Else If Upper = 'euro' Then HTML_DecodeEntity := 'EUR'
+ Else If Upper = 'eacute' Then HTML_DecodeEntity := 'e'
+ Else If Upper = 'egrave' Then HTML_DecodeEntity := 'e'
+ Else If Upper = 'agrave' Then HTML_DecodeEntity := 'a'
+ Else If Upper = 'ccedil' Then HTML_DecodeEntity := 'c'
+ Else If Upper = 'bull' Then HTML_DecodeEntity := '*'
+ Else If Upper = 'mdash' Then HTML_DecodeEntity := '-'
+ Else HTML_DecodeEntity := '?';
+End;
+
+{ Convertit une couleur HTML en couleur BGI }
+Function HTML_ParseColor(ColorStr: String): Word;
+Var
+ Upper: String;
+Begin
+ Upper := HTML_UpperCase(HTML_Trim(ColorStr));
+ { Couleurs nommees }
+ If Upper = 'BLACK' Then HTML_ParseColor := Black
+ Else If Upper = 'WHITE' Then HTML_ParseColor := White
+ Else If Upper = 'RED' Then HTML_ParseColor := Red
+ Else If Upper = 'GREEN' Then HTML_ParseColor := Green
+ Else If Upper = 'BLUE' Then HTML_ParseColor := Blue
+ Else If Upper = 'YELLOW' Then HTML_ParseColor := Yellow
+ Else If Upper = 'CYAN' Then HTML_ParseColor := Cyan
+ Else If Upper = 'MAGENTA' Then HTML_ParseColor := Magenta
+ Else If Upper = 'GRAY' Then HTML_ParseColor := DarkGray
+ Else If Upper = 'GREY' Then HTML_ParseColor := DarkGray
+ Else If Upper = 'SILVER' Then HTML_ParseColor := LightGray
+ Else If Upper = 'NAVY' Then HTML_ParseColor := Blue
+ Else If Upper = 'MAROON' Then HTML_ParseColor := Red
+ Else If Upper = 'OLIVE' Then HTML_ParseColor := Brown
+ Else If Upper = 'PURPLE' Then HTML_ParseColor := Magenta
+ Else If Upper = 'TEAL' Then HTML_ParseColor := Cyan
+ Else If Upper = 'ORANGE' Then HTML_ParseColor := LightRed
+ Else If (Length(Upper) >= 1) And (Upper[1] = '#') Then Begin
+  { Couleur hexadecimale - approximation simple }
+  If Length(Upper) >= 7 Then Begin
+   { Extraction des composantes RGB basique }
+   If (Upper[2] >= '8') Or (Upper[3] >= '8') Then HTML_ParseColor := LightRed
+   Else If (Upper[4] >= '8') Or (Upper[5] >= '8') Then HTML_ParseColor := LightGreen
+   Else If (Upper[6] >= '8') Or (Upper[7] >= '8') Then HTML_ParseColor := LightBlue
+   Else HTML_ParseColor := DarkGray;
+  End
+  Else HTML_ParseColor := White;
+ End
+ Else HTML_ParseColor := White;
+End;
+
+{ Parse les attributs d'une balise }
+Procedure HTML_ParseAttributes(AttrStr: String; Var Token: THTMLToken);
+Var
+ I, J, K: Integer;
+ Name, Value: String;
+ InQuote: Boolean;
+ QuoteChar: Char;
+Begin
+ Token.AttrCount := 0;
+ I := 1;
+
+ While (I <= Length(AttrStr)) And (Token.AttrCount < 8) Do Begin
+  { Sauter les espaces }
+  While (I <= Length(AttrStr)) And (AttrStr[I] <= ' ') Do
+   Inc(I);
+  If I > Length(AttrStr) Then Exit;
+
+  { Lire le nom de l'attribut }
+  Name := '';
+  While (I <= Length(AttrStr)) And (AttrStr[I] <> '=') And (AttrStr[I] > ' ') Do Begin
+   Name := Name + AttrStr[I];
+   Inc(I);
+  End;
+
+  If I > Length(AttrStr) Then Exit;
+
+  { Sauter le signe = }
+  If AttrStr[I] = '=' Then Inc(I);
+
+  { Sauter les espaces }
+  While (I <= Length(AttrStr)) And (AttrStr[I] <= ' ') Do
+   Inc(I);
+  If I > Length(AttrStr) Then Exit;
+
+  { Lire la valeur }
+  Value := '';
+  If (AttrStr[I] = '"') Or (AttrStr[I] = '''') Then Begin
+   QuoteChar := AttrStr[I];
+   Inc(I);
+   While (I <= Length(AttrStr)) And (AttrStr[I] <> QuoteChar) Do Begin
+    Value := Value + AttrStr[I];
+    Inc(I);
+   End;
+   Inc(I); { Sauter le guillemet fermant }
+  End
+  Else Begin
+   While (I <= Length(AttrStr)) And (AttrStr[I] > ' ') Do Begin
+    Value := Value + AttrStr[I];
+    Inc(I);
+   End;
+  End;
+
+  { Stocker l'attribut }
+  If Length(Name) > 0 Then Begin
+   Token.Attributes[Token.AttrCount].Name := HTML_LowerCase(Name);
+   Token.Attributes[Token.AttrCount].Value := Value;
+   Inc(Token.AttrCount);
+  End;
+ End;
+End;
+
+{ Recupere la valeur d'un attribut }
+Function HTML_GetAttribute(Var Token: THTMLToken; Name: String): String;
+Var
+ I: Integer;
+ LowerName: String;
+Begin
+ HTML_GetAttribute := '';
+ LowerName := HTML_LowerCase(Name);
+ For I := 0 To Token.AttrCount - 1 Do Begin
+  If Token.Attributes[I].Name = LowerName Then Begin
+   HTML_GetAttribute := Token.Attributes[I].Value;
+   Exit;
+  End;
+ End;
+End;
+
+{ Tokenize le HTML }
+Procedure HTML_Tokenize(HTML: String);
+Var
+ I, J, TagStart: Integer;
+ InTag: Boolean;
+ TagContent, TagName, AttrStr: String;
+ IsClosing, IsSelfClose: Boolean;
+ TextBuffer: String;
+Begin
+ HTMLTokenCount := 0;
+ I := 1;
+ TextBuffer := '';
+
+ While (I <= Length(HTML)) And (HTMLTokenCount < MAX_HTML_TOKENS) Do Begin
+  If HTML[I] = '<' Then Begin
+   { Sauver le texte accumule }
+   If Length(TextBuffer) > 0 Then Begin
+    HTMLTokens[HTMLTokenCount].TokenType := ttText;
+    HTMLTokens[HTMLTokenCount].Content := TextBuffer;
+    HTMLTokens[HTMLTokenCount].AttrCount := 0;
+    Inc(HTMLTokenCount);
+    TextBuffer := '';
+   End;
+
+   { Lire la balise }
+   TagContent := '';
+   Inc(I);
+
+   { Verifier si c'est un commentaire }
+   If (I + 2 <= Length(HTML)) And (HTML[I] = '!') And
+      (HTML[I+1] = '-') And (HTML[I+2] = '-') Then Begin
+    { Sauter le commentaire }
+    While (I + 2 <= Length(HTML)) And Not
+          ((HTML[I] = '-') And (HTML[I+1] = '-') And (HTML[I+2] = '>')) Do
+     Inc(I);
+    Inc(I, 3);
+    Continue;
+   End;
+
+   { Lire le contenu de la balise }
+   While (I <= Length(HTML)) And (HTML[I] <> '>') Do Begin
+    TagContent := TagContent + HTML[I];
+    Inc(I);
+   End;
+   Inc(I); { Sauter > }
+
+   { Analyser la balise }
+   IsClosing := False;
+   IsSelfClose := False;
+
+   If (Length(TagContent) > 0) And (TagContent[1] = '/') Then Begin
+    IsClosing := True;
+    Delete(TagContent, 1, 1);
+   End;
+
+   If (Length(TagContent) > 0) And (TagContent[Length(TagContent)] = '/') Then Begin
+    IsSelfClose := True;
+    Delete(TagContent, Length(TagContent), 1);
+   End;
+
+   { Extraire le nom de la balise }
+   TagName := '';
+   J := 1;
+   While (J <= Length(TagContent)) And (TagContent[J] > ' ') Do Begin
+    TagName := TagName + TagContent[J];
+    Inc(J);
+   End;
+
+   { Extraire les attributs }
+   AttrStr := '';
+   If J <= Length(TagContent) Then
+    AttrStr := Copy(TagContent, J, Length(TagContent) - J + 1);
+
+   { Creer le token }
+   If IsClosing Then
+    HTMLTokens[HTMLTokenCount].TokenType := ttCloseTag
+   Else If IsSelfClose Then
+    HTMLTokens[HTMLTokenCount].TokenType := ttSelfClose
+   Else
+    HTMLTokens[HTMLTokenCount].TokenType := ttOpenTag;
+
+   HTMLTokens[HTMLTokenCount].TagName := HTML_LowerCase(TagName);
+   HTMLTokens[HTMLTokenCount].TagType := HTML_GetTagType(TagName);
+   HTMLTokens[HTMLTokenCount].Content := '';
+   HTML_ParseAttributes(AttrStr, HTMLTokens[HTMLTokenCount]);
+   Inc(HTMLTokenCount);
+  End
+  Else If HTML[I] = '&' Then Begin
+   { Entite HTML }
+   J := I + 1;
+   While (J <= Length(HTML)) And (HTML[J] <> ';') And (J - I < 10) Do
+    Inc(J);
+   If (J <= Length(HTML)) And (HTML[J] = ';') Then Begin
+    TextBuffer := TextBuffer + HTML_DecodeEntity(Copy(HTML, I + 1, J - I - 1));
+    I := J + 1;
+   End
+   Else Begin
+    TextBuffer := TextBuffer + HTML[I];
+    Inc(I);
+   End;
+  End
+  Else Begin
+   { Texte normal }
+   If HTML[I] >= ' ' Then
+    TextBuffer := TextBuffer + HTML[I]
+   Else If HTML[I] = #10 Then
+    TextBuffer := TextBuffer + ' '
+   Else If HTML[I] = #9 Then
+    TextBuffer := TextBuffer + ' ';
+   Inc(I);
+  End;
+ End;
+
+ { Sauver le texte restant }
+ If Length(TextBuffer) > 0 Then Begin
+  HTMLTokens[HTMLTokenCount].TokenType := ttText;
+  HTMLTokens[HTMLTokenCount].Content := TextBuffer;
+  HTMLTokens[HTMLTokenCount].AttrCount := 0;
+  Inc(HTMLTokenCount);
+ End;
+End;
+
+{ Initialise le style de rendu par defaut }
+Procedure HTML_InitStyle;
+Begin
+ HTMLCurrentStyle.Bold := False;
+ HTMLCurrentStyle.Italic := False;
+ HTMLCurrentStyle.Underline := False;
+ HTMLCurrentStyle.FontColor := HTML_COLOR_TEXT;
+ HTMLCurrentStyle.BGColor := HTML_COLOR_BG;
+ HTMLCurrentStyle.FontSize := HTML_DEFAULT_FONT_SIZE;
+ HTMLCurrentStyle.Align := haLeft;
+ HTMLCurrentStyle.InPre := False;
+ HTMLCurrentStyle.ListLevel := 0;
+ HTMLCurrentStyle.ListOrdered := False;
+ HTMLCurrentStyle.ListItemNum := 0;
+ HTMLCurrentStyle.InTable := False;
+ HTMLCurrentStyle.InLink := False;
+ HTMLCurrentStyle.LinkURL := '';
+End;
+
+{ Ajoute un element de rendu }
+Procedure HTML_AddElement(Text: String; X, Y, W, H: Integer);
+Begin
+ If HTMLElementCount >= MAX_HTML_ELEMENTS Then Exit;
+
+ HTMLElements[HTMLElementCount].X := X;
+ HTMLElements[HTMLElementCount].Y := Y;
+ HTMLElements[HTMLElementCount].Width := W;
+ HTMLElements[HTMLElementCount].Height := H;
+ HTMLElements[HTMLElementCount].Text := Text;
+ HTMLElements[HTMLElementCount].Style := HTMLCurrentStyle;
+ HTMLElements[HTMLElementCount].IsLink := HTMLCurrentStyle.InLink;
+ HTMLElements[HTMLElementCount].LinkURL := HTMLCurrentStyle.LinkURL;
+ HTMLElements[HTMLElementCount].IsImage := False;
+ Inc(HTMLElementCount);
+End;
+
+{ Ajoute un placeholder d'image }
+Procedure HTML_AddImagePlaceholder(X, Y, W, H: Integer);
+Begin
+ If HTMLElementCount >= MAX_HTML_ELEMENTS Then Exit;
+
+ HTMLElements[HTMLElementCount].X := X;
+ HTMLElements[HTMLElementCount].Y := Y;
+ HTMLElements[HTMLElementCount].Width := W;
+ HTMLElements[HTMLElementCount].Height := H;
+ HTMLElements[HTMLElementCount].Text := '';
+ HTMLElements[HTMLElementCount].Style := HTMLCurrentStyle;
+ HTMLElements[HTMLElementCount].IsLink := False;
+ HTMLElements[HTMLElementCount].LinkURL := '';
+ HTMLElements[HTMLElementCount].IsImage := True;
+ HTMLElements[HTMLElementCount].ImageWidth := W;
+ HTMLElements[HTMLElementCount].ImageHeight := H;
+ Inc(HTMLElementCount);
+End;
+
+{ Dessine une ligne horizontale }
+Procedure HTML_DrawHR(Y, Width: Integer);
+Begin
+ SetColor(DarkGray);
+ Line(HTMLRenderX, Y + 5, HTMLRenderX + Width - 1, Y + 5);
+ SetColor(LightGray);
+ Line(HTMLRenderX, Y + 6, HTMLRenderX + Width - 1, Y + 6);
+End;
+
+{ Rend les tokens HTML }
+Procedure HTML_Render(StartX, StartY, MaxWidth, MaxHeight: Integer);
+Var
+ I, J, WordWidth, LineHeight: Integer;
+ Word, Line: String;
+ InHead: Boolean;
+ AttrValue: String;
+Begin
+ HTML_InitStyle;
+ HTMLElementCount := 0;
+ HTMLRenderX := StartX;
+ HTMLRenderY := StartY;
+ HTMLRenderWidth := MaxWidth;
+ LineHeight := 14;
+ InHead := False;
+
+ For I := 0 To HTMLTokenCount - 1 Do Begin
+  Case HTMLTokens[I].TokenType Of
+   ttOpenTag: Begin
+    Case HTMLTokens[I].TagType Of
+     htHead: InHead := True;
+     htBody: InHead := False;
+     htB, htStrong: HTMLCurrentStyle.Bold := True;
+     htI, htEm: HTMLCurrentStyle.Italic := True;
+     htU: HTMLCurrentStyle.Underline := True;
+     htFont: Begin
+      AttrValue := HTML_GetAttribute(HTMLTokens[I], 'color');
+      If Length(AttrValue) > 0 Then
+       HTMLCurrentStyle.FontColor := HTML_ParseColor(AttrValue);
+      AttrValue := HTML_GetAttribute(HTMLTokens[I], 'size');
+      If Length(AttrValue) > 0 Then Begin
+       If AttrValue[1] In ['1'..'7'] Then
+        HTMLCurrentStyle.FontSize := Ord(AttrValue[1]) - Ord('0');
+      End;
+     End;
+     htA: Begin
+      HTMLCurrentStyle.InLink := True;
+      HTMLCurrentStyle.LinkURL := HTML_GetAttribute(HTMLTokens[I], 'href');
+      HTMLCurrentStyle.FontColor := HTML_COLOR_LINK;
+      HTMLCurrentStyle.Underline := True;
+     End;
+     htP, htDiv: Begin
+      If HTMLRenderX > StartX Then Begin
+       HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+       HTMLRenderY := HTMLRenderY + LineHeight + 4;
+      End;
+     End;
+     htBr: Begin
+      HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+      HTMLRenderY := HTMLRenderY + LineHeight;
+     End;
+     htHr: Begin
+      HTMLRenderX := StartX;
+      HTMLRenderY := HTMLRenderY + 4;
+      HTML_DrawHR(HTMLRenderY, MaxWidth);
+      HTMLRenderY := HTMLRenderY + 12;
+     End;
+     htH1: Begin
+      If HTMLRenderX > StartX Then HTMLRenderY := HTMLRenderY + LineHeight;
+      HTMLRenderX := StartX;
+      HTMLCurrentStyle.Bold := True;
+      HTMLCurrentStyle.FontSize := 6;
+      LineHeight := 20;
+     End;
+     htH2: Begin
+      If HTMLRenderX > StartX Then HTMLRenderY := HTMLRenderY + LineHeight;
+      HTMLRenderX := StartX;
+      HTMLCurrentStyle.Bold := True;
+      HTMLCurrentStyle.FontSize := 5;
+      LineHeight := 18;
+     End;
+     htH3: Begin
+      If HTMLRenderX > StartX Then HTMLRenderY := HTMLRenderY + LineHeight;
+      HTMLRenderX := StartX;
+      HTMLCurrentStyle.Bold := True;
+      HTMLCurrentStyle.FontSize := 4;
+      LineHeight := 16;
+     End;
+     htCenter: HTMLCurrentStyle.Align := haCenter;
+     htUL: Begin
+      Inc(HTMLCurrentStyle.ListLevel);
+      HTMLCurrentStyle.ListOrdered := False;
+      HTMLCurrentStyle.ListItemNum := 0;
+      HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+      If HTMLRenderY > StartY Then HTMLRenderY := HTMLRenderY + LineHeight;
+     End;
+     htOL: Begin
+      Inc(HTMLCurrentStyle.ListLevel);
+      HTMLCurrentStyle.ListOrdered := True;
+      HTMLCurrentStyle.ListItemNum := 0;
+      HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+      If HTMLRenderY > StartY Then HTMLRenderY := HTMLRenderY + LineHeight;
+     End;
+     htLI: Begin
+      HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+      HTMLRenderY := HTMLRenderY + LineHeight;
+      Inc(HTMLCurrentStyle.ListItemNum);
+      { Dessiner le marqueur }
+      If HTMLCurrentStyle.ListOrdered Then Begin
+       Str(HTMLCurrentStyle.ListItemNum, Word);
+       Word := Word + '. ';
+      End
+      Else
+       Word := '* ';
+      HTML_AddElement(Word, HTMLRenderX - 15, HTMLRenderY, 15, LineHeight);
+     End;
+     htTable: Begin
+      HTMLCurrentStyle.InTable := True;
+      HTMLRenderX := StartX;
+      HTMLRenderY := HTMLRenderY + LineHeight;
+     End;
+     htTR: Begin
+      HTMLRenderX := StartX;
+      HTMLRenderY := HTMLRenderY + LineHeight + 2;
+     End;
+     htTD, htTH: Begin
+      HTMLRenderX := HTMLRenderX + 10;
+      If HTMLTokens[I].TagType = htTH Then
+       HTMLCurrentStyle.Bold := True;
+     End;
+     htImg: Begin
+      AttrValue := HTML_GetAttribute(HTMLTokens[I], 'width');
+      WordWidth := 64;
+      If Length(AttrValue) > 0 Then Begin
+       Val(AttrValue, WordWidth, J);
+       If J <> 0 Then WordWidth := 64;
+      End;
+      AttrValue := HTML_GetAttribute(HTMLTokens[I], 'height');
+      LineHeight := 64;
+      If Length(AttrValue) > 0 Then Begin
+       Val(AttrValue, LineHeight, J);
+       If J <> 0 Then LineHeight := 64;
+      End;
+      HTML_AddImagePlaceholder(HTMLRenderX, HTMLRenderY, WordWidth, LineHeight);
+      HTMLRenderX := HTMLRenderX + WordWidth + 4;
+      LineHeight := 14;
+     End;
+     htPre, htCode: Begin
+      HTMLCurrentStyle.InPre := True;
+     End;
+     htBlockquote: Begin
+      HTMLRenderX := HTMLRenderX + 20;
+      HTMLCurrentStyle.Italic := True;
+     End;
+    End;
+   End;
+   ttCloseTag: Begin
+    Case HTMLTokens[I].TagType Of
+     htHead: InHead := False;
+     htB, htStrong: HTMLCurrentStyle.Bold := False;
+     htI, htEm: HTMLCurrentStyle.Italic := False;
+     htU: HTMLCurrentStyle.Underline := False;
+     htFont: Begin
+      HTMLCurrentStyle.FontColor := HTML_COLOR_TEXT;
+      HTMLCurrentStyle.FontSize := HTML_DEFAULT_FONT_SIZE;
+     End;
+     htA: Begin
+      HTMLCurrentStyle.InLink := False;
+      HTMLCurrentStyle.LinkURL := '';
+      HTMLCurrentStyle.FontColor := HTML_COLOR_TEXT;
+      HTMLCurrentStyle.Underline := False;
+     End;
+     htP, htDiv: Begin
+      HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+      HTMLRenderY := HTMLRenderY + LineHeight + 4;
+     End;
+     htH1, htH2, htH3: Begin
+      HTMLCurrentStyle.Bold := False;
+      HTMLCurrentStyle.FontSize := HTML_DEFAULT_FONT_SIZE;
+      LineHeight := 14;
+      HTMLRenderX := StartX;
+      HTMLRenderY := HTMLRenderY + LineHeight + 4;
+     End;
+     htCenter: HTMLCurrentStyle.Align := haLeft;
+     htUL, htOL: Begin
+      If HTMLCurrentStyle.ListLevel > 0 Then
+       Dec(HTMLCurrentStyle.ListLevel);
+      HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+      HTMLRenderY := HTMLRenderY + 4;
+     End;
+     htTable: Begin
+      HTMLCurrentStyle.InTable := False;
+      HTMLRenderY := HTMLRenderY + LineHeight;
+     End;
+     htTH: HTMLCurrentStyle.Bold := False;
+     htPre, htCode: HTMLCurrentStyle.InPre := False;
+     htBlockquote: Begin
+      HTMLRenderX := StartX;
+      HTMLCurrentStyle.Italic := False;
+     End;
+    End;
+   End;
+   ttText: Begin
+    If InHead Then Continue;
+
+    Line := HTMLTokens[I].Content;
+
+    { Rendre le texte mot par mot }
+    J := 1;
+    While J <= Length(Line) Do Begin
+     { Extraire un mot }
+     Word := '';
+     While (J <= Length(Line)) And (Line[J] > ' ') Do Begin
+      Word := Word + Line[J];
+      Inc(J);
+     End;
+
+     If Length(Word) > 0 Then Begin
+      WordWidth := TextWidth(Word) + 4;
+
+      { Verifier si le mot tient sur la ligne }
+      If (HTMLRenderX + WordWidth > StartX + MaxWidth) And (HTMLRenderX > StartX) Then Begin
+       HTMLRenderX := StartX + (HTMLCurrentStyle.ListLevel * HTML_LIST_INDENT);
+       HTMLRenderY := HTMLRenderY + LineHeight;
+      End;
+
+      { Verifier si on depasse la hauteur max }
+      If HTMLRenderY > StartY + MaxHeight Then Exit;
+
+      HTML_AddElement(Word, HTMLRenderX, HTMLRenderY, WordWidth, LineHeight);
+      HTMLRenderX := HTMLRenderX + WordWidth;
+     End;
+
+     { Sauter les espaces }
+     While (J <= Length(Line)) And (Line[J] <= ' ') Do Begin
+      If Line[J] = ' ' Then
+       HTMLRenderX := HTMLRenderX + 4;
+      Inc(J);
+     End;
+    End;
+   End;
+  End;
+ End;
+End;
+
+{ Dessine les elements de rendu HTML }
+Procedure HTML_Draw;
+Var
+ I: Integer;
+ OldColor: Word;
+Begin
+ For I := 0 To HTMLElementCount - 1 Do Begin
+  With HTMLElements[I] Do Begin
+   If IsImage Then Begin
+    { Dessiner le placeholder d'image }
+    SetColor(DarkGray);
+    Rectangle(X, Y, X + ImageWidth, Y + ImageHeight);
+    SetFillStyle(SolidFill, DarkGray);
+    Bar(X + 1, Y + 1, X + ImageWidth - 1, Y + ImageHeight - 1);
+    SetColor(LightGray);
+    OutTextXY(X + (ImageWidth Div 2) - 12, Y + (ImageHeight Div 2) - 4, '[IMG]');
+   End
+   Else If Length(Text) > 0 Then Begin
+    SetColor(Style.FontColor);
+    If Style.Bold Then
+     SetTextStyle(DefaultFont, HorizDir, 1)
+    Else
+     SetTextStyle(DefaultFont, HorizDir, 1);
+    OutTextXY(X, Y, Text);
+    If Style.Underline Then Begin
+     SetColor(Style.FontColor);
+     Line(X, Y + 10, X + TextWidth(Text), Y + 10);
+    End;
+   End;
+  End;
+ End;
+End;
+
+{ Detecte si une chaine contient du HTML }
+Function HTML_IsHTMLContent(Content: String): Boolean;
+Var
+ Upper: String;
+Begin
+ Upper := HTML_UpperCase(Content);
+ HTML_IsHTMLContent := (Pos('<HTML', Upper) > 0) Or
+                       (Pos('<BODY', Upper) > 0) Or
+                       (Pos('<DIV', Upper) > 0) Or
+                       (Pos('<P>', Upper) > 0) Or
+                       (Pos('<BR', Upper) > 0) Or
+                       (Pos('<TABLE', Upper) > 0) Or
+                       (Pos('<FONT', Upper) > 0);
+End;
+
+{ Rend un message HTML dans une zone donnee }
+Procedure HTML_RenderMessage(HTML: String; X, Y, Width, Height: Integer);
+Begin
+ HideMouse;
+ HTML_Tokenize(HTML);
+ HTML_Render(X, Y, Width, Height);
+ HTML_Draw;
+ ShowMouse;
+End;
+
+{ Initialise le moteur HTML }
+Procedure HTML_Init;
+Begin
+ HTMLTokenCount := 0;
+ HTMLElementCount := 0;
+ HTMLIsHTML := False;
+ HTML_InitStyle;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU MOTEUR DE RENDU HTML
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -9580,6 +10429,9 @@ BEGIN
 
  { Initialisation du gestionnaire de pieces jointes (TODO 13) }
  InitAttachmentManager;
+
+ { Initialisation du moteur de rendu HTML (TODO 14) }
+ HTML_Init;
 
  { Affichage de l'interface }
  ShowMouse;
