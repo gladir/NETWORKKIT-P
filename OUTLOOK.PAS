@@ -181,7 +181,7 @@
       - Synchronisation à la reconnexion
       - Indicateur visuel du mode en ligne/hors ligne
 
-  25. [ ] Support multi-langue de l'interface
+  25. [x] Support multi-langue de l'interface
       - Français (par défaut), English, Deutsch, Italiano
       - Español, Português, Svenska, Dansk, Nihongo (en rōmaji)
       - Albanais (Shqip)
@@ -1330,6 +1330,60 @@ Type
   StartTime: LongInt;            { Debut de la sync }
   EndTime: LongInt;              { Fin de la sync }
  End;
+
+ { ============================================================================
+   TYPES POUR LE SUPPORT MULTI-LANGUE (TODO 25)
+   ============================================================================ }
+
+ { Langues supportees }
+ TLanguage = (
+  langFrench,                    { Francais (par defaut) }
+  langEnglish,                   { Anglais }
+  langGerman,                    { Allemand }
+  langItalian,                   { Italien }
+  langSpanish,                   { Espagnol }
+  langPortuguese,                { Portugais }
+  langSwedish,                   { Suedois }
+  langDanish,                    { Danois }
+  langJapanese,                  { Japonais (romaji) }
+  langAlbanian                   { Albanais }
+ );
+
+ { Identifiant de chaine traduisible }
+ TStringID = (
+  { Menu Fichier }
+  sidFile, sidNewMessage, sidOpen, sidSave, sidSaveAs,
+  sidPrint, sidExit,
+  { Menu Edition }
+  sidEdit, sidUndo, sidRedo, sidCut, sidCopy, sidPaste,
+  sidSelectAll, sidFind,
+  { Menu Affichage }
+  sidView, sidFolderPane, sidPreviewPane, sidToolbar,
+  sidStatusBar, sidRefresh,
+  { Menu Message }
+  sidMessage, sidReply, sidReplyAll, sidForward, sidDelete,
+  sidMarkAsRead, sidMarkAsUnread, sidFlag,
+  { Menu Outils }
+  sidTools, sidAccounts, sidRules, sidPreferences,
+  sidSendReceive,
+  { Menu Aide }
+  sidHelp, sidContents, sidAbout,
+  { Dossiers }
+  sidInbox, sidOutbox, sidSentItems, sidDrafts, sidTrash,
+  { Interface }
+  sidFrom, sidTo, sidSubject, sidDate, sidSize, sidPriority,
+  sidAttachment, sidSearch, sidSearchPlaceholder,
+  { Boutons }
+  sidOK, sidCancel, sidYes, sidNo, sidApply, sidClose,
+  { Messages }
+  sidNoMessages, sidLoading, sidError, sidSuccess,
+  sidConfirmDelete, sidMessageSent,
+  { Etat connexion }
+  sidOnline, sidOffline, sidConnecting, sidSynchronizing,
+  { Divers }
+  sidNewMail, sidUnreadCount, sidTotalCount,
+  sidBytes, sidKB, sidMB
+ );
 
  { Type de colonne pour la liste des messages }
  TColumnType = (ctPriority, ctAttachment, ctFlag, ctFrom, ctSubject, ctDate, ctSize);
@@ -2516,6 +2570,387 @@ Const
  STATUS_CONNECTING_TEXT = 'Connexion...';
  STATUS_SYNCING_TEXT = 'Synchronisation...';
 
+ { ============================================================================
+   CONSTANTES POUR LE SUPPORT MULTI-LANGUE (TODO 25)
+   ============================================================================ }
+
+ { Nombre maximum de chaines traduisibles }
+ MAX_STRING_IDS = 70;
+
+ { Codes de langue ISO }
+ LANG_CODES: Array[TLanguage] of String[5] = (
+  'FR', 'EN', 'DE', 'IT', 'ES', 'PT', 'SV', 'DA', 'JA', 'SQ'
+ );
+
+ { Noms des langues }
+ LANG_NAMES: Array[TLanguage] of String[15] = (
+  'Francais', 'English', 'Deutsch', 'Italiano', 'Espanol',
+  'Portugues', 'Svenska', 'Dansk', 'Nihongo', 'Shqip'
+ );
+
+ { Extension des fichiers de langue }
+ LANG_FILE_EXT = '.LNG';
+
+ { Traductions francaises (par defaut) }
+ STRINGS_FR: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Fichier }
+  'Fichier', 'Nouveau message', 'Ouvrir', 'Enregistrer', 'Enregistrer sous',
+  'Imprimer', 'Quitter',
+  { Menu Edition }
+  'Edition', 'Annuler', 'Retablir', 'Couper', 'Copier', 'Coller',
+  'Tout selectionner', 'Rechercher',
+  { Menu Affichage }
+  'Affichage', 'Volet des dossiers', 'Volet de lecture', 'Barre d''outils',
+  'Barre d''etat', 'Actualiser',
+  { Menu Message }
+  'Message', 'Repondre', 'Repondre a tous', 'Transferer', 'Supprimer',
+  'Marquer comme lu', 'Marquer comme non lu', 'Ajouter un indicateur',
+  { Menu Outils }
+  'Outils', 'Comptes', 'Regles', 'Preferences',
+  'Envoyer/Recevoir',
+  { Menu Aide }
+  'Aide', 'Sommaire', 'A propos',
+  { Dossiers }
+  'Boite de reception', 'Boite d''envoi', 'Elements envoyes', 'Brouillons', 'Corbeille',
+  { Interface }
+  'De', 'A', 'Objet', 'Date', 'Taille', 'Priorite',
+  'Piece jointe', 'Rechercher', 'Rechercher un message...',
+  { Boutons }
+  'OK', 'Annuler', 'Oui', 'Non', 'Appliquer', 'Fermer',
+  { Messages }
+  'Aucun message', 'Chargement...', 'Erreur', 'Succes',
+  'Confirmer la suppression', 'Message envoye',
+  { Etat connexion }
+  'En ligne', 'Hors ligne', 'Connexion...', 'Synchronisation...',
+  { Divers }
+  'Nouveau courrier', 'non lus', 'messages',
+  'octets', 'Ko', 'Mo'
+ );
+
+ { Traductions anglaises }
+ STRINGS_EN: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu File }
+  'File', 'New Message', 'Open', 'Save', 'Save As',
+  'Print', 'Exit',
+  { Menu Edit }
+  'Edit', 'Undo', 'Redo', 'Cut', 'Copy', 'Paste',
+  'Select All', 'Find',
+  { Menu View }
+  'View', 'Folder Pane', 'Preview Pane', 'Toolbar',
+  'Status Bar', 'Refresh',
+  { Menu Message }
+  'Message', 'Reply', 'Reply All', 'Forward', 'Delete',
+  'Mark as Read', 'Mark as Unread', 'Flag',
+  { Menu Tools }
+  'Tools', 'Accounts', 'Rules', 'Preferences',
+  'Send/Receive',
+  { Menu Help }
+  'Help', 'Contents', 'About',
+  { Folders }
+  'Inbox', 'Outbox', 'Sent Items', 'Drafts', 'Trash',
+  { Interface }
+  'From', 'To', 'Subject', 'Date', 'Size', 'Priority',
+  'Attachment', 'Search', 'Search messages...',
+  { Buttons }
+  'OK', 'Cancel', 'Yes', 'No', 'Apply', 'Close',
+  { Messages }
+  'No messages', 'Loading...', 'Error', 'Success',
+  'Confirm delete', 'Message sent',
+  { Connection state }
+  'Online', 'Offline', 'Connecting...', 'Synchronizing...',
+  { Misc }
+  'New mail', 'unread', 'messages',
+  'bytes', 'KB', 'MB'
+ );
+
+ { Traductions allemandes }
+ STRINGS_DE: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Datei }
+  'Datei', 'Neue Nachricht', 'Oeffnen', 'Speichern', 'Speichern unter',
+  'Drucken', 'Beenden',
+  { Menu Bearbeiten }
+  'Bearbeiten', 'Rueckgaengig', 'Wiederholen', 'Ausschneiden', 'Kopieren', 'Einfuegen',
+  'Alles auswaehlen', 'Suchen',
+  { Menu Ansicht }
+  'Ansicht', 'Ordnerbereich', 'Vorschaubereich', 'Symbolleiste',
+  'Statusleiste', 'Aktualisieren',
+  { Menu Nachricht }
+  'Nachricht', 'Antworten', 'Allen antworten', 'Weiterleiten', 'Loeschen',
+  'Als gelesen markieren', 'Als ungelesen markieren', 'Kennzeichnen',
+  { Menu Extras }
+  'Extras', 'Konten', 'Regeln', 'Einstellungen',
+  'Senden/Empfangen',
+  { Menu Hilfe }
+  'Hilfe', 'Inhalt', 'Info',
+  { Ordner }
+  'Posteingang', 'Postausgang', 'Gesendete', 'Entwuerfe', 'Papierkorb',
+  { Oberflaeche }
+  'Von', 'An', 'Betreff', 'Datum', 'Groesse', 'Prioritaet',
+  'Anlage', 'Suchen', 'Nachrichten suchen...',
+  { Schaltflaechen }
+  'OK', 'Abbrechen', 'Ja', 'Nein', 'Uebernehmen', 'Schliessen',
+  { Nachrichten }
+  'Keine Nachrichten', 'Laden...', 'Fehler', 'Erfolg',
+  'Loeschen bestaetigen', 'Nachricht gesendet',
+  { Verbindungsstatus }
+  'Online', 'Offline', 'Verbinden...', 'Synchronisieren...',
+  { Sonstiges }
+  'Neue E-Mail', 'ungelesen', 'Nachrichten',
+  'Bytes', 'KB', 'MB'
+ );
+
+ { Traductions italiennes }
+ STRINGS_IT: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu File }
+  'File', 'Nuovo messaggio', 'Apri', 'Salva', 'Salva con nome',
+  'Stampa', 'Esci',
+  { Menu Modifica }
+  'Modifica', 'Annulla', 'Ripeti', 'Taglia', 'Copia', 'Incolla',
+  'Seleziona tutto', 'Trova',
+  { Menu Visualizza }
+  'Visualizza', 'Riquadro cartelle', 'Riquadro anteprima', 'Barra strumenti',
+  'Barra di stato', 'Aggiorna',
+  { Menu Messaggio }
+  'Messaggio', 'Rispondi', 'Rispondi a tutti', 'Inoltra', 'Elimina',
+  'Segna come letto', 'Segna come non letto', 'Contrassegna',
+  { Menu Strumenti }
+  'Strumenti', 'Account', 'Regole', 'Preferenze',
+  'Invia/Ricevi',
+  { Menu Guida }
+  'Guida', 'Sommario', 'Informazioni su',
+  { Cartelle }
+  'Posta in arrivo', 'Posta in uscita', 'Posta inviata', 'Bozze', 'Cestino',
+  { Interfaccia }
+  'Da', 'A', 'Oggetto', 'Data', 'Dimensione', 'Priorita',
+  'Allegato', 'Cerca', 'Cerca messaggi...',
+  { Pulsanti }
+  'OK', 'Annulla', 'Si', 'No', 'Applica', 'Chiudi',
+  { Messaggi }
+  'Nessun messaggio', 'Caricamento...', 'Errore', 'Successo',
+  'Conferma eliminazione', 'Messaggio inviato',
+  { Stato connessione }
+  'Online', 'Offline', 'Connessione...', 'Sincronizzazione...',
+  { Varie }
+  'Nuova posta', 'non letti', 'messaggi',
+  'byte', 'KB', 'MB'
+ );
+
+ { Traductions espagnoles }
+ STRINGS_ES: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Archivo }
+  'Archivo', 'Nuevo mensaje', 'Abrir', 'Guardar', 'Guardar como',
+  'Imprimir', 'Salir',
+  { Menu Editar }
+  'Editar', 'Deshacer', 'Rehacer', 'Cortar', 'Copiar', 'Pegar',
+  'Seleccionar todo', 'Buscar',
+  { Menu Ver }
+  'Ver', 'Panel de carpetas', 'Panel de vista previa', 'Barra herramientas',
+  'Barra de estado', 'Actualizar',
+  { Menu Mensaje }
+  'Mensaje', 'Responder', 'Responder a todos', 'Reenviar', 'Eliminar',
+  'Marcar como leido', 'Marcar como no leido', 'Marcar',
+  { Menu Herramientas }
+  'Herramientas', 'Cuentas', 'Reglas', 'Preferencias',
+  'Enviar/Recibir',
+  { Menu Ayuda }
+  'Ayuda', 'Contenido', 'Acerca de',
+  { Carpetas }
+  'Bandeja de entrada', 'Bandeja de salida', 'Enviados', 'Borradores', 'Papelera',
+  { Interfaz }
+  'De', 'Para', 'Asunto', 'Fecha', 'Tamano', 'Prioridad',
+  'Adjunto', 'Buscar', 'Buscar mensajes...',
+  { Botones }
+  'OK', 'Cancelar', 'Si', 'No', 'Aplicar', 'Cerrar',
+  { Mensajes }
+  'Sin mensajes', 'Cargando...', 'Error', 'Exito',
+  'Confirmar eliminacion', 'Mensaje enviado',
+  { Estado conexion }
+  'En linea', 'Sin conexion', 'Conectando...', 'Sincronizando...',
+  { Varios }
+  'Correo nuevo', 'no leidos', 'mensajes',
+  'bytes', 'KB', 'MB'
+ );
+
+ { Traductions portugaises }
+ STRINGS_PT: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Ficheiro }
+  'Ficheiro', 'Nova mensagem', 'Abrir', 'Guardar', 'Guardar como',
+  'Imprimir', 'Sair',
+  { Menu Editar }
+  'Editar', 'Anular', 'Refazer', 'Cortar', 'Copiar', 'Colar',
+  'Seleccionar tudo', 'Procurar',
+  { Menu Ver }
+  'Ver', 'Painel de pastas', 'Painel de pre-visualizacao', 'Barra ferramentas',
+  'Barra de estado', 'Actualizar',
+  { Menu Mensagem }
+  'Mensagem', 'Responder', 'Responder a todos', 'Reencaminhar', 'Eliminar',
+  'Marcar como lida', 'Marcar como nao lida', 'Sinalizar',
+  { Menu Ferramentas }
+  'Ferramentas', 'Contas', 'Regras', 'Preferencias',
+  'Enviar/Receber',
+  { Menu Ajuda }
+  'Ajuda', 'Conteudo', 'Acerca de',
+  { Pastas }
+  'Caixa de entrada', 'Caixa de saida', 'Itens enviados', 'Rascunhos', 'Lixo',
+  { Interface }
+  'De', 'Para', 'Assunto', 'Data', 'Tamanho', 'Prioridade',
+  'Anexo', 'Procurar', 'Procurar mensagens...',
+  { Botoes }
+  'OK', 'Cancelar', 'Sim', 'Nao', 'Aplicar', 'Fechar',
+  { Mensagens }
+  'Sem mensagens', 'A carregar...', 'Erro', 'Sucesso',
+  'Confirmar eliminacao', 'Mensagem enviada',
+  { Estado ligacao }
+  'Online', 'Offline', 'A ligar...', 'A sincronizar...',
+  { Diversos }
+  'Novo correio', 'nao lidas', 'mensagens',
+  'bytes', 'KB', 'MB'
+ );
+
+ { Traductions suedoises }
+ STRINGS_SV: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Meny Arkiv }
+  'Arkiv', 'Nytt meddelande', 'Oeppna', 'Spara', 'Spara som',
+  'Skriv ut', 'Avsluta',
+  { Meny Redigera }
+  'Redigera', 'Aangra', 'Goer om', 'Klipp ut', 'Kopiera', 'Klistra in',
+  'Markera allt', 'Soek',
+  { Meny Visa }
+  'Visa', 'Mappanel', 'Forhandsvisning', 'Verktygsfaelt',
+  'Statusfaelt', 'Uppdatera',
+  { Meny Meddelande }
+  'Meddelande', 'Svara', 'Svara alla', 'Vidarebefordra', 'Ta bort',
+  'Markera som laest', 'Markera som olaest', 'Flagga',
+  { Meny Verktyg }
+  'Verktyg', 'Konton', 'Regler', 'Installningar',
+  'Skicka/Ta emot',
+  { Meny Hjaelp }
+  'Hjaelp', 'Innehall', 'Om',
+  { Mappar }
+  'Inkorg', 'Utkorg', 'Skickat', 'Utkast', 'Papperskorg',
+  { Graenssnitt }
+  'Fran', 'Till', 'AEmne', 'Datum', 'Storlek', 'Prioritet',
+  'Bilaga', 'Soek', 'Soek meddelanden...',
+  { Knappar }
+  'OK', 'Avbryt', 'Ja', 'Nej', 'Tillaemp', 'Staeng',
+  { Meddelanden }
+  'Inga meddelanden', 'Laddar...', 'Fel', 'Lyckades',
+  'Bekraefta borttagning', 'Meddelande skickat',
+  { Anslutningsstatus }
+  'Online', 'Offline', 'Ansluter...', 'Synkroniserar...',
+  { OEvrigt }
+  'Ny e-post', 'olaesta', 'meddelanden',
+  'byte', 'KB', 'MB'
+ );
+
+ { Traductions danoises }
+ STRINGS_DA: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Fil }
+  'Fil', 'Ny besked', 'AAbn', 'Gem', 'Gem som',
+  'Udskriv', 'Afslut',
+  { Menu Rediger }
+  'Rediger', 'Fortryd', 'Annuller fortryd', 'Klip', 'Kopier', 'Indsaet',
+  'Vaelg alle', 'Find',
+  { Menu Vis }
+  'Vis', 'Mappepanel', 'Eksempelpanel', 'Vaerktoejslinje',
+  'Statuslinje', 'Opdater',
+  { Menu Besked }
+  'Besked', 'Svar', 'Svar alle', 'Videresend', 'Slet',
+  'Marker som laest', 'Marker som ulaest', 'Flag',
+  { Menu Funktioner }
+  'Funktioner', 'Konti', 'Regler', 'Indstillinger',
+  'Send/Modtag',
+  { Menu Hjaelp }
+  'Hjaelp', 'Indhold', 'Om',
+  { Mapper }
+  'Indbakke', 'Udbakke', 'Sendt', 'Kladder', 'Papirkurv',
+  { Graenseflade }
+  'Fra', 'Til', 'Emne', 'Dato', 'Storrelse', 'Prioritet',
+  'Vedhaeftning', 'Soeg', 'Soeg i beskeder...',
+  { Knapper }
+  'OK', 'Annuller', 'Ja', 'Nej', 'Anvend', 'Luk',
+  { Beskeder }
+  'Ingen beskeder', 'Indlaeser...', 'Fejl', 'Succes',
+  'Bekraeft sletning', 'Besked sendt',
+  { Forbindelsesstatus }
+  'Online', 'Offline', 'Forbinder...', 'Synkroniserer...',
+  { Diverse }
+  'Ny e-mail', 'ulaeste', 'beskeder',
+  'bytes', 'KB', 'MB'
+ );
+
+ { Traductions japonaises (romaji) }
+ STRINGS_JA: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Fairu }
+  'Fairu', 'Atarashii messeeji', 'Hiraku', 'Hozon', 'Namae wo tsukete hozon',
+  'Insatsu', 'Shuuryou',
+  { Menu Henshuu }
+  'Henshuu', 'Modosu', 'Yarinaoshi', 'Kiru', 'Kopii', 'Haritsukezu',
+  'Subete sentaku', 'Kensaku',
+  { Menu Hyouji }
+  'Hyouji', 'Foruda pein', 'Purebyu pein', 'Tsuuru baa',
+  'Suteetasu baa', 'Saishinji',
+  { Menu Messeeji }
+  'Messeeji', 'Henshin', 'Zen-in ni henshin', 'Tensou', 'Sakujo',
+  'Kidoku ni suru', 'Midoku ni suru', 'Furagu',
+  { Menu Tsuuru }
+  'Tsuuru', 'Akaunto', 'Ruuru', 'Settei',
+  'Soushin/Jushin',
+  { Menu Herupu }
+  'Herupu', 'Mokuji', 'Kono apuri ni tsuite',
+  { Foruda }
+  'Jushinbako', 'Soushinbako', 'Soushinsumi', 'Shitagaki', 'Gomibako',
+  { Intaafeisu }
+  'Sashidashinin', 'Atesaki', 'Kenmei', 'Hizuke', 'Saizu', 'Yuusendo',
+  'Tenpu', 'Kensaku', 'Messeeji wo kensaku...',
+  { Botan }
+  'OK', 'Kyanseru', 'Hai', 'Iie', 'Tekiyou', 'Tojiru',
+  { Messeeji }
+  'Messeeji nashi', 'Yomikomi-chu...', 'Eraa', 'Seikoo',
+  'Sakujo kakunin', 'Messeeji soushin-zumi',
+  { Setsuzoku joutai }
+  'Onrain', 'Ofurain', 'Setsuzoku-chu...', 'Douki-chu...',
+  { Sonota }
+  'Shin meeru', 'midoku', 'messeeji',
+  'baito', 'KB', 'MB'
+ );
+
+ { Traductions albanaises }
+ STRINGS_SQ: Array[0..MAX_STRING_IDS-1] of String[40] = (
+  { Menu Skedar }
+  'Skedar', 'Mesazh i ri', 'Hap', 'Ruaj', 'Ruaj si',
+  'Printo', 'Dil',
+  { Menu Ndrysho }
+  'Ndrysho', 'Zhbej', 'Ribej', 'Prit', 'Kopjo', 'Ngjit',
+  'Zgjidh te gjitha', 'Keerko',
+  { Menu Shiko }
+  'Shiko', 'Paneli dosje', 'Paneli parapamje', 'Shiriti veglash',
+  'Shiriti statusit', 'Rifresko',
+  { Menu Mesazh }
+  'Mesazh', 'Pergjigju', 'Pergjigju te gjitheve', 'Percjell', 'Fshi',
+  'Sheno si lexuar', 'Sheno si palexuar', 'Sheno',
+  { Menu Vegla }
+  'Vegla', 'Llogarite', 'Rregullat', 'Preferencat',
+  'Dergo/Merr',
+  { Menu Ndihme }
+  'Ndihme', 'Permbajtja', 'Rreth',
+  { Dosje }
+  'Kutia hyrëse', 'Kutia dalëse', 'Te dërguarat', 'Skica', 'Koshi',
+  { Nderfaqe }
+  'Nga', 'Per', 'Tema', 'Data', 'Madhesia', 'Prioriteti',
+  'Bashkëangjitje', 'Keerko', 'Keerko mesazhe...',
+  { Butona }
+  'OK', 'Anulo', 'Po', 'Jo', 'Zbato', 'Mbyll',
+  { Mesazhe }
+  'Pa mesazhe', 'Duke ngarkuar...', 'Gabim', 'Sukses',
+  'Konfirmo fshirjen', 'Mesazhi u dergua',
+  { Status lidhje }
+  'Online', 'Offline', 'Duke u lidhur...', 'Duke sinkronizuar...',
+  { Te tjera }
+  'Poste e re', 'palexuar', 'mesazhe',
+  'byte', 'KB', 'MB'
+ );
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -2862,6 +3297,15 @@ Var
  StatusIndicatorVisible: Boolean;      { Indicateur visible }
  StatusBlinkState: Boolean;            { Etat de clignotement }
  LastBlinkTime: LongInt;               { Dernier changement de clignotement }
+
+ { ============================================================================
+   VARIABLES POUR LE SUPPORT MULTI-LANGUE (TODO 25)
+   ============================================================================ }
+
+ CurrentLanguage: TLanguage;           { Langue actuelle }
+ CustomStrings: Array[0..MAX_STRING_IDS-1] of String[40]; { Chaines personnalisees }
+ UseCustomStrings: Boolean;            { Utiliser les chaines personnalisees }
+ LanguageFilePath: String[80];         { Chemin du fichier de langue }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -19761,6 +20205,304 @@ End;
   FIN DE L'IMPLEMENTATION DU MODE HORS LIGNE ET SYNCHRONISATION (TODO 24)
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU SUPPORT MULTI-LANGUE (TODO 25)
+  ============================================================================ }
+
+{ Retourne la chaine traduite pour un identifiant }
+Function Lang_GetString(SID: TStringID): String;
+Var
+ Index: Integer;
+Begin
+ Index := Ord(SID);
+ If (Index < 0) Or (Index >= MAX_STRING_IDS) Then Begin
+  Lang_GetString := '';
+  Exit;
+ End;
+
+ { Utiliser les chaines personnalisees si disponibles }
+ If UseCustomStrings And (CustomStrings[Index] <> '') Then Begin
+  Lang_GetString := CustomStrings[Index];
+  Exit;
+ End;
+
+ { Sinon utiliser les traductions integrees }
+ Case CurrentLanguage Of
+  langFrench: Lang_GetString := STRINGS_FR[Index];
+  langEnglish: Lang_GetString := STRINGS_EN[Index];
+  langGerman: Lang_GetString := STRINGS_DE[Index];
+  langItalian: Lang_GetString := STRINGS_IT[Index];
+  langSpanish: Lang_GetString := STRINGS_ES[Index];
+  langPortuguese: Lang_GetString := STRINGS_PT[Index];
+  langSwedish: Lang_GetString := STRINGS_SV[Index];
+  langDanish: Lang_GetString := STRINGS_DA[Index];
+  langJapanese: Lang_GetString := STRINGS_JA[Index];
+  langAlbanian: Lang_GetString := STRINGS_SQ[Index];
+  Else Lang_GetString := STRINGS_FR[Index];
+ End;
+End;
+
+{ Alias court pour obtenir une chaine }
+Function _T(SID: TStringID): String;
+Begin
+ _T := Lang_GetString(SID);
+End;
+
+{ Detecte la langue depuis la variable d'environnement LANGUAGE }
+Function Lang_DetectFromEnv: TLanguage;
+Var
+ LangEnv: String;
+ I: Integer;
+Begin
+ Lang_DetectFromEnv := langFrench; { Par defaut }
+
+ {$IFDEF FPC}
+ LangEnv := GetEnvironmentVariable('LANGUAGE');
+ If LangEnv = '' Then
+  LangEnv := GetEnvironmentVariable('LANG');
+ If LangEnv = '' Then
+  LangEnv := GetEnvironmentVariable('LC_ALL');
+ {$ELSE}
+ LangEnv := GetEnv('LANGUAGE');
+ If LangEnv = '' Then
+  LangEnv := GetEnv('LANG');
+ {$ENDIF}
+
+ If LangEnv = '' Then Exit;
+
+ { Convertir en majuscules }
+ For I := 1 To Length(LangEnv) Do
+  If (LangEnv[I] >= 'a') And (LangEnv[I] <= 'z') Then
+   LangEnv[I] := Chr(Ord(LangEnv[I]) - 32);
+
+ { Verifier les codes de langue }
+ If (Pos('EN', LangEnv) = 1) Or (Pos('US', LangEnv) > 0) Or
+    (Pos('GB', LangEnv) > 0) Then
+  Lang_DetectFromEnv := langEnglish
+ Else If (Pos('DE', LangEnv) = 1) Or (Pos('GR', LangEnv) = 1) Or
+         (Pos('GE', LangEnv) > 0) Then
+  Lang_DetectFromEnv := langGerman
+ Else If Pos('IT', LangEnv) = 1 Then
+  Lang_DetectFromEnv := langItalian
+ Else If (Pos('ES', LangEnv) = 1) Or (Pos('SP', LangEnv) = 1) Then
+  Lang_DetectFromEnv := langSpanish
+ Else If (Pos('PT', LangEnv) = 1) Or (Pos('PRT', LangEnv) > 0) Or
+         (Pos('BR', LangEnv) > 0) Then
+  Lang_DetectFromEnv := langPortuguese
+ Else If (Pos('SV', LangEnv) = 1) Or (Pos('SE', LangEnv) = 1) Or
+         (Pos('SWE', LangEnv) > 0) Then
+  Lang_DetectFromEnv := langSwedish
+ Else If (Pos('DA', LangEnv) = 1) Or (Pos('DK', LangEnv) = 1) Or
+         (Pos('DNK', LangEnv) > 0) Then
+  Lang_DetectFromEnv := langDanish
+ Else If (Pos('JA', LangEnv) = 1) Or (Pos('JP', LangEnv) = 1) Or
+         (Pos('JPN', LangEnv) > 0) Then
+  Lang_DetectFromEnv := langJapanese
+ Else If (Pos('SQ', LangEnv) = 1) Or (Pos('ALB', LangEnv) > 0) Or
+         (Pos('AL', LangEnv) = 1) Then
+  Lang_DetectFromEnv := langAlbanian
+ Else If Pos('FR', LangEnv) = 1 Then
+  Lang_DetectFromEnv := langFrench;
+End;
+
+{ Definit la langue courante }
+Procedure Lang_SetLanguage(NewLang: TLanguage);
+Begin
+ CurrentLanguage := NewLang;
+End;
+
+{ Retourne la langue courante }
+Function Lang_GetLanguage: TLanguage;
+Begin
+ Lang_GetLanguage := CurrentLanguage;
+End;
+
+{ Retourne le code de la langue courante }
+Function Lang_GetCode: String;
+Begin
+ Lang_GetCode := LANG_CODES[CurrentLanguage];
+End;
+
+{ Retourne le nom de la langue courante }
+Function Lang_GetName: String;
+Begin
+ Lang_GetName := LANG_NAMES[CurrentLanguage];
+End;
+
+{ Charge un fichier de langue }
+Function Lang_LoadFile(Filename: String): Boolean;
+Var
+ F: Text;
+ Line: String;
+ Index, P: Integer;
+ Key, Value: String;
+Begin
+ Lang_LoadFile := False;
+
+ {$I-}
+ Assign(F, Filename);
+ Reset(F);
+ If IOResult <> 0 Then Exit;
+
+ UseCustomStrings := False;
+ Index := 0;
+
+ While Not Eof(F) And (Index < MAX_STRING_IDS) Do Begin
+  ReadLn(F, Line);
+
+  { Ignorer les commentaires et lignes vides }
+  If (Length(Line) = 0) Or (Line[1] = ';') Or (Line[1] = '#') Then
+   Continue;
+
+  { Format: CLE=VALEUR ou simplement VALEUR (une par ligne) }
+  P := Pos('=', Line);
+  If P > 0 Then Begin
+   { Format CLE=VALEUR }
+   Key := Copy(Line, 1, P - 1);
+   Value := Copy(Line, P + 1, Length(Line) - P);
+
+   { Chercher l'index de la cle }
+   { Pour simplifier, on utilise l'index numerique }
+   Val(Key, Index, P);
+   If (P = 0) And (Index >= 0) And (Index < MAX_STRING_IDS) Then Begin
+    CustomStrings[Index] := Value;
+   End;
+  End
+  Else Begin
+   { Format sequentiel }
+   CustomStrings[Index] := Line;
+   Inc(Index);
+  End;
+ End;
+
+ Close(F);
+ {$I+}
+
+ If IOResult = 0 Then Begin
+  UseCustomStrings := True;
+  LanguageFilePath := Filename;
+  Lang_LoadFile := True;
+ End;
+End;
+
+{ Sauvegarde les chaines dans un fichier de langue }
+Function Lang_SaveFile(Filename: String): Boolean;
+Var
+ F: Text;
+ I: Integer;
+Begin
+ Lang_SaveFile := False;
+
+ {$I-}
+ Assign(F, Filename);
+ Rewrite(F);
+ If IOResult <> 0 Then Exit;
+
+ WriteLn(F, '; Fichier de langue pour Outlook Express');
+ WriteLn(F, '; Langue: ' + LANG_NAMES[CurrentLanguage]);
+ WriteLn(F, '; Code: ' + LANG_CODES[CurrentLanguage]);
+ WriteLn(F, ';');
+ WriteLn(F, '; Format: INDEX=TEXTE');
+ WriteLn(F, '');
+
+ For I := 0 To MAX_STRING_IDS - 1 Do Begin
+  If UseCustomStrings And (CustomStrings[I] <> '') Then
+   WriteLn(F, I, '=', CustomStrings[I])
+  Else
+   WriteLn(F, I, '=', Lang_GetString(TStringID(I)));
+ End;
+
+ Close(F);
+ {$I+}
+
+ Lang_SaveFile := (IOResult = 0);
+End;
+
+{ Charge automatiquement le fichier de langue si disponible }
+Procedure Lang_AutoLoadFile;
+Var
+ Filename: String;
+Begin
+ Filename := 'OUTLOOK_' + LANG_CODES[CurrentLanguage] + LANG_FILE_EXT;
+ If Lang_LoadFile(Filename) Then Exit;
+
+ { Essayer avec le chemin complet }
+ Filename := 'LANG\OUTLOOK_' + LANG_CODES[CurrentLanguage] + LANG_FILE_EXT;
+ Lang_LoadFile(Filename);
+End;
+
+{ Initialise le systeme de traduction }
+Procedure Lang_Init;
+Var
+ I: Integer;
+Begin
+ { Initialiser les chaines personnalisees }
+ For I := 0 To MAX_STRING_IDS - 1 Do
+  CustomStrings[I] := '';
+
+ UseCustomStrings := False;
+ LanguageFilePath := '';
+
+ { Detecter la langue depuis l'environnement }
+ CurrentLanguage := Lang_DetectFromEnv;
+
+ { Essayer de charger un fichier de langue }
+ Lang_AutoLoadFile;
+End;
+
+{ Retourne la liste des langues disponibles }
+Function Lang_GetAvailableCount: Integer;
+Begin
+ Lang_GetAvailableCount := Ord(High(TLanguage)) + 1;
+End;
+
+{ Retourne le nom d'une langue par index }
+Function Lang_GetNameByIndex(Index: Integer): String;
+Begin
+ If (Index >= 0) And (Index <= Ord(High(TLanguage))) Then
+  Lang_GetNameByIndex := LANG_NAMES[TLanguage(Index)]
+ Else
+  Lang_GetNameByIndex := '';
+End;
+
+{ Retourne le code d'une langue par index }
+Function Lang_GetCodeByIndex(Index: Integer): String;
+Begin
+ If (Index >= 0) And (Index <= Ord(High(TLanguage))) Then
+  Lang_GetCodeByIndex := LANG_CODES[TLanguage(Index)]
+ Else
+  Lang_GetCodeByIndex := '';
+End;
+
+{ Definit la langue par son code }
+Function Lang_SetByCode(Code: String): Boolean;
+Var
+ I: Integer;
+ UpCode: String;
+Begin
+ Lang_SetByCode := False;
+ UpCode := Code;
+
+ { Convertir en majuscules }
+ For I := 1 To Length(UpCode) Do
+  If (UpCode[I] >= 'a') And (UpCode[I] <= 'z') Then
+   UpCode[I] := Chr(Ord(UpCode[I]) - 32);
+
+ { Chercher le code }
+ For I := 0 To Ord(High(TLanguage)) Do Begin
+  If LANG_CODES[TLanguage(I)] = UpCode Then Begin
+   CurrentLanguage := TLanguage(I);
+   Lang_AutoLoadFile;
+   Lang_SetByCode := True;
+   Exit;
+  End;
+ End;
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU SUPPORT MULTI-LANGUE (TODO 25)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -21573,6 +22315,9 @@ BEGIN
  Offline_Init;
  Offline_LoadCache;
  Offline_LoadQueue;
+
+ { Initialisation du support multi-langue (TODO 25) }
+ Lang_Init;
 
  { Affichage de l'interface }
  ShowMouse;
