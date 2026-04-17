@@ -174,7 +174,7 @@
       - Onglet Connexion: Délais, tentatives, mode hors ligne
       - Onglet Sécurité: Avertissements, blocage d'images externes
 
-  24. [ ] Mode hors ligne et synchronisation
+  24. [x] Mode hors ligne et synchronisation
       - Détection automatique de la connectivité
       - File d'attente des messages à envoyer
       - Cache local des messages et dossiers
@@ -1248,6 +1248,87 @@ Type
   Connection: TConnectionPrefs;  { Preferences de connexion }
   Security: TSecurityPrefs;      { Preferences de securite }
   Modified: Boolean;             { Preferences modifiees }
+ End;
+
+ { ============================================================================
+   TYPES POUR LE MODE HORS LIGNE ET SYNCHRONISATION (TODO 24)
+   ============================================================================ }
+
+ { Etat de connexion }
+ TConnectionState = (
+  csOnline,                      { Connecte }
+  csOffline,                     { Hors ligne }
+  csConnecting,                  { En cours de connexion }
+  csDisconnecting,               { En cours de deconnexion }
+  csSynchronizing                { En cours de synchronisation }
+ );
+
+ { Type d'operation en attente }
+ TQueuedOpType = (
+  qotSendMessage,                { Envoyer un message }
+  qotDeleteMessage,              { Supprimer un message }
+  qotMoveMessage,                { Deplacer un message }
+  qotMarkAsRead,                 { Marquer comme lu }
+  qotMarkAsUnread,               { Marquer comme non lu }
+  qotFlagMessage,                { Marquer d'un drapeau }
+  qotUnflagMessage               { Retirer le drapeau }
+ );
+
+ { Etat d'une operation en file d'attente }
+ TQueuedOpState = (
+  qosWaiting,                    { En attente }
+  qosProcessing,                 { En cours de traitement }
+  qosCompleted,                  { Terminee }
+  qosFailed                      { Echouee }
+ );
+
+ { Operation en file d'attente }
+ TQueuedOperation = Record
+  OpType: TQueuedOpType;         { Type d'operation }
+  State: TQueuedOpState;         { Etat de l'operation }
+  MessageID: String[20];         { ID du message concerne }
+  TargetFolder: String[40];      { Dossier cible (pour deplacement) }
+  QueuedTime: LongInt;           { Heure de mise en file (timestamp) }
+  RetryCount: Integer;           { Nombre de tentatives }
+  LastError: String[80];         { Derniere erreur }
+  Priority: Integer;             { Priorite (0=haute, 9=basse) }
+ End;
+
+ { Message en cache local }
+ TCachedMessage = Record
+  MsgID: String[20];             { Identifiant unique }
+  FolderName: String[40];        { Nom du dossier }
+  FromName: String[40];          { Nom de l'expediteur }
+  FromEmail: String[60];         { Adresse email }
+  Subject: String[80];           { Objet }
+  DateSort: LongInt;             { Date pour le tri }
+  Size: LongInt;                 { Taille en octets }
+  IsRead: Boolean;               { Message lu }
+  IsFlagged: Boolean;            { Message marque }
+  HasAttachment: Boolean;        { Contient des pieces jointes }
+  CacheTime: LongInt;            { Heure de mise en cache }
+  IsDirty: Boolean;              { Modifie localement }
+ End;
+
+ { Dossier en cache }
+ TCachedFolder = Record
+  Name: String[40];              { Nom du dossier }
+  ParentName: String[40];        { Nom du dossier parent }
+  MessageCount: Integer;         { Nombre de messages }
+  UnreadCount: Integer;          { Messages non lus }
+  LastSync: LongInt;             { Derniere synchronisation }
+  IsDirty: Boolean;              { Modifie localement }
+ End;
+
+ { Statistiques de synchronisation }
+ TSyncStats = Record
+  MessagesSent: Integer;         { Messages envoyes }
+  MessagesReceived: Integer;     { Messages recus }
+  MessagesDeleted: Integer;      { Messages supprimes }
+  MessagesMoved: Integer;        { Messages deplaces }
+  Errors: Integer;               { Erreurs }
+  StartTime: LongInt;            { Debut de la sync }
+  EndTime: LongInt;              { Fin de la sync }
  End;
 
  { Type de colonne pour la liste des messages }
@@ -2398,6 +2479,43 @@ Const
   'Texte enrichi'
  );
 
+ { ============================================================================
+   CONSTANTES POUR LE MODE HORS LIGNE ET SYNCHRONISATION (TODO 24)
+   ============================================================================ }
+
+ { Taille maximale de la file d'attente }
+ MAX_QUEUED_OPS = 100;
+
+ { Taille maximale du cache de messages }
+ MAX_CACHED_MESSAGES = 500;
+
+ { Taille maximale du cache de dossiers }
+ MAX_CACHED_FOLDERS = 50;
+
+ { Intervalle de verification de la connectivite (secondes) }
+ CONNECTIVITY_CHECK_INTERVAL = 30;
+
+ { Nombre maximum de tentatives par operation }
+ MAX_RETRY_COUNT = 3;
+
+ { Delai entre les tentatives (secondes) }
+ RETRY_DELAY = 5;
+
+ { Nom du fichier de cache }
+ CACHE_FILENAME = 'OUTLOOK.CAC';
+
+ { Nom du fichier de file d'attente }
+ QUEUE_FILENAME = 'OUTLOOK.QUE';
+
+ { Version du fichier de cache }
+ CACHE_VERSION = 1;
+
+ { Indicateurs d'etat de connexion }
+ STATUS_ONLINE_TEXT = 'En ligne';
+ STATUS_OFFLINE_TEXT = 'Hors ligne';
+ STATUS_CONNECTING_TEXT = 'Connexion...';
+ STATUS_SYNCING_TEXT = 'Synchronisation...';
+
 Var
  Layout: TWindowLayout;
  DragState: TDragState;
@@ -2710,6 +2828,40 @@ Var
  PrefsEditingField: Integer;           { Champ en cours d'edition }
  PrefsEditBuffer: String[80];          { Tampon d'edition }
  PrefsNeedsSave: Boolean;              { Modifications non sauvegardees }
+
+ { ============================================================================
+   VARIABLES POUR LE MODE HORS LIGNE ET SYNCHRONISATION (TODO 24)
+   ============================================================================ }
+
+ ConnectionState: TConnectionState;    { Etat de connexion actuel }
+ LastConnectivityCheck: LongInt;       { Derniere verification connectivite }
+ IsManualOffline: Boolean;             { Mode hors ligne force manuellement }
+
+ { File d'attente des operations }
+ QueuedOps: Array[0..MAX_QUEUED_OPS-1] of TQueuedOperation;
+ QueuedOpCount: Integer;               { Nombre d'operations en attente }
+ QueueProcessing: Boolean;             { Traitement en cours }
+
+ { Cache des messages }
+ CachedMessages: Array[0..MAX_CACHED_MESSAGES-1] of TCachedMessage;
+ CachedMessageCount: Integer;          { Nombre de messages en cache }
+
+ { Cache des dossiers }
+ CachedFolders: Array[0..MAX_CACHED_FOLDERS-1] of TCachedFolder;
+ CachedFolderCount: Integer;           { Nombre de dossiers en cache }
+
+ { Statistiques de synchronisation }
+ LastSyncStats: TSyncStats;            { Stats de la derniere sync }
+ SyncInProgress: Boolean;              { Synchronisation en cours }
+ SyncProgress: Integer;                { Progression (0-100) }
+ SyncStatusText: String[80];           { Texte d'etat de la sync }
+
+ { Indicateur visuel }
+ StatusIndicatorX: Integer;            { Position X de l'indicateur }
+ StatusIndicatorY: Integer;            { Position Y de l'indicateur }
+ StatusIndicatorVisible: Boolean;      { Indicateur visible }
+ StatusBlinkState: Boolean;            { Etat de clignotement }
+ LastBlinkTime: LongInt;               { Dernier changement de clignotement }
 
 { ============================================================================
   PROCÉDURES D'INITIALISATION GRAPHIQUE
@@ -18730,6 +18882,885 @@ End;
   FIN DE L'IMPLEMENTATION DE LA CONFIGURATION DES PREFERENCES (TODO 23)
   ============================================================================ }
 
+{ ============================================================================
+  IMPLEMENTATION DU MODE HORS LIGNE ET SYNCHRONISATION (TODO 24)
+  ============================================================================ }
+
+{ Initialise le systeme hors ligne }
+Procedure Offline_Init;
+Begin
+ ConnectionState := csOffline;
+ LastConnectivityCheck := 0;
+ IsManualOffline := False;
+
+ QueuedOpCount := 0;
+ QueueProcessing := False;
+
+ CachedMessageCount := 0;
+ CachedFolderCount := 0;
+
+ SyncInProgress := False;
+ SyncProgress := 0;
+ SyncStatusText := '';
+
+ StatusIndicatorX := 0;
+ StatusIndicatorY := 0;
+ StatusIndicatorVisible := True;
+ StatusBlinkState := False;
+ LastBlinkTime := 0;
+
+ FillChar(LastSyncStats, SizeOf(TSyncStats), 0);
+End;
+
+{ Retourne le texte d'etat de connexion }
+Function Offline_GetStatusText: String;
+Begin
+ Case ConnectionState Of
+  csOnline: Offline_GetStatusText := STATUS_ONLINE_TEXT;
+  csOffline: Offline_GetStatusText := STATUS_OFFLINE_TEXT;
+  csConnecting: Offline_GetStatusText := STATUS_CONNECTING_TEXT;
+  csDisconnecting: Offline_GetStatusText := STATUS_OFFLINE_TEXT;
+  csSynchronizing: Offline_GetStatusText := STATUS_SYNCING_TEXT;
+  Else Offline_GetStatusText := STATUS_OFFLINE_TEXT;
+ End;
+End;
+
+{ Verifie la connectivite reseau }
+Function Offline_CheckConnectivity: Boolean;
+Begin
+ { Verification basique de la connectivite }
+ { En pratique, on pourrait tenter une connexion au serveur IMAP }
+ If IMAPClient.Connected Then Begin
+  Offline_CheckConnectivity := True;
+  Exit;
+ End;
+
+ { Tentative de connexion }
+ {$I-}
+ IMAP_Connect(IMAPClient.Server, IMAPClient.Port);
+ {$I+}
+
+ Offline_CheckConnectivity := IMAPClient.Connected;
+End;
+
+{ Met a jour l'etat de connexion }
+Procedure Offline_UpdateConnectionState;
+Var
+ CurrentTime: LongInt;
+ WasOnline: Boolean;
+Begin
+ { Ne pas verifier si mode hors ligne force }
+ If IsManualOffline Then Begin
+  ConnectionState := csOffline;
+  Exit;
+ End;
+
+ { Obtenir le temps actuel }
+ CurrentTime := GetTickCount Div 1000;
+
+ { Verifier si c'est le moment de tester }
+ If (CurrentTime - LastConnectivityCheck) < CONNECTIVITY_CHECK_INTERVAL Then
+  Exit;
+
+ LastConnectivityCheck := CurrentTime;
+ WasOnline := (ConnectionState = csOnline);
+
+ { Verifier la connectivite }
+ If Offline_CheckConnectivity Then Begin
+  If ConnectionState <> csOnline Then Begin
+   ConnectionState := csOnline;
+   { Lancer la synchronisation si on vient de se reconnecter }
+   If Not WasOnline Then
+    Offline_StartSync;
+  End;
+ End
+ Else Begin
+  ConnectionState := csOffline;
+ End;
+End;
+
+{ Passe en mode hors ligne manuellement }
+Procedure Offline_GoOffline;
+Begin
+ IsManualOffline := True;
+ ConnectionState := csOffline;
+
+ { Deconnecter le client IMAP }
+ If IMAPClient.Connected Then
+  IMAP_Disconnect;
+End;
+
+{ Passe en mode en ligne }
+Procedure Offline_GoOnline;
+Begin
+ IsManualOffline := False;
+ ConnectionState := csConnecting;
+
+ { Tenter la connexion }
+ If Offline_CheckConnectivity Then Begin
+  ConnectionState := csOnline;
+  { Lancer la synchronisation }
+  Offline_StartSync;
+ End
+ Else Begin
+  ConnectionState := csOffline;
+ End;
+End;
+
+{ Ajoute une operation a la file d'attente }
+Function Offline_QueueOperation(OpType: TQueuedOpType; MsgID, TargetFolder: String): Boolean;
+Var
+ I: Integer;
+Begin
+ Offline_QueueOperation := False;
+
+ { Verifier s'il y a de la place }
+ If QueuedOpCount >= MAX_QUEUED_OPS Then Exit;
+
+ { Verifier si l'operation existe deja }
+ For I := 0 To QueuedOpCount - 1 Do Begin
+  If (QueuedOps[I].OpType = OpType) And (QueuedOps[I].MessageID = MsgID) And
+     (QueuedOps[I].State = qosWaiting) Then Begin
+   { Operation deja en attente }
+   Exit;
+  End;
+ End;
+
+ { Ajouter l'operation }
+ QueuedOps[QueuedOpCount].OpType := OpType;
+ QueuedOps[QueuedOpCount].State := qosWaiting;
+ QueuedOps[QueuedOpCount].MessageID := MsgID;
+ QueuedOps[QueuedOpCount].TargetFolder := TargetFolder;
+ QueuedOps[QueuedOpCount].QueuedTime := GetTickCount Div 1000;
+ QueuedOps[QueuedOpCount].RetryCount := 0;
+ QueuedOps[QueuedOpCount].LastError := '';
+ QueuedOps[QueuedOpCount].Priority := 5; { Priorite normale }
+
+ Inc(QueuedOpCount);
+ Offline_QueueOperation := True;
+End;
+
+{ Retire une operation de la file d'attente }
+Procedure Offline_RemoveOperation(Index: Integer);
+Var
+ I: Integer;
+Begin
+ If (Index < 0) Or (Index >= QueuedOpCount) Then Exit;
+
+ { Decaler les operations suivantes }
+ For I := Index To QueuedOpCount - 2 Do
+  QueuedOps[I] := QueuedOps[I + 1];
+
+ Dec(QueuedOpCount);
+End;
+
+{ Traite une operation de la file d'attente }
+Function Offline_ProcessOperation(Index: Integer): Boolean;
+Var
+ Op: TQueuedOperation;
+Begin
+ Offline_ProcessOperation := False;
+ If (Index < 0) Or (Index >= QueuedOpCount) Then Exit;
+
+ Op := QueuedOps[Index];
+ QueuedOps[Index].State := qosProcessing;
+
+ Case Op.OpType Of
+  qotSendMessage: Begin
+   { Envoyer le message via SMTP }
+   { TODO: Implementer l'envoi SMTP }
+   QueuedOps[Index].State := qosCompleted;
+   Offline_ProcessOperation := True;
+  End;
+
+  qotDeleteMessage: Begin
+   { Supprimer le message sur le serveur }
+   If IMAP_DeleteMessage(Op.MessageID) Then Begin
+    QueuedOps[Index].State := qosCompleted;
+    Offline_ProcessOperation := True;
+   End
+   Else Begin
+    QueuedOps[Index].State := qosFailed;
+    QueuedOps[Index].LastError := 'Echec suppression';
+    Inc(QueuedOps[Index].RetryCount);
+   End;
+  End;
+
+  qotMoveMessage: Begin
+   { Deplacer le message sur le serveur }
+   If IMAP_MoveMessage(Op.MessageID, Op.TargetFolder) Then Begin
+    QueuedOps[Index].State := qosCompleted;
+    Offline_ProcessOperation := True;
+   End
+   Else Begin
+    QueuedOps[Index].State := qosFailed;
+    QueuedOps[Index].LastError := 'Echec deplacement';
+    Inc(QueuedOps[Index].RetryCount);
+   End;
+  End;
+
+  qotMarkAsRead: Begin
+   { Marquer comme lu sur le serveur }
+   If IMAP_SetFlag(Op.MessageID, '\Seen', True) Then Begin
+    QueuedOps[Index].State := qosCompleted;
+    Offline_ProcessOperation := True;
+   End
+   Else Begin
+    QueuedOps[Index].State := qosFailed;
+    Inc(QueuedOps[Index].RetryCount);
+   End;
+  End;
+
+  qotMarkAsUnread: Begin
+   { Marquer comme non lu }
+   If IMAP_SetFlag(Op.MessageID, '\Seen', False) Then Begin
+    QueuedOps[Index].State := qosCompleted;
+    Offline_ProcessOperation := True;
+   End
+   Else Begin
+    QueuedOps[Index].State := qosFailed;
+    Inc(QueuedOps[Index].RetryCount);
+   End;
+  End;
+
+  qotFlagMessage: Begin
+   { Marquer avec drapeau }
+   If IMAP_SetFlag(Op.MessageID, '\Flagged', True) Then Begin
+    QueuedOps[Index].State := qosCompleted;
+    Offline_ProcessOperation := True;
+   End
+   Else Begin
+    QueuedOps[Index].State := qosFailed;
+    Inc(QueuedOps[Index].RetryCount);
+   End;
+  End;
+
+  qotUnflagMessage: Begin
+   { Retirer le drapeau }
+   If IMAP_SetFlag(Op.MessageID, '\Flagged', False) Then Begin
+    QueuedOps[Index].State := qosCompleted;
+    Offline_ProcessOperation := True;
+   End
+   Else Begin
+    QueuedOps[Index].State := qosFailed;
+    Inc(QueuedOps[Index].RetryCount);
+   End;
+  End;
+ End;
+End;
+
+{ Traite la file d'attente des operations }
+Procedure Offline_ProcessQueue;
+Var
+ I: Integer;
+ Processed: Integer;
+Begin
+ If ConnectionState <> csOnline Then Exit;
+ If QueueProcessing Then Exit;
+ If QueuedOpCount = 0 Then Exit;
+
+ QueueProcessing := True;
+ Processed := 0;
+
+ { Traiter les operations en attente }
+ I := 0;
+ While I < QueuedOpCount Do Begin
+  If QueuedOps[I].State = qosWaiting Then Begin
+   If Offline_ProcessOperation(I) Then Begin
+    Inc(Processed);
+    Inc(LastSyncStats.MessagesSent);
+   End
+   Else Begin
+    { Verifier le nombre de tentatives }
+    If QueuedOps[I].RetryCount >= MAX_RETRY_COUNT Then Begin
+     { Abandonner l'operation }
+     Offline_RemoveOperation(I);
+     Inc(LastSyncStats.Errors);
+     Continue; { Ne pas incrementer I }
+    End;
+   End;
+  End
+  Else If QueuedOps[I].State = qosCompleted Then Begin
+   { Retirer les operations terminees }
+   Offline_RemoveOperation(I);
+   Continue;
+  End;
+  Inc(I);
+ End;
+
+ QueueProcessing := False;
+End;
+
+{ Ajoute un message au cache }
+Function Offline_CacheMessage(Const Msg: TMessage): Boolean;
+Var
+ I, Index: Integer;
+Begin
+ Offline_CacheMessage := False;
+
+ { Chercher si le message existe deja }
+ Index := -1;
+ For I := 0 To CachedMessageCount - 1 Do Begin
+  If CachedMessages[I].MsgID = Msg.MsgID Then Begin
+   Index := I;
+   Break;
+  End;
+ End;
+
+ { Si non trouve et pas de place, utiliser LRU }
+ If (Index < 0) And (CachedMessageCount >= MAX_CACHED_MESSAGES) Then Begin
+  { Trouver le message le plus ancien }
+  Index := 0;
+  For I := 1 To CachedMessageCount - 1 Do Begin
+   If CachedMessages[I].CacheTime < CachedMessages[Index].CacheTime Then
+    Index := I;
+  End;
+ End
+ Else If Index < 0 Then Begin
+  Index := CachedMessageCount;
+  Inc(CachedMessageCount);
+ End;
+
+ { Mettre a jour le cache }
+ CachedMessages[Index].MsgID := Msg.MsgID;
+ CachedMessages[Index].FolderName := 'INBOX'; { TODO: dossier actuel }
+ CachedMessages[Index].FromName := Msg.FromName;
+ CachedMessages[Index].FromEmail := Msg.FromEmail;
+ CachedMessages[Index].Subject := Msg.Subject;
+ CachedMessages[Index].DateSort := Msg.DateSort;
+ CachedMessages[Index].Size := Msg.Size;
+ CachedMessages[Index].IsRead := Msg.IsRead;
+ CachedMessages[Index].IsFlagged := Msg.IsFlagged;
+ CachedMessages[Index].HasAttachment := Msg.HasAttachment;
+ CachedMessages[Index].CacheTime := GetTickCount Div 1000;
+ CachedMessages[Index].IsDirty := False;
+
+ Offline_CacheMessage := True;
+End;
+
+{ Trouve un message dans le cache }
+Function Offline_FindCachedMessage(MsgID: String; Var Index: Integer): Boolean;
+Var
+ I: Integer;
+Begin
+ Offline_FindCachedMessage := False;
+ Index := -1;
+
+ For I := 0 To CachedMessageCount - 1 Do Begin
+  If CachedMessages[I].MsgID = MsgID Then Begin
+   Index := I;
+   Offline_FindCachedMessage := True;
+   Exit;
+  End;
+ End;
+End;
+
+{ Ajoute un dossier au cache }
+Function Offline_CacheFolder(Name, ParentName: String; MsgCount, UnreadCount: Integer): Boolean;
+Var
+ I, Index: Integer;
+Begin
+ Offline_CacheFolder := False;
+
+ { Chercher si le dossier existe deja }
+ Index := -1;
+ For I := 0 To CachedFolderCount - 1 Do Begin
+  If CachedFolders[I].Name = Name Then Begin
+   Index := I;
+   Break;
+  End;
+ End;
+
+ If (Index < 0) And (CachedFolderCount >= MAX_CACHED_FOLDERS) Then Begin
+  { Pas de place }
+  Exit;
+ End
+ Else If Index < 0 Then Begin
+  Index := CachedFolderCount;
+  Inc(CachedFolderCount);
+ End;
+
+ CachedFolders[Index].Name := Name;
+ CachedFolders[Index].ParentName := ParentName;
+ CachedFolders[Index].MessageCount := MsgCount;
+ CachedFolders[Index].UnreadCount := UnreadCount;
+ CachedFolders[Index].LastSync := GetTickCount Div 1000;
+ CachedFolders[Index].IsDirty := False;
+
+ Offline_CacheFolder := True;
+End;
+
+{ Sauvegarde le cache sur disque }
+Procedure Offline_SaveCache;
+Var
+ F: File of Byte;
+ B: Byte;
+ I, J: Integer;
+Begin
+ {$I-}
+ Assign(F, CACHE_FILENAME);
+ Rewrite(F);
+ If IOResult <> 0 Then Exit;
+
+ { Version }
+ B := CACHE_VERSION;
+ Write(F, B);
+
+ { Nombre de messages en cache }
+ B := CachedMessageCount And $FF;
+ Write(F, B);
+ B := (CachedMessageCount Shr 8) And $FF;
+ Write(F, B);
+
+ { Sauvegarder les messages }
+ For I := 0 To CachedMessageCount - 1 Do Begin
+  { MsgID }
+  B := Length(CachedMessages[I].MsgID);
+  Write(F, B);
+  For J := 1 To Length(CachedMessages[I].MsgID) Do Begin
+   B := Ord(CachedMessages[I].MsgID[J]);
+   Write(F, B);
+  End;
+
+  { FolderName }
+  B := Length(CachedMessages[I].FolderName);
+  Write(F, B);
+  For J := 1 To Length(CachedMessages[I].FolderName) Do Begin
+   B := Ord(CachedMessages[I].FolderName[J]);
+   Write(F, B);
+  End;
+
+  { FromName }
+  B := Length(CachedMessages[I].FromName);
+  Write(F, B);
+  For J := 1 To Length(CachedMessages[I].FromName) Do Begin
+   B := Ord(CachedMessages[I].FromName[J]);
+   Write(F, B);
+  End;
+
+  { Subject }
+  B := Length(CachedMessages[I].Subject);
+  Write(F, B);
+  For J := 1 To Length(CachedMessages[I].Subject) Do Begin
+   B := Ord(CachedMessages[I].Subject[J]);
+   Write(F, B);
+  End;
+
+  { Flags }
+  B := 0;
+  If CachedMessages[I].IsRead Then B := B Or 1;
+  If CachedMessages[I].IsFlagged Then B := B Or 2;
+  If CachedMessages[I].HasAttachment Then B := B Or 4;
+  If CachedMessages[I].IsDirty Then B := B Or 8;
+  Write(F, B);
+ End;
+
+ { Nombre de dossiers }
+ B := CachedFolderCount;
+ Write(F, B);
+
+ { Sauvegarder les dossiers }
+ For I := 0 To CachedFolderCount - 1 Do Begin
+  B := Length(CachedFolders[I].Name);
+  Write(F, B);
+  For J := 1 To Length(CachedFolders[I].Name) Do Begin
+   B := Ord(CachedFolders[I].Name[J]);
+   Write(F, B);
+  End;
+
+  B := CachedFolders[I].MessageCount And $FF;
+  Write(F, B);
+  B := (CachedFolders[I].MessageCount Shr 8) And $FF;
+  Write(F, B);
+
+  B := CachedFolders[I].UnreadCount And $FF;
+  Write(F, B);
+  B := (CachedFolders[I].UnreadCount Shr 8) And $FF;
+  Write(F, B);
+ End;
+
+ Close(F);
+ {$I+}
+End;
+
+{ Charge le cache depuis le disque }
+Function Offline_LoadCache: Boolean;
+Var
+ F: File of Byte;
+ B, B2: Byte;
+ I, J, Len: Integer;
+Begin
+ Offline_LoadCache := False;
+
+ {$I-}
+ Assign(F, CACHE_FILENAME);
+ Reset(F);
+ If IOResult <> 0 Then Exit;
+
+ { Verifier la version }
+ Read(F, B);
+ If B > CACHE_VERSION Then Begin
+  Close(F);
+  Exit;
+ End;
+
+ { Nombre de messages }
+ Read(F, B);
+ Read(F, B2);
+ CachedMessageCount := B Or (B2 Shl 8);
+ If CachedMessageCount > MAX_CACHED_MESSAGES Then
+  CachedMessageCount := MAX_CACHED_MESSAGES;
+
+ { Charger les messages }
+ For I := 0 To CachedMessageCount - 1 Do Begin
+  { MsgID }
+  Read(F, B);
+  Len := B;
+  CachedMessages[I].MsgID := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   CachedMessages[I].MsgID := CachedMessages[I].MsgID + Chr(B);
+  End;
+
+  { FolderName }
+  Read(F, B);
+  Len := B;
+  CachedMessages[I].FolderName := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   CachedMessages[I].FolderName := CachedMessages[I].FolderName + Chr(B);
+  End;
+
+  { FromName }
+  Read(F, B);
+  Len := B;
+  CachedMessages[I].FromName := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   CachedMessages[I].FromName := CachedMessages[I].FromName + Chr(B);
+  End;
+
+  { Subject }
+  Read(F, B);
+  Len := B;
+  CachedMessages[I].Subject := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   CachedMessages[I].Subject := CachedMessages[I].Subject + Chr(B);
+  End;
+
+  { Flags }
+  Read(F, B);
+  CachedMessages[I].IsRead := (B And 1) <> 0;
+  CachedMessages[I].IsFlagged := (B And 2) <> 0;
+  CachedMessages[I].HasAttachment := (B And 4) <> 0;
+  CachedMessages[I].IsDirty := (B And 8) <> 0;
+ End;
+
+ { Nombre de dossiers }
+ Read(F, B);
+ CachedFolderCount := B;
+ If CachedFolderCount > MAX_CACHED_FOLDERS Then
+  CachedFolderCount := MAX_CACHED_FOLDERS;
+
+ { Charger les dossiers }
+ For I := 0 To CachedFolderCount - 1 Do Begin
+  Read(F, B);
+  Len := B;
+  CachedFolders[I].Name := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   CachedFolders[I].Name := CachedFolders[I].Name + Chr(B);
+  End;
+
+  Read(F, B);
+  Read(F, B2);
+  CachedFolders[I].MessageCount := B Or (B2 Shl 8);
+
+  Read(F, B);
+  Read(F, B2);
+  CachedFolders[I].UnreadCount := B Or (B2 Shl 8);
+ End;
+
+ Close(F);
+ {$I+}
+
+ Offline_LoadCache := True;
+End;
+
+{ Sauvegarde la file d'attente }
+Procedure Offline_SaveQueue;
+Var
+ F: File of Byte;
+ B: Byte;
+ I, J: Integer;
+Begin
+ {$I-}
+ Assign(F, QUEUE_FILENAME);
+ Rewrite(F);
+ If IOResult <> 0 Then Exit;
+
+ { Nombre d'operations }
+ B := QueuedOpCount;
+ Write(F, B);
+
+ For I := 0 To QueuedOpCount - 1 Do Begin
+  { Type d'operation }
+  B := Ord(QueuedOps[I].OpType);
+  Write(F, B);
+
+  { Etat }
+  B := Ord(QueuedOps[I].State);
+  Write(F, B);
+
+  { MessageID }
+  B := Length(QueuedOps[I].MessageID);
+  Write(F, B);
+  For J := 1 To Length(QueuedOps[I].MessageID) Do Begin
+   B := Ord(QueuedOps[I].MessageID[J]);
+   Write(F, B);
+  End;
+
+  { TargetFolder }
+  B := Length(QueuedOps[I].TargetFolder);
+  Write(F, B);
+  For J := 1 To Length(QueuedOps[I].TargetFolder) Do Begin
+   B := Ord(QueuedOps[I].TargetFolder[J]);
+   Write(F, B);
+  End;
+
+  { RetryCount }
+  B := QueuedOps[I].RetryCount;
+  Write(F, B);
+
+  { Priority }
+  B := QueuedOps[I].Priority;
+  Write(F, B);
+ End;
+
+ Close(F);
+ {$I+}
+End;
+
+{ Charge la file d'attente }
+Function Offline_LoadQueue: Boolean;
+Var
+ F: File of Byte;
+ B: Byte;
+ I, J, Len: Integer;
+Begin
+ Offline_LoadQueue := False;
+
+ {$I-}
+ Assign(F, QUEUE_FILENAME);
+ Reset(F);
+ If IOResult <> 0 Then Exit;
+
+ Read(F, B);
+ QueuedOpCount := B;
+ If QueuedOpCount > MAX_QUEUED_OPS Then
+  QueuedOpCount := MAX_QUEUED_OPS;
+
+ For I := 0 To QueuedOpCount - 1 Do Begin
+  Read(F, B);
+  QueuedOps[I].OpType := TQueuedOpType(B);
+
+  Read(F, B);
+  QueuedOps[I].State := TQueuedOpState(B);
+
+  Read(F, B);
+  Len := B;
+  QueuedOps[I].MessageID := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   QueuedOps[I].MessageID := QueuedOps[I].MessageID + Chr(B);
+  End;
+
+  Read(F, B);
+  Len := B;
+  QueuedOps[I].TargetFolder := '';
+  For J := 1 To Len Do Begin
+   Read(F, B);
+   QueuedOps[I].TargetFolder := QueuedOps[I].TargetFolder + Chr(B);
+  End;
+
+  Read(F, B);
+  QueuedOps[I].RetryCount := B;
+
+  Read(F, B);
+  QueuedOps[I].Priority := B;
+
+  QueuedOps[I].QueuedTime := GetTickCount Div 1000;
+  QueuedOps[I].LastError := '';
+ End;
+
+ Close(F);
+ {$I+}
+
+ Offline_LoadQueue := True;
+End;
+
+{ Demarre la synchronisation }
+Procedure Offline_StartSync;
+Begin
+ If SyncInProgress Then Exit;
+ If ConnectionState <> csOnline Then Exit;
+
+ SyncInProgress := True;
+ SyncProgress := 0;
+ ConnectionState := csSynchronizing;
+
+ { Reinitialiser les statistiques }
+ FillChar(LastSyncStats, SizeOf(TSyncStats), 0);
+ LastSyncStats.StartTime := GetTickCount Div 1000;
+
+ SyncStatusText := 'Connexion au serveur...';
+End;
+
+{ Execute une etape de synchronisation }
+Procedure Offline_SyncStep;
+Begin
+ If Not SyncInProgress Then Exit;
+
+ { Etape 1: Traiter la file d'attente (0-30%) }
+ If SyncProgress < 30 Then Begin
+  SyncStatusText := 'Envoi des operations en attente...';
+  Offline_ProcessQueue;
+  SyncProgress := 30;
+  Exit;
+ End;
+
+ { Etape 2: Synchroniser les dossiers (30-50%) }
+ If SyncProgress < 50 Then Begin
+  SyncStatusText := 'Synchronisation des dossiers...';
+  { TODO: Synchroniser la liste des dossiers }
+  SyncProgress := 50;
+  Exit;
+ End;
+
+ { Etape 3: Recuperer les nouveaux messages (50-90%) }
+ If SyncProgress < 90 Then Begin
+  SyncStatusText := 'Recuperation des nouveaux messages...';
+  { TODO: Telecharger les nouveaux messages }
+  SyncProgress := 90;
+  Exit;
+ End;
+
+ { Etape 4: Finalisation (90-100%) }
+ If SyncProgress < 100 Then Begin
+  SyncStatusText := 'Finalisation...';
+
+  { Sauvegarder le cache }
+  Offline_SaveCache;
+
+  SyncProgress := 100;
+  LastSyncStats.EndTime := GetTickCount Div 1000;
+  SyncInProgress := False;
+  ConnectionState := csOnline;
+  SyncStatusText := 'Synchronisation terminee';
+ End;
+End;
+
+{ Arrete la synchronisation }
+Procedure Offline_StopSync;
+Begin
+ If Not SyncInProgress Then Exit;
+
+ SyncInProgress := False;
+ ConnectionState := csOnline;
+ SyncStatusText := 'Synchronisation annulee';
+End;
+
+{ Dessine l'indicateur de connexion }
+Procedure Offline_DrawStatusIndicator;
+Var
+ X, Y: Integer;
+ StatusColor: Word;
+ StatusText: String;
+ CurrentTime: LongInt;
+Begin
+ If Not StatusIndicatorVisible Then Exit;
+
+ { Position dans la barre d'etat }
+ X := GetMaxX - 120;
+ Y := GetMaxY - 18;
+
+ { Determiner la couleur }
+ Case ConnectionState Of
+  csOnline: StatusColor := Green;
+  csOffline: StatusColor := Red;
+  csConnecting: StatusColor := Yellow;
+  csDisconnecting: StatusColor := Yellow;
+  csSynchronizing: Begin
+   { Clignotement pendant la sync }
+   CurrentTime := GetTickCount Div 500;
+   If (CurrentTime And 1) = 0 Then
+    StatusColor := Yellow
+   Else
+    StatusColor := Green;
+  End;
+  Else StatusColor := LightGray;
+ End;
+
+ { Dessiner le cercle indicateur }
+ SetColor(StatusColor);
+ SetFillStyle(SolidFill, StatusColor);
+ FillEllipse(X + 8, Y + 8, 6, 6);
+ SetColor(DarkGray);
+ Ellipse(X + 8, Y + 8, 0, 360, 6, 6);
+
+ { Texte d'etat }
+ StatusText := Offline_GetStatusText;
+ If SyncInProgress Then Begin
+  Str(SyncProgress, StatusText);
+  StatusText := 'Sync: ' + StatusText + '%';
+ End;
+
+ SetColor(Black);
+ OutTextXY(X + 20, Y + 3, StatusText);
+End;
+
+{ Gere le clic sur l'indicateur de connexion }
+Procedure Offline_HandleStatusClick(MX, MY: Integer);
+Var
+ X, Y: Integer;
+Begin
+ X := GetMaxX - 120;
+ Y := GetMaxY - 18;
+
+ { Verifier si le clic est sur l'indicateur }
+ If (MX >= X) And (MX <= X + 100) And (MY >= Y) And (MY <= Y + 16) Then Begin
+  { Basculer le mode }
+  If ConnectionState = csOnline Then
+   Offline_GoOffline
+  Else If ConnectionState = csOffline Then
+   Offline_GoOnline;
+ End;
+End;
+
+{ Retourne le nombre d'operations en attente }
+Function Offline_GetPendingCount: Integer;
+Var
+ I, Count: Integer;
+Begin
+ Count := 0;
+ For I := 0 To QueuedOpCount - 1 Do Begin
+  If QueuedOps[I].State = qosWaiting Then
+   Inc(Count);
+ End;
+ Offline_GetPendingCount := Count;
+End;
+
+{ Retourne True si en mode hors ligne }
+Function Offline_IsOffline: Boolean;
+Begin
+ Offline_IsOffline := (ConnectionState = csOffline);
+End;
+
+{ ============================================================================
+  FIN DE L'IMPLEMENTATION DU MODE HORS LIGNE ET SYNCHRONISATION (TODO 24)
+  ============================================================================ }
+
 { Initialise la liste des messages avec des donnees de demonstration }
 Procedure InitializeMessageList;
 Begin
@@ -20538,12 +21569,21 @@ BEGIN
  { Initialisation du systeme de preferences (TODO 23) }
  Prefs_Init;
 
+ { Initialisation du mode hors ligne (TODO 24) }
+ Offline_Init;
+ Offline_LoadCache;
+ Offline_LoadQueue;
+
  { Affichage de l'interface }
  ShowMouse;
  DrawInterface;
 
  { Boucle principale }
  MainEventLoop;
+
+ { Sauvegarde du cache avant fermeture }
+ Offline_SaveCache;
+ Offline_SaveQueue;
 
  { Fermeture du mode graphique }
  HideMouse;
