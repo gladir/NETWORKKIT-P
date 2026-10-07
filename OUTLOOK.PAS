@@ -22083,12 +22083,14 @@ Begin
    GetMouseState(MouseX, MouseY, MouseBtn);
   {$ENDIF}
 
-  { Mise à jour du survol des menus }
-  If ActiveMenu >= 0 Then
+  { Mise à jour du survol des menus (seulement si la souris a bouge) }
+  If (ActiveMenu >= 0) And
+     ((MouseX <> LastMouseX) Or (MouseY <> LastMouseY)) Then
    UpdateMenuHover;
 
-  { Mise à jour du survol du menu contextuel }
-  If ContextMenuVisible Then Begin
+  { Mise à jour du survol du menu contextuel (seulement si la souris a bouge) }
+  If ContextMenuVisible And
+     ((MouseX <> LastMouseX) Or (MouseY <> LastMouseY)) Then Begin
    HoveredContextItem := GetContextMenuItemAtPoint(MouseX, MouseY);
    HideMouse;
    DrawContextMenu;
@@ -22275,13 +22277,94 @@ Begin
    Else If Key = #27 Then Begin
     If TooltipVisible Then
      HideTooltip
+    Else If ContextMenuVisible Then Begin
+     HideContextMenu;
+     HideMouse;
+     DrawMessageList;
+     ShowMouse;
+    End
     Else If ActiveMenu >= 0 Then
      CloseDropdownMenu
     Else
-     Running := False; { Échap pour quitter }
+     Running := False; { Echap pour quitter }
+   End
+   Else If Key = #13 Then Begin
+    { Entree: executer l'element de menu selectionne }
+    If (ActiveMenu >= 0) And (ActiveMenuItem >= 0) Then Begin
+     If Menus[ActiveMenu].Items[ActiveMenuItem].Enabled Then
+      ExecuteMenuCommand(Menus[ActiveMenu].Items[ActiveMenuItem].ItemID);
+    End;
+   End
+   Else If Key = #0 Then Begin
+    { Touches etendues (fleches, F1-F12, etc.) }
+    Key := ReadKey;
+    If ActiveMenu >= 0 Then Begin
+     Case Key Of
+      #72: Begin { Fleche Haut }
+       If Menus[ActiveMenu].ItemCount > 0 Then Begin
+        If ActiveMenuItem < 0 Then
+         ActiveMenuItem := Menus[ActiveMenu].ItemCount - 1
+        Else Begin
+         ActiveMenuItem := ActiveMenuItem - 1;
+         { Sauter les separateurs }
+         While (ActiveMenuItem >= 0) And
+               Menus[ActiveMenu].Items[ActiveMenuItem].Separator Do
+          Dec(ActiveMenuItem);
+         If ActiveMenuItem < 0 Then Begin
+          ActiveMenuItem := Menus[ActiveMenu].ItemCount - 1;
+          While (ActiveMenuItem >= 0) And
+                Menus[ActiveMenu].Items[ActiveMenuItem].Separator Do
+           Dec(ActiveMenuItem);
+         End;
+        End;
+        HideMouse;
+        DrawDropdownMenu(ActiveMenu);
+        ShowMouse;
+       End;
+      End;
+      #80: Begin { Fleche Bas }
+       If Menus[ActiveMenu].ItemCount > 0 Then Begin
+        If ActiveMenuItem < 0 Then
+         ActiveMenuItem := 0
+        Else
+         ActiveMenuItem := ActiveMenuItem + 1;
+        { Sauter les separateurs }
+        While (ActiveMenuItem < Menus[ActiveMenu].ItemCount) And
+              Menus[ActiveMenu].Items[ActiveMenuItem].Separator Do
+         Inc(ActiveMenuItem);
+        If ActiveMenuItem >= Menus[ActiveMenu].ItemCount Then Begin
+         ActiveMenuItem := 0;
+         While (ActiveMenuItem < Menus[ActiveMenu].ItemCount) And
+               Menus[ActiveMenu].Items[ActiveMenuItem].Separator Do
+          Inc(ActiveMenuItem);
+        End;
+        HideMouse;
+        DrawDropdownMenu(ActiveMenu);
+        ShowMouse;
+       End;
+      End;
+      #75: Begin { Fleche Gauche - menu precedent }
+       ActiveMenu := ActiveMenu - 1;
+       If ActiveMenu < 0 Then ActiveMenu := MenuCount - 1;
+       ActiveMenuItem := -1;
+       HideMouse;
+       DrawInterface;
+       DrawDropdownMenu(ActiveMenu);
+       ShowMouse;
+      End;
+      #77: Begin { Fleche Droite - menu suivant }
+       ActiveMenu := ActiveMenu + 1;
+       If ActiveMenu >= MenuCount Then ActiveMenu := 0;
+       ActiveMenuItem := -1;
+       HideMouse;
+       DrawInterface;
+       DrawDropdownMenu(ActiveMenu);
+       ShowMouse;
+      End;
+     End; { Case }
+    End; { ActiveMenu >= 0 }
    End;
-   If Key = #0 Then ReadKey; { Touches étendues }
-  End;
+  End; { KeyPressed }
 
   { Petite pause pour ne pas saturer le CPU }
   Delay(10);

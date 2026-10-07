@@ -243,7 +243,7 @@ Begin
  End;
 End;
 
- { Fonction pour convertir un nombre en hexad�cimal }
+ { Fonction pour convertir un nombre en hexadecimal }
 Function IntToHex(Value:Integer;Digits:Integer):String;
 Const
  HexChars:String='0123456789ABCDEF';
@@ -330,7 +330,7 @@ Begin
                     IntToStr(Broadcast[2])+'.'+IntToStr(Broadcast[3]);
 End;
 
- { Fonction pour formater les octets en unit�s lisibles }
+ { Fonction pour formater les octets en unites lisibles }
 Function FormatBytes(Bytes:DWORD):String;Begin
  If Bytes<1024 Then FormatBytes:=UIntToStr(Bytes)+' O' Else
  If Bytes<1048576 Then FormatBytes:=UIntToStr(Bytes div 1024)+' Ko' Else
@@ -338,7 +338,7 @@ Function FormatBytes(Bytes:DWORD):String;Begin
                      Else FormatBytes:=UIntToStr(Bytes div 1073741824)+' Go';
 End;
 
- { Proc�dure pour obtenir les informations des interfaces }
+ { Procedure pour obtenir les informations des interfaces }
 Function GetInterfaceInfo:Boolean;
 Var
  pAdapterInfo,pAdapter:PIP_ADAPTER_INFO;
@@ -413,7 +413,7 @@ Var
  FlagsStr:String;
 Begin
  With InterfaceList[Index] Do Begin
-  { Ne pas afficher les interfaces DOWN sauf si demand� }
+  { Ne pas afficher les interfaces DOWN sauf si demande }
   If (Not ShowAll) and (Status='DOWN') and (IPAddress='0.0.0.0') Then Exit;
    { Nom de l'interface et drapeaux }
   Write(Name);
@@ -429,7 +429,7 @@ Begin
    { Configuration IP }
   If IPAddress<>'0.0.0.0' Then Begin
    Write('        inet ',IPAddress);
-   If NetMask<>'0.0.0.0' Then Write('  masque r�seau ',NetMask);
+   If NetMask<>'0.0.0.0' Then Write('  masque r'+#130+'seau ',NetMask);
    If Broadcast<>'0.0.0.0' Then Write('  diffusion ',Broadcast);
    WriteLn;
   End;
@@ -437,10 +437,10 @@ Begin
   If (MACAddress<>'')and(MACAddress<>'00:00:00:00:00:00')Then WriteLn('        ether ',MACAddress);
    { Statistiques }
   WriteLn('        RX paquets ',PacketsReceived,'  octets ',BytesReceived,' (',FormatBytes(BytesReceived),')');
-  WriteLn('        RX erreurs ',ErrorsReceived,'  paquet perdue 0  ex�cuter 0  trame 0');
+  WriteLn('        RX erreurs ',ErrorsReceived,'  paquet perdue 0  ex'+#130+'cuter 0  trame 0');
   WriteLn('        TX paquets ',PacketsTransmitted,'  bytes ',BytesTransmitted,
           ' (',FormatBytes(BytesTransmitted),')');
-  WriteLn('        TX erreurs ',ErrorsTransmitted,'  paquet perdue 0  ex�cuter 0  op�rateur 0');
+  WriteLn('        TX erreurs ',ErrorsTransmitted,'  paquet perdue 0  ex'+#130+'cuter 0  op'+#130+'rateur 0');
   WriteLn('        collisions 0');
   WriteLn;
  End;
@@ -455,7 +455,7 @@ Begin
   For I:=0 To InterfaceCount-1 Do
    ShowInterface(I,ShowAll);
  End Else
-  WriteLn('Erreur lors de la r�cup�ration des informations d''interface');
+  WriteLn('Erreur lors de la r'+#130+'cup'+#130+'ration des informations d''interface');
 End;
 
  { Proc�dure pour afficher une interface sp�cifique }
@@ -474,16 +474,17 @@ Begin
    End;
   End;
   If Not Found Then
-   WriteLn(InterfaceName,': erreur lors de la r�cup�ration des drapeaux de l''interface: P�riph�rique non trouv�');
+   WriteLn(InterfaceName,': erreur lors de la r'+#130+'cup'+#130+'ration des drapeaux de ',
+           'l''interface: P'+#130+'riph'+#130+'rique non trouv'+#130);
  End;
 End;
 
-{ Proc�dure pour afficher un r�sum� des interfaces }
+{ Procedure pour afficher un resume des interfaces }
 Procedure ShowBriefInterfaces;
 Var
  I:Integer;
 Begin
- WriteLn('Nom    Etat   Adresse IP       Masque r�seau    Adresse MAC');
+ WriteLn('Nom    Etat   Adresse IP       Masque r'+#130+'seau    Adresse MAC');
  WriteLn('------ ------ ---------------- ---------------- -----------------');
  If GetInterfaceInfo Then Begin
   For I:=0 To InterfaceCount-1 Do Begin
@@ -516,6 +517,37 @@ End;
 {$ENDIF}
 
 {$IFNDEF FPC}
+Function DetectWATTCP(Var IPAddress:LongInt):Boolean;
+Var
+ IPDetected:Boolean;
+ DetectedAddress:LongInt;
+Begin
+ IPDetected:=False;
+ DetectedAddress:=0;
+ ASM
+  MOV AX, 6100h
+  INT 2Fh
+  CMP AL, 0
+  JNE @no_wattcp
+  MOV AX, 6101h
+  INT 2Fh
+  JC @no_wattcp
+  MOV WORD PTR DetectedAddress, AX
+  MOV WORD PTR DetectedAddress+2, DX
+  MOV IPDetected, 1
+@no_wattcp:
+ END;
+ IPAddress:=DetectedAddress;
+ DetectWATTCP:=IPDetected;
+End;
+
+Function IPToString(IP:LongInt):String;Begin
+ IPToString:=IntToStr(IP and $FF)+'.'+
+             IntToStr((IP shr 8) and $FF)+'.'+
+             IntToStr((IP shr 16) and $FF)+'.'+
+             IntToStr((IP shr 24) and $FF);
+End;
+
 Function IsNetBIOSInstalled:Boolean;
 Var
  NetBIOSPresent:Boolean;
@@ -577,32 +609,48 @@ Begin
 End;
 
 Procedure ShowDosInterface;
+Var
+ IPAddress:LongInt;
+ HasWATTCP,HasNetBIOS:Boolean;
 Begin
- If Not GetDosAdapterStatus Then Begin
-  If NCB.ncb_retcode=$FF Then
-   WriteLn('NetBIOS DOS non disponible (interruption 5Ch absente).')
-  Else
-   WriteLn('Lecture NetBIOS de l''adaptateur impossible, code ',NCB.ncb_retcode,'.');
+ HasWATTCP:=DetectWATTCP(IPAddress);
+ HasNetBIOS:=GetDosAdapterStatus;
+ If Not HasWATTCP and Not HasNetBIOS Then Begin
+  WriteLn('Aucune information r'+#130+'seau disponible via WATTCP/DOS ou NetBIOS.');
   Exit;
  End;
  WriteLn('lan0: flags=<UP>');
- WriteLn('        Type adaptateur ',AdapterInfo.adapter_type);
- WriteLn('        ether ',FormatDosMAC);
- WriteLn('        RX paquets ',AdapterInfo.recv_success);
- WriteLn('        TX paquets ',AdapterInfo.xmit_success);
- WriteLn('        Adresse IP, masque et passerelle indisponibles via NetBIOS.');
+ If HasWATTCP Then
+  WriteLn('        inet ',IPToString(IPAddress))
+ Else
+  WriteLn('        Adresse IPv4 indisponible (WATTCP/DOS non disponible).');
+ If HasNetBIOS Then Begin
+  WriteLn('        Type adaptateur ',AdapterInfo.adapter_type);
+  WriteLn('        ether ',FormatDosMAC);
+  WriteLn('        RX paquets ',AdapterInfo.recv_success);
+  WriteLn('        TX paquets ',AdapterInfo.xmit_success);
+ End
+ Else
+  WriteLn('        MAC et compteurs indisponibles (NetBIOS non disponible).');
 End;
 
 Procedure ShowDosBrief;
+Var
+ IPAddress:LongInt;
+ HasWATTCP,HasNetBIOS:Boolean;
 Begin
- WriteLn('Interface Etat   Adresse MAC');
- WriteLn('--------- ------ -----------------');
- If GetDosAdapterStatus Then
-  WriteLn('lan0      UP     ',FormatDosMAC)
- Else If NCB.ncb_retcode=$FF Then
-  WriteLn('NetBIOS DOS non disponible.')
- Else
-  WriteLn('Lecture NetBIOS impossible, code ',NCB.ncb_retcode,'.');
+ WriteLn('Interface Etat   IPv4            Adresse MAC');
+ WriteLn('--------- ------ --------------- -----------------');
+ HasWATTCP:=DetectWATTCP(IPAddress);
+ HasNetBIOS:=GetDosAdapterStatus;
+ If Not HasWATTCP and Not HasNetBIOS Then Begin
+  WriteLn('Aucune information r'+#130+'seau disponible.');
+  Exit;
+ End;
+ Write('lan0      UP     ');
+ If HasWATTCP Then Write(IPToString(IPAddress)) Else Write('n/d');
+ Write('  ');
+ If HasNetBIOS Then WriteLn(FormatDosMAC) Else WriteLn('n/d');
 End;
 
 Procedure ShowDosSpecificInterface(InterfaceName:String);
@@ -614,7 +662,7 @@ Begin
 End;
 {$ENDIF}
 
- { Proc�dure pour analyser les param�tres }
+ { Procedure pour analyser les parametres }
 Procedure ParseCommand;
 Var
  Cmd:String;
@@ -645,7 +693,7 @@ Begin
  End
   Else
  If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
-  { Interface sp�cifique }
+  { Interface specifique }
   {$IFDEF FPC}
    ShowSpecificInterface(ParamStr(1));
   {$ELSE}
@@ -662,7 +710,7 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('IFCONFIG : Cette commande permet d''effectuer la configuration et l''affichage des interfaces r�seau');
+  WriteLn('IFCONFIG : Cette commande permet d''effectuer la configuration et l''affichage des interfaces r'+#130+'seau');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  IFCONFIG                    Afficher les interfaces actives');
@@ -679,7 +727,7 @@ BEGIN
   WriteLn('  IFCONFIG -s                 # R'+#130+'sum'+#130+' tabulaire');
   WriteLn('  IFCONFIG eth0               # Interface sp'+#130+'cifique');
   WriteLn;
-  WriteLn('Turbo Pascal: informations NetBIOS reelles si disponible; IP non garantie.');
+  WriteLn('Turbo Pascal: IPv4 via WATTCP/DOS; MAC et stats via NetBIOS si disponible.');
   WriteLn('Free Pascal: informations detaillees sous Windows.');
  End
   Else
