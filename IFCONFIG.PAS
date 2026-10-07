@@ -10,13 +10,17 @@ Program IFCONFIG;
 
 {$IFDEF FPC}
  {$mode objfpc}
- Uses SysUtils, Windows;
 {$ELSE}
  Uses DOS;
 {$ENDIF}
 
 {$IFDEF FPC}
 Type
+ DWORD=LongWord;
+ UINT=LongWord;
+ ULONG=LongWord;
+ BOOL=LongInt;
+
  { Structure pour les informations d'interface }
  TInterfaceInfo = Record
   Name:String;
@@ -40,7 +44,7 @@ Type
   ErrorsTransmitted:DWORD;
  End;
 
- { Structure IP_ADAPTER_INFO Çtendue }
+ { Structure IP_ADAPTER_INFO ÔøΩtendue }
  IP_ADDR_STRING = Record
   Next:Pointer;
   IpAddress:Array[0..15] of AnsiChar;
@@ -126,7 +130,59 @@ Function GetIfEntry(pIfRow:PMIB_IFROW):DWORD;stdcall;external 'iphlpapi.dll';
 {$ENDIF}
 
 {$IFNDEF FPC}
- { Fonctions utilitaires pour Turbo Pascal }
+Type
+ TNetBIOSNCB=Record
+  ncb_command:Byte;
+  ncb_retcode:Byte;
+  ncb_lsn:Byte;
+  ncb_num:Byte;
+  ncb_buffer:Pointer;
+  ncb_length:Word;
+  ncb_callname:Array[0..15] of Char;
+  ncb_name:Array[0..15] of Char;
+  ncb_rto:Byte;
+  ncb_sto:Byte;
+  ncb_post:Pointer;
+  ncb_lana_num:Byte;
+  ncb_cmd_cplt:Byte;
+  ncb_reserve:Array[0..13] of Char;
+ End;
+
+ TAdapterStatus=Record
+  adapter_address:Array[0..5] of Byte;
+  rev_major:Byte;
+  reserved0:Byte;
+  adapter_type:Byte;
+  rev_minor:Byte;
+  duration:Word;
+  frmr_recv:Word;
+  frmr_xmit:Word;
+  iframe_recv_err:Word;
+  xmit_aborts:Word;
+  xmit_success:LongInt;
+  recv_success:LongInt;
+  iframe_xmit_err:Word;
+  recv_buff_unavail:Word;
+  t1_timeouts:Word;
+  ti_timeouts:Word;
+  reserved1:LongInt;
+  free_ncbs:Word;
+  max_cfg_ncbs:Word;
+  max_ncbs:Word;
+  xmit_buf_unavail:Word;
+  max_dgram_size:Word;
+  pending_sess:Word;
+  max_cfg_sess:Word;
+  max_sess:Word;
+  max_sess_pkt_size:Word;
+  name_count:Word;
+ End;
+
+Var
+ NCB:TNetBIOSNCB;
+ AdapterInfo:TAdapterStatus;
+{$ENDIF}
+
 Function IntToStr(Value:LongInt):String;
 Var
  S:String;
@@ -134,6 +190,20 @@ Begin
  Str(Value,S);
  IntToStr:=S;
 End;
+
+{$IFDEF FPC}
+Function UIntToStr(Value:QWord):String;
+Var
+ S:String;
+Begin
+ S:='';
+ Repeat
+  S:=Chr(Ord('0')+(Value mod 10))+S;
+  Value:=Value div 10;
+ Until Value=0;
+ UIntToStr:=S;
+End;
+{$ENDIF}
 
 Function UpperCase(S:String):String;
 Var
@@ -172,9 +242,8 @@ Begin
   End;
  End;
 End;
-{$ENDIF}
 
- { Fonction pour convertir un nombre en hexadÇcimal }
+ { Fonction pour convertir un nombre en hexadÔøΩcimal }
 Function IntToHex(Value:Integer;Digits:Integer):String;
 Const
  HexChars:String='0123456789ABCDEF';
@@ -202,7 +271,7 @@ Function GetInterfaceTypeName(InterfaceType:DWORD):String;Begin
   MIB_IF_TYPE_SOFTWARE_LOOPBACK:GetInterfaceTypeName:='Loopback';
   MIB_IF_TYPE_ATM:GetInterfaceTypeName:='ATM';
   MIB_IF_TYPE_IEEE80211:GetInterfaceTypeName:='IEEE 802.11';
-  Else GetInterfaceTypeName:='Unknown ('+IntToStr(InterfaceType)+')';
+  Else GetInterfaceTypeName:='Unknown ('+UIntToStr(InterfaceType)+')';
  End;
 End;
 
@@ -261,15 +330,15 @@ Begin
                     IntToStr(Broadcast[2])+'.'+IntToStr(Broadcast[3]);
 End;
 
- { Fonction pour formater les octets en unitÇs lisibles }
+ { Fonction pour formater les octets en unitÔøΩs lisibles }
 Function FormatBytes(Bytes:DWORD):String;Begin
- If Bytes<1024 Then FormatBytes:=IntToStr(Bytes)+' O' Else
- If Bytes<1048576 Then FormatBytes:=IntToStr(Bytes div 1024)+' Ko' Else
- If Bytes<1073741824 Then FormatBytes:=IntToStr(Bytes div 1048576)+' Mo'
-                     Else FormatBytes:=IntToStr(Bytes div 1073741824)+' Go';
+ If Bytes<1024 Then FormatBytes:=UIntToStr(Bytes)+' O' Else
+ If Bytes<1048576 Then FormatBytes:=UIntToStr(Bytes div 1024)+' Ko' Else
+ If Bytes<1073741824 Then FormatBytes:=UIntToStr(Bytes div 1048576)+' Mo'
+                     Else FormatBytes:=UIntToStr(Bytes div 1073741824)+' Go';
 End;
 
- { ProcÇdure pour obtenir les informations des interfaces }
+ { ProcÔøΩdure pour obtenir les informations des interfaces }
 Function GetInterfaceInfo:Boolean;
 Var
  pAdapterInfo,pAdapter:PIP_ADAPTER_INFO;
@@ -281,10 +350,10 @@ Begin
  GetInterfaceInfo:=False;
  InterfaceCount:=0;
  OutBufLen:=0;
-  { Premiäre appel pour obtenir la taille }
+  { PremiÔøΩre appel pour obtenir la taille }
  RetVal:=GetAdaptersInfo(nil,OutBufLen);
  If RetVal<>ERROR_BUFFER_OVERFLOW Then Exit;
-  { Allouer la mÇmoire }
+  { Allouer la mÔøΩmoire }
  GetMem(pAdapterInfo,OutBufLen);
  Try
    { Obtenir les informations des adaptateurs }
@@ -293,7 +362,7 @@ Begin
    pAdapter:=pAdapterInfo;
    While (pAdapter<>nil) and (InterfaceCount<32) Do Begin
     With InterfaceList[InterfaceCount] Do Begin
-     Name:='eth'+IntToStr(pAdapter^.Index);
+    Name:='eth'+UIntToStr(pAdapter^.Index);
      DisplayName:=StrPas(pAdapter^.AdapterName);
      Description:=StrPas(pAdapter^.Description);
      IPAddress:=StrPas(pAdapter^.IpAddressList.IpAddress);
@@ -338,13 +407,13 @@ Begin
  End;
 End;
 
- { ProcÇdure pour afficher une interface (style Linux) }
+ { ProcÔøΩdure pour afficher une interface (style Linux) }
 Procedure ShowInterface(Index:Integer;ShowAll:Boolean);
 Var
  FlagsStr:String;
 Begin
  With InterfaceList[Index] Do Begin
-  { Ne pas afficher les interfaces DOWN sauf si demandÇ }
+  { Ne pas afficher les interfaces DOWN sauf si demandÔøΩ }
   If (Not ShowAll) and (Status='DOWN') and (IPAddress='0.0.0.0') Then Exit;
    { Nom de l'interface et drapeaux }
   Write(Name);
@@ -360,7 +429,7 @@ Begin
    { Configuration IP }
   If IPAddress<>'0.0.0.0' Then Begin
    Write('        inet ',IPAddress);
-   If NetMask<>'0.0.0.0' Then Write('  masque rÇseau ',NetMask);
+   If NetMask<>'0.0.0.0' Then Write('  masque rÔøΩseau ',NetMask);
    If Broadcast<>'0.0.0.0' Then Write('  diffusion ',Broadcast);
    WriteLn;
   End;
@@ -368,16 +437,16 @@ Begin
   If (MACAddress<>'')and(MACAddress<>'00:00:00:00:00:00')Then WriteLn('        ether ',MACAddress);
    { Statistiques }
   WriteLn('        RX paquets ',PacketsReceived,'  octets ',BytesReceived,' (',FormatBytes(BytesReceived),')');
-  WriteLn('        RX erreurs ',ErrorsReceived,'  paquet perdue 0  exÇcuter 0  trame 0');
+  WriteLn('        RX erreurs ',ErrorsReceived,'  paquet perdue 0  exÔøΩcuter 0  trame 0');
   WriteLn('        TX paquets ',PacketsTransmitted,'  bytes ',BytesTransmitted,
           ' (',FormatBytes(BytesTransmitted),')');
-  WriteLn('        TX erreurs ',ErrorsTransmitted,'  paquet perdue 0  exÇcuter 0  opÇrateur 0');
+  WriteLn('        TX erreurs ',ErrorsTransmitted,'  paquet perdue 0  exÔøΩcuter 0  opÔøΩrateur 0');
   WriteLn('        collisions 0');
   WriteLn;
  End;
 End;
 
- { ProcÇdure pour afficher toutes les interfaces }
+ { ProcÔøΩdure pour afficher toutes les interfaces }
 Procedure ShowAllInterfaces(ShowAll:Boolean);
 Var
  I:Integer;
@@ -386,10 +455,10 @@ Begin
   For I:=0 To InterfaceCount-1 Do
    ShowInterface(I,ShowAll);
  End Else
-  WriteLn('Erreur lors de la rÇcupÇration des informations d''interface');
+  WriteLn('Erreur lors de la rÔøΩcupÔøΩration des informations d''interface');
 End;
 
- { ProcÇdure pour afficher une interface spÇcifique }
+ { ProcÔøΩdure pour afficher une interface spÔøΩcifique }
 Procedure ShowSpecificInterface(InterfaceName:String);
 Var
  I:Integer;
@@ -405,16 +474,16 @@ Begin
    End;
   End;
   If Not Found Then
-   WriteLn(InterfaceName,': erreur lors de la rÇcupÇration des drapeaux de l''interface: PÇriphÇrique non trouvÇ');
+   WriteLn(InterfaceName,': erreur lors de la rÔøΩcupÔøΩration des drapeaux de l''interface: PÔøΩriphÔøΩrique non trouvÔøΩ');
  End;
 End;
 
-{ ProcÇdure pour afficher un rÇsumÇ des interfaces }
+{ ProcÔøΩdure pour afficher un rÔøΩsumÔøΩ des interfaces }
 Procedure ShowBriefInterfaces;
 Var
  I:Integer;
 Begin
- WriteLn('Nom    Etat   Adresse IP       Masque rÇseau    Adresse MAC');
+ WriteLn('Nom    Etat   Adresse IP       Masque rÔøΩseau    Adresse MAC');
  WriteLn('------ ------ ---------------- ---------------- -----------------');
  If GetInterfaceInfo Then Begin
   For I:=0 To InterfaceCount-1 Do Begin
@@ -447,37 +516,105 @@ End;
 {$ENDIF}
 
 {$IFNDEF FPC}
- { Version Turbo Pascal - Simulation }
-Procedure ShowSimulatedInterfaces;Begin
- WriteLn('eth0: flags=<UP,RUNNING,BROADCAST,DHCP,MULTICAST> mtu 1500');
- WriteLn('        Ethernet');
- WriteLn('        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255');
- WriteLn('        ether 00:1a:2b:3c:4d:5e');
- WriteLn('        RX paquets 1234  octets 567890 (554 Ko)');
- WriteLn('        RX erreurs 0  paquets perdues 0  exÇcutions 0  trame 0');
- WriteLn('        TX paquets 987  octets 123456 (120 Ko)');
- WriteLn('        TX erreurs 0  paquets perdues 0  exÇcutions 0  porteuse 0');
- WriteLn('        collisions 0');
- WriteLn;
- WriteLn('lo: flags=<UP,RUNNING,LOOPBACK> mtu 65536');
- WriteLn('        Loopback');
- WriteLn('        inet 127.0.0.1  netmask 255.0.0.0');
- WriteLn('        RX paquets 8  octets 640 (640 O)');
- WriteLn('        RX erreurs 0  paquet perdue 0  exÇcutions 0  trame 0');
- WriteLn('        TX packets 8  octets 640 (640 O)');
- WriteLn('        TX erreurs 0  paquet perdue 0  exÇcutions 0  porteuse 0');
- WriteLn('        collisions 0');
+Function IsNetBIOSInstalled:Boolean;
+Var
+ NetBIOSPresent:Boolean;
+Begin
+ NetBIOSPresent:=False;
+ ASM
+  PUSH ES
+  MOV AX, 0
+  MOV ES, AX
+  MOV BX, 5Ch * 4
+  MOV AX, ES:[BX]
+  MOV DX, ES:[BX+2]
+  OR AX, DX
+  JZ @no_netbios
+  MOV NetBIOSPresent, 1
+@no_netbios:
+  POP ES
+ END;
+ IsNetBIOSInstalled:=NetBIOSPresent;
 End;
 
-Procedure ShowSimulatedBrief;Begin
- WriteLn('Nom    Etat   Adresse IP       Masque rÇseau    Adresse MAC');
- WriteLn('------ ------ ---------------- ---------------- -----------------');
- WriteLn('eth0   UP     192.168.1.100    255.255.255.0    00:1a:2b:3c:4d:5e');
- WriteLn('lo     UP     127.0.0.1        255.0.0.0        00:00:00:00:00:00');
+Procedure CallNetBIOS(Var NCB:TNetBIOSNCB);
+Begin
+ If Not IsNetBIOSInstalled Then Begin
+  NCB.ncb_retcode:=$FF;
+  Exit;
+ End;
+ ASM
+  PUSH DS
+  LES BX, NCB
+  MOV AX, DS
+  MOV ES, AX
+  INT 5Ch
+  POP DS
+ END;
+End;
+
+Function GetDosAdapterStatus:Boolean;
+Begin
+ FillChar(NCB,SizeOf(NCB),0);
+ FillChar(AdapterInfo,SizeOf(AdapterInfo),0);
+ NCB.ncb_command:=$33;
+ NCB.ncb_lana_num:=0;
+ NCB.ncb_buffer:=@AdapterInfo;
+ NCB.ncb_length:=SizeOf(AdapterInfo);
+ NCB.ncb_callname[0]:='*';
+ CallNetBIOS(NCB);
+ GetDosAdapterStatus:=(NCB.ncb_retcode=0);
+End;
+
+Function FormatDosMAC:String;
+Begin
+ FormatDosMAC:=IntToHex(AdapterInfo.adapter_address[0],2)+':'+
+               IntToHex(AdapterInfo.adapter_address[1],2)+':'+
+               IntToHex(AdapterInfo.adapter_address[2],2)+':'+
+               IntToHex(AdapterInfo.adapter_address[3],2)+':'+
+               IntToHex(AdapterInfo.adapter_address[4],2)+':'+
+               IntToHex(AdapterInfo.adapter_address[5],2);
+End;
+
+Procedure ShowDosInterface;
+Begin
+ If Not GetDosAdapterStatus Then Begin
+  If NCB.ncb_retcode=$FF Then
+   WriteLn('NetBIOS DOS non disponible (interruption 5Ch absente).')
+  Else
+   WriteLn('Lecture NetBIOS de l''adaptateur impossible, code ',NCB.ncb_retcode,'.');
+  Exit;
+ End;
+ WriteLn('lan0: flags=<UP>');
+ WriteLn('        Type adaptateur ',AdapterInfo.adapter_type);
+ WriteLn('        ether ',FormatDosMAC);
+ WriteLn('        RX paquets ',AdapterInfo.recv_success);
+ WriteLn('        TX paquets ',AdapterInfo.xmit_success);
+ WriteLn('        Adresse IP, masque et passerelle indisponibles via NetBIOS.');
+End;
+
+Procedure ShowDosBrief;
+Begin
+ WriteLn('Interface Etat   Adresse MAC');
+ WriteLn('--------- ------ -----------------');
+ If GetDosAdapterStatus Then
+  WriteLn('lan0      UP     ',FormatDosMAC)
+ Else If NCB.ncb_retcode=$FF Then
+  WriteLn('NetBIOS DOS non disponible.')
+ Else
+  WriteLn('Lecture NetBIOS impossible, code ',NCB.ncb_retcode,'.');
+End;
+
+Procedure ShowDosSpecificInterface(InterfaceName:String);
+Begin
+ If (UpperCase(InterfaceName)='LAN0') or (UpperCase(InterfaceName)='ETH0') Then
+  ShowDosInterface
+ Else
+  WriteLn(InterfaceName,': interface non trouvee.');
 End;
 {$ENDIF}
 
- { ProcÇdure pour analyser les paramätres }
+ { ProcÔøΩdure pour analyser les paramÔøΩtres }
 Procedure ParseCommand;
 Var
  Cmd:String;
@@ -486,7 +623,7 @@ Begin
   {$IFDEF FPC}
    ShowAllInterfaces(False);
   {$ELSE}
-   ShowSimulatedInterfaces;
+    ShowDosInterface;
   {$ENDIF}
   Exit;
  End;
@@ -495,7 +632,7 @@ Begin
   {$IFDEF FPC}
   ShowAllInterfaces(True);
   {$ELSE}
-  ShowSimulatedInterfaces;
+  ShowDosInterface;
   {$ENDIF}
  End
   Else
@@ -503,24 +640,16 @@ Begin
   {$IFDEF FPC}
   ShowBriefInterfaces;
   {$ELSE}
-  ShowSimulatedBrief;
+  ShowDosBrief;
   {$ENDIF}
  End
   Else
  If (Cmd[1]<>'-') and (Cmd[1]<>'/') Then Begin
-  { Interface spÇcifique }
+  { Interface spÔøΩcifique }
   {$IFDEF FPC}
    ShowSpecificInterface(ParamStr(1));
   {$ELSE}
-   WriteLn('eth0: flags=<UP,RUNNING,BROADCAST,DHCP,MULTICAST> mtu 1500');
-   WriteLn('        Ethernet');
-   WriteLn('        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255');
-   WriteLn('        ether 00:1a:2b:3c:4d:5e');
-   WriteLn('        RX paquets 1234  octets 567890 (554 Ko)');
-   WriteLn('        RX erreurs 0  pertes 0  exÇcutions 0  trame 0');
-   WriteLn('        TX paquets 987  octets 123456 (120 Ko)');
-   WriteLn('        TX erreurs 0  paquet perdue 0  exÇcutions 0  porteuse 0');
-   WriteLn('        collisions 0');
+    ShowDosSpecificInterface(ParamStr(1));
   {$ENDIF}
  End
   Else
@@ -533,31 +662,32 @@ End;
 BEGIN
  If(ParamStr(1)='/?')or(ParamStr(1)='--help')or(ParamStr(1)='-h')or
    (ParamStr(1)='/h')or(ParamStr(1)='/H')Then Begin
-  WriteLn('IFCONFIG : Cette commande permet d''effectuer la configuration et l''affichage des interfaces rÇseau');
+  WriteLn('IFCONFIG : Cette commande permet d''effectuer la configuration et l''affichage des interfaces rÔøΩseau');
   WriteLn;
   WriteLn('Syntaxe :');
   WriteLn('  IFCONFIG                    Afficher les interfaces actives');
   WriteLn('  IFCONFIG -a                 Afficher toutes les interfaces');
-  WriteLn('  IFCONFIG -s                 Affichage rÇsumÇ');
-  WriteLn('  IFCONFIG interface          Afficher une interface spÇcifique');
+  WriteLn('  IFCONFIG -s                 Affichage r'+#130+'sum'+#130);
+  WriteLn('  IFCONFIG interface          Afficher une interface sp'+#130+'cifique');
   WriteLn;
-  WriteLn('Paramätres :');
+  WriteLn('Param'+#138+'tres :');
   WriteLn('  interface   Nom de l''interface (exemple: eth0, eth1)');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  IFCONFIG                    # Afficher interfaces actives');
   WriteLn('  IFCONFIG -a                 # Toutes les interfaces');
-  WriteLn('  IFCONFIG -s                 # RÇsumÇ tabulaire');
-  WriteLn('  IFCONFIG eth0               # Interface spÇcifique');
+  WriteLn('  IFCONFIG -s                 # R'+#130+'sum'+#130+' tabulaire');
+  WriteLn('  IFCONFIG eth0               # Interface sp'+#130+'cifique');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (donnÇes rÇelles)');
+  WriteLn('Turbo Pascal: informations NetBIOS reelles si disponible; IP non garantie.');
+  WriteLn('Free Pascal: informations detaillees sous Windows.');
  End
   Else
  If ParamStr(1)='--version'Then Begin
-  WriteLn('IFCONFIG 1.00 - Configuration interface rÇseau, NETWORKKIT-P, LINUX-0, corail');
+  WriteLn('IFCONFIG 1.00 - Configuration interface r'+#130+'seau, NETWORKKIT-P, LINUX-0, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('êcrit par Sylvain Maltais');
+  WriteLn(#144,'crit par Sylvain Maltais');
  End
   Else
  Begin
