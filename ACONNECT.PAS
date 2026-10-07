@@ -24,17 +24,17 @@ Type
   ClientName: String[64];    { Nom du client }
   PortName: String[64];      { Nom du port }
   PortType: String[20];      { Type de port (Read, Write, Duplex) }
-  Capabilities: Word;        { CapacitÇs du port }
-  Connected: Boolean;        { Port connectÇ }
+  Capabilities: Word;        { CapacitÔøΩs du port }
+  Connected: Boolean;        { Port connectÔøΩ }
   Active: Boolean;           { Port actif }
  End;
 
  { Structure pour une connexion MIDI }
  TMIDIConnection = Record
-  SenderClient: Integer;     { Client Çmetteur }
-  SenderPort: Integer;       { Port Çmetteur }
-  ReceiverClient: Integer;   { Client rÇcepteur }
-  ReceiverPort: Integer;     { Port rÇcepteur }
+  SenderClient: Integer;     { Client ÔøΩmetteur }
+  SenderPort: Integer;       { Port ÔøΩmetteur }
+  ReceiverClient: Integer;   { Client rÔøΩcepteur }
+  ReceiverPort: Integer;     { Port rÔøΩcepteur }
   Active: Boolean;           { Connexion active }
   Permanent: Boolean;        { Connexion permanente }
  End;
@@ -58,7 +58,7 @@ Var
  PortCount: Integer;
  ConnectionCount: Integer;
 
-{ ProcÇdures Windows pour MIDI (simulation) }
+{ ProcÔøΩdures Windows pour MIDI (simulation) }
 Function midiOutGetNumDevs: UINT; stdcall; external 'winmm.dll';
 Function midiInGetNumDevs: UINT; stdcall; external 'winmm.dll';
 
@@ -95,9 +95,9 @@ Begin
  End;
 End;
 
-{ CrÇer des ports MIDI d'exemple }
+{ CrÔøΩer des ports MIDI d'exemple }
 Procedure CreateSamplePorts;Begin
- { Port systäme ALSA }
+ { Port systÔøΩme ALSA }
  With MIDIPorts[0] Do Begin
   ClientID := 0;
   PortID := 1;
@@ -108,7 +108,7 @@ Procedure CreateSamplePorts;Begin
   Connected := False;
   Active := True;
  End;
-  { Port systäme Announce }
+  { Port systÔøΩme Announce }
  With MIDIPorts[1] Do Begin
   ClientID := 1;
   PortID := 0;
@@ -119,7 +119,7 @@ Procedure CreateSamplePorts;Begin
   Connected := False;
   Active := True;
  End;
-  { SynthÇtiseur logiciel }
+  { SynthÔøΩtiseur logiciel }
  With MIDIPorts[2] Do Begin
   ClientID := 14;
   PortID := 0;
@@ -154,7 +154,7 @@ Procedure CreateSamplePorts;Begin
   Connected := True;
   Active := True;
  End;
-  { SÇquenceur }
+  { SÔøΩquenceur }
  With MIDIPorts[5] Do Begin
   ClientID := 129;
   PortID := 0;
@@ -168,9 +168,9 @@ Procedure CreateSamplePorts;Begin
  PortCount := 6;
 End;
 
- { CrÇer des connexions d'exemple }
+ { CrÔøΩer des connexions d'exemple }
 Procedure CreateSampleConnections;Begin
-  { Connexion clavier vers synthÇ }
+  { Connexion clavier vers synthÔøΩ }
  With MIDIConnections[0] Do Begin
   SenderClient := 20;
   SenderPort := 0;
@@ -179,7 +179,7 @@ Procedure CreateSampleConnections;Begin
   Active := True;
   Permanent := False;
  End;
-  { Connexion sÇquenceur vers synthÇ }
+  { Connexion sÔøΩquenceur vers synthÔøΩ }
  With MIDIConnections[1] Do Begin
   SenderClient := 129;
   SenderPort := 0;
@@ -303,34 +303,34 @@ Var
  SenderIndex, ReceiverIndex: Integer;
 Begin
  ConnectPorts := False;
-  { VÇrifier que les ports existent }
+  { VÔøΩrifier que les ports existent }
  SenderIndex := FindPort(SenderClient, SenderPort);
  ReceiverIndex := FindPort(ReceiverClient, ReceiverPort);
  If SenderIndex < 0 Then Begin
-  WriteLn('Erreur: Port Çmetteur ', SenderClient, ':', SenderPort, ' introuvable');
+  WriteLn('Erreur: Port '+#130+'metteur ', SenderClient, ':', SenderPort, ' introuvable');
   Exit;
  End;
  If ReceiverIndex < 0 Then Begin
-  WriteLn('Erreur: Port rÇcepteur ', ReceiverClient, ':', ReceiverPort, ' introuvable');
+  WriteLn('Erreur: Port r'+#130+'cepteur ', ReceiverClient, ':', ReceiverPort, ' introuvable');
   Exit;
  End;
-  { VÇrifier les capacitÇs }
+  { VÔøΩrifier les capacitÔøΩs }
  If (MIDIPorts[SenderIndex].Capabilities and SND_SEQ_PORT_CAP_READ) = 0 Then Begin
-  WriteLn('Erreur: Le port ', SenderClient, ':', SenderPort, ' ne peut pas Çmettre');
+  WriteLn('Erreur: Le port ', SenderClient, ':', SenderPort, ' ne peut pas '+#130+'mettre');
   Exit;
  End;
  If (MIDIPorts[ReceiverIndex].Capabilities and SND_SEQ_PORT_CAP_WRITE) = 0 Then Begin
   WriteLn('Erreur: Le port ', ReceiverClient, ':', ReceiverPort, ' ne peut pas recevoir');
   Exit;
  End;
-  { VÇrifier si la connexion existe dÇjÖ }
+  { VÔøΩrifier si la connexion existe deja }
  Index := FindConnection(SenderClient, SenderPort, ReceiverClient, ReceiverPort);
  If Index >= 0 Then Begin
   WriteLn('Connexion ', SenderClient, ':', SenderPort, ' -> ',
-          ReceiverClient, ':', ReceiverPort, ' dÇjÖ existante');
+          ReceiverClient, ':', ReceiverPort, ' d'+#130+'j'+#130+' existante');
   Exit;
  End;
-  { CrÇer la connexion }
+  { CrÔøΩer la connexion }
  If ConnectionCount >= MAX_MIDI_CONNECTIONS Then Begin
   WriteLn('Erreur: Nombre maximum de connexions atteint');
   Exit;
@@ -345,11 +345,11 @@ Begin
   Permanent := False;
  End;
  Inc(ConnectionCount);
- WriteLn('Connexion crÇÇe: ', SenderClient, ':', SenderPort, ' -> ',ReceiverClient, ':', ReceiverPort);
+ WriteLn('Connexion cr'+#130+#130+'e: ', SenderClient, ':', SenderPort, ' -> ',ReceiverClient, ':', ReceiverPort);
  ConnectPorts := True;
 End;
 
-{ DÇconnecter deux ports MIDI }
+{ DÔøΩconnecter deux ports MIDI }
 Function DisconnectPorts(SenderClient, SenderPort, ReceiverClient, ReceiverPort: Integer): Boolean;
 Var
  Index, I: Integer;
@@ -364,19 +364,19 @@ Begin
   { Supprimer la connexion }
  For I := Index To ConnectionCount - 2 Do MIDIConnections[I] := MIDIConnections[I + 1];
  Dec(ConnectionCount);
- WriteLn('Connexion supprimÇe: ', SenderClient, ':', SenderPort, ' -> ',
+ WriteLn('Connexion supprim'+#130+'e: ', SenderClient, ':', SenderPort, ' -> ',
          ReceiverClient, ':', ReceiverPort);
  DisconnectPorts := True;
 End;
 
-{ DÇconnecter toutes les connexions d'un port }
+{ DÔøΩconnecter toutes les connexions d'un port }
 Function DisconnectAllFromPort(ClientID, PortID: Integer): Boolean;
 Var
  I, Removed: Integer;
 Begin
  DisconnectAllFromPort := False;
  Removed := 0;
-  { Parcourir Ö l'envers pour Çviter les problämes d'index }
+  { Parcourir a l'envers pour eviter les problemes d'index }
  I := ConnectionCount - 1;
  While I >= 0 Do Begin
   With MIDIConnections[I] Do Begin
@@ -385,7 +385,7 @@ Begin
     { Supprimer cette connexion }
     WriteLn('Suppression connexion: ', SenderClient, ':', SenderPort, ' -> ',
             ReceiverClient, ':', ReceiverPort);
-    { DÇcaler les connexions suivantes }
+    { DÔøΩcaler les connexions suivantes }
     While I < ConnectionCount - 1 Do Begin
      MIDIConnections[I] := MIDIConnections[I + 1];
      Inc(I);
@@ -398,13 +398,13 @@ Begin
   End;
  End;
  If Removed > 0 Then Begin
-  WriteLn(Removed, ' connexion(s) supprimÇe(s) du port ', ClientID, ':', PortID);
+  WriteLn(Removed, ' connexion(s) supprim'+#130+'e(s) du port ', ClientID, ':', PortID);
   DisconnectAllFromPort := True;
  End Else
-  WriteLn('Aucune connexion trouvÇe pour le port ', ClientID, ':', PortID);
+  WriteLn('Aucune connexion trouvÔøΩe pour le port ', ClientID, ':', PortID);
 End;
 
- { Afficher les capacitÇs d'un port }
+ { Afficher les capacites d'un port }
 Function GetCapabilitiesString(Capabilities: Word): String;
 Var
  CapStr: String;
@@ -438,10 +438,10 @@ Begin
    With MIDIPorts[I] Do Begin
     WriteLn('Client ', ClientID, ': ''', ClientName, ''' [type=user]');
     WriteLn('    ', PortID, ' ''', PortName, '''');
-    WriteLn('        CapacitÇs: ', GetCapabilitiesString(Capabilities));
+    WriteLn('        Capacit'+#130+'es: ', GetCapabilitiesString(Capabilities));
     WriteLn('        Type: ', PortType);
-    If Connected Then WriteLn('        êtat: ConnectÇ')
-                 Else WriteLn('        êtat: Disponible');
+    If Connected Then WriteLn('        '+#130+'tat: Connect'+#130+'')
+                 Else WriteLn('        '+#130+'tat: Disponible');
     WriteLn;
    End;
   End;
@@ -518,9 +518,9 @@ Begin
  WriteLn('Statistiques MIDI ALSA:');
  WriteLn('=======================');
  WriteLn('Ports totaux        : ', PortCount);
- WriteLn('Ports d''entrÇe      : ', ReadPorts);
+ WriteLn('Ports d''entr'+#130+'e      : ', ReadPorts);
  WriteLn('Ports de sortie     : ', WritePorts);
- WriteLn('Ports connectÇs     : ', ConnectedPorts);
+ WriteLn('Ports connect'+#130+'s     : ', ConnectedPorts);
  WriteLn('Connexions actives  : ', ConnectionCount);
 End;
 {$ENDIF}
@@ -551,25 +551,25 @@ Begin
 End;
 
 Procedure SimulateMIDIConnect;Begin
- WriteLn('Connexion crÇÇe: 20:0 -> 128:0 (simulation)');
+ WriteLn('Connexion cr'+#130+#130+'e: 20:0 -> 128:0 (simulation)');
 End;
 
 Procedure SimulateMIDIDisconnect;Begin
- WriteLn('Connexion supprimÇe: 20:0 -> 128:0 (simulation)');
+ WriteLn('Connexion supprim'+#130+'e: 20:0 -> 128:0 (simulation)');
 End;
 
 Procedure ShowSimulatedStats;Begin
  WriteLn('Statistiques MIDI ALSA:');
  WriteLn('=======================');
  WriteLn('Ports totaux        : 6');
- WriteLn('Ports d''entrÇe      : 4');
+ WriteLn('Ports d''entr'+#130+'e      : 4');
  WriteLn('Ports de sortie     : 5');
- WriteLn('Ports connectÇs     : 1');
+ WriteLn('Ports connect'+#130+'s     : 1');
  WriteLn('Connexions actives  : 2');
 End;
 {$ENDIF}
 
-{ Analyser une spÇcification de port (client:port) }
+{ Analyser une spÔøΩcification de port (client:port) }
 Procedure ParsePortSpec(PortSpec: String; var ClientID, PortID: Integer);
 Var
  ColonPos: Integer;
@@ -604,7 +604,7 @@ Begin
  ReceiverPort := 0;
  ShowDetails := False;
 
- { Analyser les paramätres }
+ { Analyser les paramÔøΩtres }
  For I := 1 To ParamCount Do Begin
   Param := ParamStr(I);
   If (LowerCase(Param) = '-i') or (LowerCase(Param) = '--input') Then
@@ -628,7 +628,7 @@ Begin
   Else If LowerCase(Param) = '--stats' Then
    Action := 'stats'
   Else If Pos(':', Param) > 0 Then Begin
-   { SpÇcification de port }
+   { SpÔøΩcification de port }
    If (Action = 'list') and (SenderClient = 0) and (ReceiverClient = 0) Then
     Action := 'connect'; { Connexion implicite }
    If (Action = 'connect') or (Action = 'disconnect') Then Begin
@@ -648,7 +648,7 @@ Begin
    Else
   If Action='list-input'Then Begin
    If PortCount = 0 Then CreateSamplePorts;
-   WriteLn('Ports d''entrÇe MIDI:');
+   WriteLn('Ports d''entrÔøΩe MIDI:');
    ListMIDIPorts(False);
   End
    Else
@@ -663,7 +663,7 @@ Begin
    If (SenderClient <> 0) and (ReceiverClient <> 0) Then
     ConnectPorts(SenderClient, SenderPort, ReceiverClient, ReceiverPort)
    Else
-    WriteLn('Erreur: SpÇcifiez les ports Çmetteur et rÇcepteur (client:port)');
+    WriteLn('Erreur: Sp'+#130+'cifiez les ports '+#130+'metteur et r'+#130+'cepteur (client:port)');
   End
    Else
   If Action='disconnect'Then Begin
@@ -671,7 +671,7 @@ Begin
    If (SenderClient <> 0) and (ReceiverClient <> 0) Then
     DisconnectPorts(SenderClient, SenderPort, ReceiverClient, ReceiverPort)
    Else
-    WriteLn('Erreur: SpÇcifiez les ports Çmetteur et rÇcepteur (client:port)');
+    WriteLn('Erreur: Sp'+#130+'cifiez les ports '+#130+'metteur et r'+#130+'cepteur (client:port)');
   End
    Else
   If Action='remove-all'Then Begin
@@ -679,7 +679,7 @@ Begin
    If SenderClient <> 0 Then
     DisconnectAllFromPort(SenderClient, SenderPort)
    Else
-    WriteLn('Erreur: SpÇcifiez le port (client:port)');
+    WriteLn('Erreur: Sp'+#130+'cifiez le port (client:port)');
   End
    Else
   If Action='connections'Then Begin
@@ -702,7 +702,7 @@ Begin
  {$ELSE}
   If Action='list'Then ShowSimulatedPorts Else
   If Action='list-input'Then Begin
-   WriteLn('Ports d''entrÇe MIDI (simulation):');
+   WriteLn('Ports d''entrÔøΩe MIDI (simulation):');
    ShowSimulatedPorts;
   End
    Else
@@ -713,7 +713,7 @@ Begin
    Else
   If Action='connect'Then SimulateMIDIConnect Else
   If Action='disconnect'Then SimulateMIDIDisconnect Else
-  If Action='remove-all'THen WriteLn('Toutes les connexions supprimÇes (simulation)') Else
+  If Action='remove-all'THen WriteLn('Toutes les connexions supprim'+#130+'es (simulation)') Else
   If Action='stats'Then ShowSimulatedStats
                    Else ShowSimulatedConnections;
  {$ENDIF}
@@ -728,52 +728,52 @@ BEGIN
   WriteLn('  ACONNECT [options] [sender] [receiver]');
   WriteLn;
   WriteLn('Options :');
-  WriteLn('  -i, --input           Lister les ports d''entrÇe');
+  WriteLn('  -i, --input           Lister les ports d''entr'+#130+'e');
   WriteLn('  -o, --output          Lister les ports de sortie');
   WriteLn('  -l, --list            Lister tous les ports');
   WriteLn('  -c, --connect         Connecter deux ports');
-  WriteLn('  -d, --disconnect      DÇconnecter deux ports');
+  WriteLn('  -d, --disconnect      DÔøΩconnecter deux ports');
   WriteLn('  -x, --remove-all      Supprimer toutes les connexions d''un port');
-  WriteLn('  -r, --real-time       Mode temps rÇel (ignorÇ)');
-  WriteLn('  -v, --verbose         Affichage dÇtaillÇ');
+  WriteLn('  -r, --real-time       Mode temps rÔøΩel (ignorÔøΩ)');
+  WriteLn('  -v, --verbose         Affichage dÔøΩtaillÔøΩ');
   WriteLn('  --stats               Statistiques MIDI');
   WriteLn;
-  WriteLn('Paramätres :');
-  WriteLn('  sender                Port Çmetteur (client:port)');
-  WriteLn('  receiver              Port rÇcepteur (client:port)');
+  WriteLn('ParamÔøΩtres :');
+  WriteLn('  sender                Port '+#130+'metteur (client:port)');
+  WriteLn('  receiver              Port r'+#130+'cepteur (client:port)');
   WriteLn;
   WriteLn('Format des ports :');
-  WriteLn('  client:port           NumÇro de client et de port');
-  WriteLn('  client                Client avec port 0 par dÇfaut');
+  WriteLn('  client:port           Num'+#130+'ro de client et de port');
+  WriteLn('  client                Client avec port 0 par d'+#130+'faut');
   WriteLn;
   WriteLn('Exemples :');
   WriteLn('  ACONNECT -l                       # Lister tous les ports');
-  WriteLn('  ACONNECT -i                       # Ports d''entrÇe seulement');
+  WriteLn('  ACONNECT -i                       # Ports d''entr'+#130+'e seulement');
   WriteLn('  ACONNECT -o                       # Ports de sortie seulement');
   WriteLn('  ACONNECT                          # Connexions actives');
   WriteLn('  ACONNECT 20:0 128:0               # Connecter ports');
   WriteLn('  ACONNECT -c 20:0 128:0            # Connecter explicitement');
-  WriteLn('  ACONNECT -d 20:0 128:0            # DÇconnecter ports');
+  WriteLn('  ACONNECT -d 20:0 128:0            # DÔøΩconnecter ports');
   WriteLn('  ACONNECT -x 20:0                  # Supprimer toutes connexions');
   WriteLn('  ACONNECT --stats                  # Statistiques');
   WriteLn;
-  WriteLn('CapacitÇs des ports :');
-  WriteLn('  R = Lecture (Read)    W = êcriture (Write)');
-  WriteLn('  Sr = Lecture sync     Sw = êcriture sync');
+  WriteLn('CapacitÔøΩs des ports :');
+  WriteLn('  R = Lecture (Read)    W = '+#144+'criture (Write)');
+  WriteLn('  Sr = Lecture sync     Sw = '+#144+'criture sync');
   WriteLn('  D = Duplex           Su = Souscription');
   WriteLn;
-  WriteLn('Note: ACONNECT gäre les connexions entre ports MIDI via ALSA.');
-  WriteLn('Les connexions permettent de router les ÇvÇnements MIDI entre');
-  WriteLn('applications, synthÇtiseurs, et contrìleurs.');
+  WriteLn('Note: ACONNECT gÔøΩre les connexions entre ports MIDI via ALSA.');
+  WriteLn('Les connexions permettent de router les '+#130+'v'+#130+'nements MIDI entre');
+  WriteLn('applications, synth'+#130+'tiseurs, et contr'+#147+'leurs.');
   WriteLn;
-  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion rÇelle)');
+  WriteLn('Compatible Turbo Pascal (simulation) et Free Pascal (gestion r'+#130+'elle)');
  End
   Else
  If ParamStr(1) = '--version' Then Begin
   WriteLn('ACONNECT 1.00 - ALSA MIDI Connection Manager, NETWORKKIT-P, corail');
   WriteLn('Licence MIT');
   WriteLn;
-  WriteLn('êcrit par Sylvain Maltais');
+  WriteLn(#144+'crit par Sylvain Maltais');
  End
   Else
  Begin
