@@ -1,6 +1,7 @@
 { @author: Sylvain Maltais (support@gladir.com)
   @created: 2026
   @version: 1.00
+  @website(https://www.gladir.com/office-0)
   @website(https://www.gladir.com/networkkitp)
   @abstract(Target: Turbo Pascal 7, Free Pascal
   @description: Clone de l'application Outlook en mode graphique
@@ -10,7 +11,7 @@
   ============================================================================
 
   1.  [x] Interface graphique principale (fenêtre principale VGA/SVGA)
-      - Créer la fenêtre principale avec barre de titre "Outlook Express"
+      - Créer la fenêtre principale avec barre de titre "Outlook"
       - Implémenter les zones: menu, barre d'outils, panneau de navigation,
         liste des messages, volet de lecture
       - Gérer le redimensionnement des panneaux avec la souris
@@ -193,9 +194,9 @@
   ============================================================================
 
   Unités Pascal requises:
-  - Free Pascal: PtcGraph, PtcCrt, PtcMouse, SysUtils, Classes, StrUtils,
-                 DateUtils, Sockets, SSLSockets, Base64, DOM, XMLRead
-  - Turbo Pascal: Graph, Crt, DOS, Strings (support limité réseau)
+  - Free Pascal: Crt, PtcGraph, PtcCrt, PtcMouse
+  - Turbo Pascal: Crt, Graph, DOS
+  - Fonctions utilitaires et declarations des API integrees au programme
 
   Structure des données principales:
   - TOutlookAccount: Configuration d'un compte de messagerie
@@ -224,15 +225,19 @@
 Program OUTLOOK;
 
 Uses {$IFDEF FPC}
-      Crt,PtcGraph,PtcCrt,PtcMouse,SysUtils
+      Crt,PtcGraph,PtcCrt,PtcMouse,DOS
      {$ELSE}
       Crt,Graph,DOS
      {$ENDIF};
 
 Const
  { Dimensions de l'écran VGA 640x480 }
- SCREEN_WIDTH = 640;
- SCREEN_HEIGHT = 480;
+ DEFAULT_SCREEN_WIDTH = 640;
+ DEFAULT_SCREEN_HEIGHT = 480;
+ OPEN_DIALOG_WIDTH = 560;
+ OPEN_DIALOG_HEIGHT = 380;
+ OPEN_DIALOG_ROWS = 14;
+ MAX_OPEN_DIALOG_FILES = 256;
 
  { Couleurs style Windows 95/98 }
  COLOR_DESKTOP = 1;       { Bleu foncé - fond bureau }
@@ -284,6 +289,47 @@ Const
  MOUSE_MIDDLE = 4;
 
 Type
+ {$IFDEF FPC}
+ TMailText = AnsiString;
+ {$ELSE}
+ TMailText = String;
+ {$ENDIF}
+ {$IFDEF WINDOWS}
+ TMailHandle = Record Lower, Upper: PtrUInt; End;
+ TMailSecBuffer = Record Count, Kind: LongWord; Data: Pointer; End;
+ TMailSecDesc = Record Version, Count: LongWord; Buffers: Pointer; End;
+ TMailTLSSize = Record Header, Trailer, Maximum, Buffers, BlockSize: LongWord; End;
+ TMailCredentials = Record
+  Version, CertCount: LongWord;
+  Certs, RootStore: Pointer;
+  MapperCount: LongWord; Mappers: Pointer;
+  AlgorithmCount: LongWord; Algorithms: Pointer;
+  Protocols, MinimumStrength, MaximumStrength, Lifespan, Flags, Format: LongWord;
+ End;
+ PMailAddress = ^TMailAddress;
+ TMailAddress = Record
+  Flags, Family, SocketType, Protocol: LongInt;
+  AddressLength: PtrUInt;
+  CanonicalName, Address: Pointer;
+  Next: PMailAddress;
+ End;
+ TMailFDSet = Record Count: LongWord; Sockets: Array[0..63] of PtrUInt; End;
+ TMailTimeVal = Record Seconds, Microseconds: LongInt; End;
+ {$ENDIF}
+ TOpenFileEntry = Record
+  Name: String[255];
+  IsDirectory: Boolean;
+ End;
+ TMailConnection = Record
+  {$IFDEF WINDOWS}
+  Socket: PtrUInt;
+  Credential, Context: TMailHandle;
+  Sizes: TMailTLSSize;
+  HasCredential, HasContext: Boolean;
+  {$ENDIF}
+  Open, Secure: Boolean;
+  Host, Pending, Encrypted: TMailText;
+ End;
  { Structure pour la disposition des zones de l'interface }
  TWindowLayout = Record
   TitleBarRect: Record X1, Y1, X2, Y2: Integer; End;
@@ -355,8 +401,8 @@ Type
   ParentIndex: Integer;      { Index du parent (-1 si racine) }
   Expanded: Boolean;         { Étendu ou replié }
   Selected: Boolean;         { Sélectionné }
-  UnreadCount: Integer;      { Nombre de messages non lus }
-  TotalCount: Integer;       { Nombre total de messages }
+  UnreadCount: LongInt;      { Nombre de messages non lus }
+  TotalCount: LongInt;       { Nombre total de messages }
   Y: Integer;                { Position Y actuelle (calculée lors du dessin) }
   Visible: Boolean;          { Visible dans l'arbre (dépend de l'expansion du parent) }
  End;
@@ -1511,7 +1557,7 @@ Type
 
   { Etat de la connexion }
   State: TIMAPState;       { Etat actuel }
-  TagCounter: Integer;     { Compteur de tags }
+  TagCounter: LongInt;     { Compteur de tags }
   LastTag: String[10];     { Dernier tag envoye }
   LastError: String[80];   { Derniere erreur }
   Capabilities: String[200]; { Capacites du serveur }
@@ -1524,7 +1570,7 @@ Type
   IdleSupported: Boolean;  { Serveur supporte IDLE }
   IdleActive: Boolean;     { IDLE actuellement actif }
 
-  { Socket de connexion (simule pour cette implementation) }
+  { Etat du transport natif; la socket est geree dans TMailConnection. }
   Connected: Boolean;
   SocketHandle: Integer;
  End;
@@ -1614,7 +1660,7 @@ Type
   HeadersOnly: Boolean;    { Telecharger seulement les en-tetes }
   DeleteAfterDays: Integer; { Supprimer apres X jours (0 = jamais) }
 
-  { Socket de connexion (simule pour cette implementation) }
+  { Etat du transport natif; la socket est geree dans TMailConnection. }
   Connected: Boolean;
   SocketHandle: Integer;
  End;
@@ -1708,7 +1754,7 @@ Type
   RcptCount: Integer;      { Nombre de destinataires }
   RcptAccepted: Integer;   { Nombre de destinataires acceptes }
 
-  { Socket de connexion (simule pour cette implementation) }
+  { Etat du transport natif; la socket est geree dans TMailConnection. }
   Connected: Boolean;
   SocketHandle: Integer;
   TLSActive: Boolean;      { TLS actif (apres STARTTLS) }
@@ -1741,6 +1787,7 @@ Type
   Title: String[15];        { Titre de la colonne }
   X: Integer;               { Position X }
   Width: Integer;           { Largeur de la colonne }
+  Visible: Boolean;         { Colonne affichee }
   Sortable: Boolean;        { Triable ou non }
  End;
 
@@ -1814,6 +1861,22 @@ Type
   CheckIntervalMins: Integer;  { Intervalle de verification (minutes) }
  End;
 
+ { Rendez-vous et reunions : heures locales dans le calendrier. }
+ TRibbonButton = Record
+  X,Y,W,H,MenuItem,Group: Integer;
+ End;
+ TCalendarEvent = Record
+  ID,Sequence: LongInt;
+  IsMeeting,InvitationSent: Boolean;
+  Title,Location,UID,Organizer: String[80];
+  StartDate,EndDate: String[10];
+  StartTime,EndTime: String[5];
+  Participants,Notes: String[255];
+ End;
+ TEventGUID = Record A: LongWord; B,C: Word; D: Array[0..7] Of Byte; End;
+ TEventMoment = {$IFDEF FPC} Int64 {$ELSE} Real {$ENDIF};
+ TEventSystemTime = Record Year,Month,WeekDay,Day,Hour,Minute,Second,Millis: Word; End;
+
  { Structure pour un champ de saisie dans une boite de dialogue }
  TInputField = Record
   X, Y: Integer;               { Position }
@@ -1875,6 +1938,7 @@ Type
   CcField: String[250];        { Copie carbone }
   BccField: String[250];       { Copie carbone invisible }
   SubjectField: String[80];    { Objet }
+  AccountIndex: Integer;      { -1: compte du dossier ou compte par defaut }
 
   { Corps du message }
   Lines: Array[0..499] of TEditorLine; { Lignes de texte (max 500) }
@@ -1915,6 +1979,14 @@ Const
  CMD_EDIT_PASTE    = 204;
  CMD_EDIT_SELECTALL= 205;
 
+ CMD_VIEW_CALENDAR = 307;
+ CMD_VIEW_MAIL = 308;
+ CMD_EVENT_NEW = 312;
+ CMD_EVENT_MEETING = 313;
+ CMD_EVENT_AGENDA = 314;
+ CMD_CAL_PREVIOUS = 309;
+ CMD_CAL_NEXT = 310;
+ CMD_CAL_TODAY = 311;
  CMD_VIEW_PREVIEW  = 301;
  CMD_VIEW_SORTBY   = 302;
  CMD_VIEW_COLUMNS  = 303;
@@ -2118,8 +2190,6 @@ Const
  { Dimensions de la boite de dialogue de gestion des comptes }
  DIALOG_WIDTH = 500;
  DIALOG_HEIGHT = 350;
- DIALOG_X = (SCREEN_WIDTH - DIALOG_WIDTH) Div 2;
- DIALOG_Y = (SCREEN_HEIGHT - DIALOG_HEIGHT) Div 2;
 
  { Dimensions des elements de dialogue }
  DIALOG_BUTTON_WIDTH = 80;
@@ -2148,8 +2218,6 @@ Const
  { Dimensions de la fenetre du compositeur }
  COMPOSER_WIDTH = 550;
  COMPOSER_HEIGHT = 400;
- COMPOSER_X = (SCREEN_WIDTH - COMPOSER_WIDTH) Div 2;
- COMPOSER_Y = (SCREEN_HEIGHT - COMPOSER_HEIGHT) Div 2;
 
  { Zones de la fenetre du compositeur }
  COMPOSER_HEADER_HEIGHT = 120;    { Zone des champs d'en-tete }
@@ -2195,7 +2263,6 @@ Const
  ATTACH_PANEL_HEIGHT = 50;
  ATTACH_ICON_SIZE = 32;
  ATTACH_ICON_SPACING = 40;
- ATTACH_PANEL_Y = COMPOSER_Y + COMPOSER_HEADER_HEIGHT - ATTACH_PANEL_HEIGHT - 5;
 
  { Extensions dangereuses (executables) }
  DANGEROUS_EXT_COUNT = 12;
@@ -2952,6 +3019,28 @@ Const
  );
 
 Var
+ ColumnsDialogVisible: Boolean;
+ ColumnsDraft: Array[0..MAX_COLUMNS-1] Of TColumnHeader;
+ ColumnsDialogSelection, ColumnsDialogFocus: Integer;
+ ColumnsDialogError: String[60];
+ SortDialogVisible: Boolean;
+ SortDialogCriterion, SortDialogFocus: Integer;
+ SortDialogOrder: TSortOrder;
+ FileOpenVisible, FileOpenShowAll: Boolean;
+ FileDialogSaveMode, FileSaveFromComposer: Boolean;
+ FileSaveOverwritePending, FileSaveOverwriteYes: Boolean;
+ FileSaveOverwritePath: String[255];
+ FileSaveData: TMailText;
+ FileOpenDirectory, FileOpenName: String[255];
+ FileOpenError: String[80];
+ FileOpenEntries: Array[0..MAX_OPEN_DIALOG_FILES-1] of TOpenFileEntry;
+ FileOpenCount, FileOpenSelection, FileOpenScroll: Integer;
+ FileOpenFocus, FileOpenCursor: Integer;
+ FileOpenTruncated: Boolean;
+ MaxScreen: Boolean;
+ SCREEN_WIDTH, SCREEN_HEIGHT: Integer;
+ DIALOG_X, DIALOG_Y, COMPOSER_X, COMPOSER_Y: Integer;
+ ATTACH_PANEL_Y: Integer;
  Layout: TWindowLayout;
  DragState: TDragState;
  DragStartX, DragStartY: Integer;
@@ -2982,6 +3071,7 @@ Var
  MenuCount: Integer;
  ActiveMenu: Integer;        { Index du menu actif (-1 = aucun) }
  ActiveMenuItem: Integer;    { Index de l'élément survolé (-1 = aucun) }
+ LastMenuShortcut: Integer;
  MenuBarActive: Boolean;     { True si la barre de menu est active }
 
  { Variables pour la barre d'outils }
@@ -3063,6 +3153,8 @@ Var
 
  { Variables globales pour le gestionnaire de comptes (TODO 11) }
  EmailAccounts: Array[0..MAX_EMAIL_ACCOUNTS-1] of TEmailAccount; { Liste des comptes }
+ CommandLineAccountsFile: String[251];
+ AccountStorageError: String[80];
  EmailAccountCount: Integer;           { Nombre de comptes configures }
  CurrentAccountIndex: Integer;         { Index du compte en cours d'edition }
  AccountDialogVisible: Boolean;        { Boite de dialogue visible }
@@ -3153,6 +3245,10 @@ Var
  RuleNextID: Integer;                   { Prochain ID disponible }
  RulesWindowState: TRulesWindowState;   { Etat de la fenetre }
  RulesWindowX, RulesWindowY: Integer;   { Position de la fenetre }
+ RulesFocus, RulesTextCursor: Integer;
+ RulesError: String[70];
+ RulesDeletePending, RulesStopAfter: Boolean;
+ RulesBackup: Array[0..MAX_RULES-1] Of TFilterRule;
  RulesVisible: Boolean;                 { Visibilite de la fenetre }
  RulesScrollOffset: Integer;            { Decalage de defilement }
  RulesSelectedIndex: Integer;           { Regle selectionnee }
@@ -3259,6 +3355,30 @@ Var
    VARIABLES POUR LA CONFIGURATION DES PREFERENCES (TODO 23)
    ============================================================================ }
 
+ OptionsDraft: TUserPreferences;
+ EventDialogVisible,EventEditing,EventReturnToList,EventDeletePending: Boolean;
+ CalendarEvents,EventBackup: Array[0..127] Of TCalendarEvent;
+ EventDraft: TCalendarEvent;
+ EventCount,EventEditIndex,EventFocus,EventCursor,EventListCount,EventListSelection,EventListScroll: Integer;
+ EventList: Array[0..127] Of Integer;
+ EventNextID: LongInt;
+ EventError: String[90];
+ BusyVisible,BusyGraphicsReady: Boolean;
+ BusyTitle,BusyDetail,BusyStageText: String[80];
+ BusyDone,BusyTotal,BusyStarted,BusyLastPaint,BusyFrame: LongInt;
+ RibbonMode,RibbonKeyboardActive: Boolean;
+ RibbonTab,RibbonFocus,RibbonPressed,RibbonHover,RibbonCount: Integer;
+ RibbonButtons: Array[0..14] Of TRibbonButton;
+ RibbonGroupCount: Integer;
+ RibbonGroupX,RibbonGroupW: Array[0..7] Of Integer;
+ CalendarVisible, CalendarInitialized, CalendarHasFocus: Boolean;
+ CalendarYear,CalendarMonth,CalendarDay: Integer;
+ LastViewShortcut: Integer;
+ AboutVisible: Boolean;
+ OptionsReady: Boolean;
+ OptionsFocus, OptionsCursor: Integer;
+ PreviewPaneWidth: Integer;
+ OptionsError: String[80];
  UserPrefs: TUserPreferences;          { Preferences utilisateur }
  PrefsVisible: Boolean;                { Fenetre visible }
  PrefsWindowX, PrefsWindowY: Integer;  { Position de la fenetre }
@@ -3312,8 +3432,532 @@ Var
  UseCustomStrings: Boolean;            { Utiliser les chaines personnalisees }
  LanguageFilePath: String[80];         { Chemin du fichier de langue }
 
+{ Utilitaires integres: aucune unite utilitaire supplementaire. }
+{$IFDEF FPC}
+ {$IFDEF MSWINDOWS}
+Function NativeTickCount: LongWord;
+ stdcall; external 'kernel32.dll' name 'GetTickCount';
+Function NativeEnvironmentVariable(Name, Buffer: PAnsiChar;
+ Size: LongWord): LongWord;
+ stdcall; external 'kernel32.dll' name 'GetEnvironmentVariableA';
+ {$ELSE}
+  {$IFDEF UNIX}
+Type
+ TNativeClock = Record Seconds, Nanoseconds: PtrInt; End;
+Function NativeClockGetTime(ClockID: LongInt; Var Value: TNativeClock): LongInt;
+ cdecl; external 'c' name 'clock_gettime';
+Function NativeGetEnv(Name: PAnsiChar): PAnsiChar;
+ cdecl; external 'c' name 'getenv';
+  {$ENDIF}
+ {$ENDIF}
+
+Function GetEnvironmentVariable(Name: String): TMailText;
+Var
+ NameText: TMailText;
+ {$IFDEF MSWINDOWS}
+ Value: TMailText;
+ Needed, Copied: LongWord;
+ {$ELSE}
+  {$IFDEF UNIX}
+ Value: PAnsiChar;
+ Count: LongInt;
+  {$ENDIF}
+ {$ENDIF}
+Begin
+ GetEnvironmentVariable := '';
+ NameText := Name;
+ {$IFDEF MSWINDOWS}
+ Needed := NativeEnvironmentVariable(PAnsiChar(NameText), nil, 0);
+ While Needed > 0 Do Begin
+  SetLength(Value, Needed);
+  Copied := NativeEnvironmentVariable(PAnsiChar(NameText), @Value[1], Needed);
+  If Copied < Needed Then Begin
+   SetLength(Value, Copied);
+   GetEnvironmentVariable := Value;
+   Exit;
+  End;
+  { La valeur a pu changer entre les deux appels. }
+  Needed := Copied;
+ End;
+ {$ELSE}
+  {$IFDEF UNIX}
+ Value := NativeGetEnv(PAnsiChar(NameText));
+ If Value <> nil Then Begin
+  Count := 0;
+  While Value[Count] <> #0 Do Inc(Count);
+  SetString(GetEnvironmentVariable, Value, Count);
+ End;
+  {$ENDIF}
+ {$ENDIF}
+End;
+{$ENDIF}
+
+{ API natives declarees ici pour conserver un seul fichier source. }
+{$IFDEF WINDOWS}
+Function EventCreateGUID(Var Value: TEventGUID): LongInt;
+ stdcall; external 'ole32.dll' name 'CoCreateGuid';
+Procedure EventGetSystemTime(Var T: TEventSystemTime);
+ stdcall; external 'kernel32.dll' name 'GetSystemTime';
+Function EventLocalToUTC(TZ,Local,UTC: Pointer): LongBool;
+ stdcall; external 'kernel32.dll' name 'TzSpecificLocalTimeToSystemTime';
+Function EventToWide(Page,Flags: LongWord; Source: Pointer; Count: LongInt; Dest: Pointer; Size: LongInt): LongInt;
+ stdcall; external 'kernel32.dll' name 'MultiByteToWideChar';
+Function EventToUTF8(Page,Flags: LongWord; Source: Pointer; Count: LongInt; Dest: Pointer;
+ Size: LongInt; DefaultChar,UsedDefault: Pointer): LongInt;
+ stdcall; external 'kernel32.dll' name 'WideCharToMultiByte';
+{ Interroger le clavier seulement lorsque notre fenetre est au premier plan. }
+Function OutlookGetAsyncKeyState(Key: LongInt): SmallInt;
+ stdcall; external 'user32.dll' name 'GetAsyncKeyState';
+Function OutlookVkKeyScan(Character: AnsiChar): SmallInt;
+ stdcall; external 'user32.dll' name 'VkKeyScanA';
+Function OutlookGetForegroundWindow: PtrUInt;
+ stdcall; external 'user32.dll' name 'GetForegroundWindow';
+Function OutlookGetWindowProcess(Window: PtrUInt; Var ProcessID: LongWord): LongWord;
+ stdcall; external 'user32.dll' name 'GetWindowThreadProcessId';
+Function OutlookGetCurrentProcessID: LongWord;
+ stdcall; external 'kernel32.dll' name 'GetCurrentProcessId';
+Function MailWSAStartup(Version: Word; Data: Pointer): LongInt;
+ stdcall; external 'ws2_32.dll' name 'WSAStartup';
+Function MailWSACleanup: LongInt;
+ stdcall; external 'ws2_32.dll' name 'WSACleanup';
+Function MailSocket(AF, Kind, Protocol: LongInt): PtrUInt;
+ stdcall; external 'ws2_32.dll' name 'socket';
+Function MailCloseSocket(S: PtrUInt): LongInt;
+ stdcall; external 'ws2_32.dll' name 'closesocket';
+Function MailConnect(S: PtrUInt; Addr: Pointer; Len: LongInt): LongInt;
+ stdcall; external 'ws2_32.dll' name 'connect';
+Function MailSend(S: PtrUInt; Data: Pointer; Len, Flags: LongInt): LongInt;
+ stdcall; external 'ws2_32.dll' name 'send';
+Function MailRecv(S: PtrUInt; Data: Pointer; Len, Flags: LongInt): LongInt;
+ stdcall; external 'ws2_32.dll' name 'recv';
+Function MailSocketOption(S: PtrUInt; Level, Opt: LongInt; Data: Pointer; Len: LongInt): LongInt;
+ stdcall; external 'ws2_32.dll' name 'setsockopt';
+Function MailGetSocketOption(S: PtrUInt; Level, Opt: LongInt; Data: Pointer; Var Len: LongInt):
+ LongInt;
+ stdcall; external 'ws2_32.dll' name 'getsockopt';
+Function MailIoctl(S: PtrUInt; Cmd: LongWord; Var Value: LongWord): LongInt;
+ stdcall; external 'ws2_32.dll' name 'ioctlsocket';
+Function MailSelect(N: LongInt; R, W, E: Pointer; Timeout: Pointer): LongInt;
+ stdcall; external 'ws2_32.dll' name 'select';
+Function MailAddressInfo(Host, Service: PAnsiChar; Hints: Pointer; Var Addr: PMailAddress): LongInt;
+ stdcall; external 'ws2_32.dll' name 'getaddrinfo';
+Procedure MailFreeAddress(Addr: PMailAddress);
+ stdcall; external 'ws2_32.dll' name 'freeaddrinfo';
+Function MailAcquire(Principal, Package: PAnsiChar; Use: LongWord; Logon, Auth, GetKey, Arg:
+ Pointer; Var Handle: TMailHandle; Expiry: Pointer): LongInt;
+ stdcall; external 'secur32.dll' name 'AcquireCredentialsHandleA';
+Function MailInitialize(Cred, OldContext: Pointer; Target: PAnsiChar; Flags, Reserved, Rep:
+ LongWord; Input: Pointer; Reserved2: LongWord; Var Context: TMailHandle; Output: Pointer; Var
+ Attributes: LongWord; Expiry: Pointer): LongInt;
+ stdcall; external 'secur32.dll' name 'InitializeSecurityContextA';
+Function MailQuery(Var Context: TMailHandle; Attribute: LongWord; Buffer: Pointer): LongInt;
+ stdcall; external 'secur32.dll' name 'QueryContextAttributesA';
+Function MailEncrypt(Var Context: TMailHandle; Qop: LongWord; Var Desc: TMailSecDesc; Seq:
+ LongWord): LongInt;
+ stdcall; external 'secur32.dll' name 'EncryptMessage';
+Function MailDecrypt(Var Context: TMailHandle; Var Desc: TMailSecDesc; Seq: LongWord; Qop:
+ Pointer): LongInt;
+ stdcall; external 'secur32.dll' name 'DecryptMessage';
+Function MailFreeBuffer(Buffer: Pointer): LongInt;
+ stdcall; external 'secur32.dll' name 'FreeContextBuffer';
+Function MailDeleteContext(Var Context: TMailHandle): LongInt;
+ stdcall; external 'secur32.dll' name 'DeleteSecurityContext';
+Function MailFreeCredential(Var Cred: TMailHandle): LongInt;
+ stdcall; external 'secur32.dll' name 'FreeCredentialsHandle';
+{$ENDIF}
+
+Var
+ IMAPWire, POP3Wire, SMTPWire: TMailConnection;
+ MailError, MailStatus: String[80];
+ MailRaw: TMailText;
+ MessageSources, PendingMessageSources: Array[0..MAX_MESSAGES-1] of TMailText;
+ MailFetchFlags: TMailText;
+ MailFetchUID: LongInt;
+ MailNewMessages: Array[0..MAX_MESSAGES-1] of TMessage;
+ MailFolderAccount: Array[0..MAX_FOLDERS-1] of Integer;
+ MailLoadedFolder: Integer;
+ {$IFDEF WINDOWS}
+ MailWinsockReady: Boolean;
+ {$ENDIF}
+
+Procedure DrawStatusBar; Forward;
+Procedure ReceiveMail; Forward;
+Procedure RefreshAccountFolders; Forward;
+Function GetTickCount: LongInt; Forward;
+Procedure BusyBegin(Title,Detail: String); Forward;
+Procedure BusyUpdate(Stage: String; Done,Total: LongInt); Forward;
+Procedure BusyStage(Stage: String); Forward;
+Procedure BusyPulse(Force: Boolean); Forward;
+Procedure BusyEnd; Forward;
+
+Function MailUpper(Text: TMailText): TMailText;
+Var I: LongInt;
+Begin
+ For I:=1 To Length(Text) Do Text[I]:=UpCase(Text[I]);
+ MailUpper:=Text;
+End;
+
+Function MailTrim(Text: TMailText): TMailText;
+Begin
+ While (Length(Text)>0) And (Text[1] In [' ',#9,#13,#10]) Do Delete(Text,1,1);
+ While (Length(Text)>0) And (Text[Length(Text)] In [' ',#9,#13,#10]) Do Delete(Text,Length(Text),1);
+ MailTrim:=Text;
+End;
+
+Procedure MailClose(Var C: TMailConnection);
+Begin
+ {$IFDEF WINDOWS}
+ If C.Open Then MailCloseSocket(C.Socket);
+ If C.HasContext Then MailDeleteContext(C.Context);
+ If C.HasCredential Then MailFreeCredential(C.Credential);
+ C.HasContext := False; C.HasCredential := False;
+ {$ENDIF}
+ C.Open := False; C.Secure := False;
+ C.Pending := ''; C.Encrypted := '';
+End;
+
+{ Attente courte repetee : le reseau garde ses delais, l indicateur reste anime. }
+Function MailWaitSocket(Var C: TMailConnection; Writing: Boolean): Boolean;
+{$IFDEF WINDOWS}
+Var Ready,Errors: TMailFDSet; TV: TMailTimeVal; ResultCode: LongInt;
+ Started,Budget,Elapsed: LongWord;
+{$ENDIF}
+Begin
+ MailWaitSocket:=False;
+ {$IFDEF WINDOWS}
+ Budget:=10000;
+ If OptionsReady Then Budget:=LongWord(UserPrefs.Connection.ConnectionTimeout)*1000;
+ If Budget<1000 Then Budget:=1000;
+ If Budget>120000 Then Budget:=120000;
+ Started:=GetTickCount;
+ Repeat
+  BusyPulse(False);
+  FillChar(Ready,SizeOf(Ready),0); Ready.Count:=1; Ready.Sockets[0]:=C.Socket; Errors:=Ready;
+  TV.Seconds:=0; TV.Microseconds:=100000;
+  If Writing Then ResultCode:=MailSelect(0,nil,@Ready,@Errors,@TV)
+  Else ResultCode:=MailSelect(0,@Ready,nil,@Errors,@TV);
+  If ResultCode<0 Then Begin MailError:='Erreur pendant l attente reseau'; Exit; End;
+  If ResultCode>0 Then Begin
+   If Errors.Count<>0 Then Begin MailError:='Connexion au serveur refusee'; Exit; End;
+   MailWaitSocket:=True; Exit;
+  End;
+  Elapsed:=(LongWord(GetTickCount)-Started) And $7FFFFFFF;
+ Until Elapsed>=Budget;
+ MailError:='Delai d attente reseau depasse';
+ {$ELSE}
+ MailError:='Reseau disponible uniquement sous Windows';
+ {$ENDIF}
+End;
+
+Function MailWriteSocket(Var C: TMailConnection; Const Data: TMailText): Boolean;
+{$IFDEF WINDOWS}
+Var Offset, N,Chunk: LongInt;
+{$ENDIF}
+Begin
+ MailWriteSocket := False;
+ {$IFDEF WINDOWS}
+ Offset := 1;
+ While Offset <= Length(Data) Do Begin
+  If Not MailWaitSocket(C,True) Then Exit;
+  Chunk:=Length(Data)-Offset+1; If Chunk>16384 Then Chunk:=16384;
+  N := MailSend(C.Socket, @Data[Offset], Chunk, 0);
+  If N <= 0 Then Begin MailError := 'Erreur envoi socket'; Exit; End;
+  Inc(Offset, N);
+ End;
+ MailWriteSocket := True;
+ {$ELSE}
+ MailError := 'Reseau disponible uniquement sous Windows';
+ {$ENDIF}
+End;
+
+Function MailReadSocket(Var C: TMailConnection; Var Data: TMailText): Boolean;
+{$IFDEF WINDOWS}
+Var B: Array[0..16383] of AnsiChar; N: LongInt; Part: AnsiString;
+{$ENDIF}
+Begin
+ MailReadSocket := False;
+ {$IFDEF WINDOWS}
+ If Not MailWaitSocket(C,False) Then Exit;
+ N := MailRecv(C.Socket, @B, SizeOf(B), 0);
+ If N <= 0 Then Begin MailError := 'Connexion fermee ou delai de reception depasse'; Exit; End;
+ SetString(Part, PAnsiChar(@B), N);
+ Data := Data + Part;
+ MailReadSocket := True;
+ {$ELSE}
+ MailError := 'Reseau disponible uniquement sous Windows';
+ {$ENDIF}
+End;
+
+Function MailStartTLS(Var C: TMailConnection): Boolean;
+{$IFDEF WINDOWS}
+Const RequestFlags = $00000010 Or $00000100 Or $00000004 Or $00000008 Or $00008000;
+Var Cred: TMailCredentials; InBuf: Array[0..1] of TMailSecBuffer;
+ OutBuf: TMailSecBuffer; InDesc, OutDesc: TMailSecDesc;
+ Status: LongInt; Attr: LongWord; Old: Pointer; NeedRead: Boolean;
+{$ENDIF}
+Begin
+ MailStartTLS := False;
+ BusyStage('Negociation de la connexion securisee TLS...');
+ {$IFDEF WINDOWS}
+ If Not C.Open Or C.Secure Or (C.Pending <> '') Then Begin
+  MailError := 'Etat TLS invalide'; Exit;
+ End;
+ FillChar(Cred, SizeOf(Cred), 0);
+ Cred.Version := 4;
+ { TLS 1.2 minimum; validation automatique certificat et nom du serveur.
+   Aucun drapeau MANUAL_CRED_VALIDATION ou IGNORE_* n est utilise. }
+ Cred.Protocols := $00000800;
+ Cred.Flags := $00000010 Or $00400000;
+ Status := MailAcquire(nil, 'Microsoft Unified Security Protocol Provider', 2,
+                       nil, @Cred, nil, nil, C.Credential, nil);
+ If Status <> 0 Then Begin
+  Str(Status,C.Pending); MailError := 'Impossible d initialiser Schannel: '+C.Pending; C.Pending:=''; Exit;
+ End;
+ C.HasCredential := True;
+ NeedRead := False;
+ Repeat
+  If Length(C.Encrypted)>1048576 Then Begin MailError:='Negociation TLS trop longue'; Exit; End;
+  If NeedRead Then
+   If Not MailReadSocket(C, C.Encrypted) Then Exit;
+  FillChar(InBuf, SizeOf(InBuf), 0);
+  InBuf[0].Kind := 2; InBuf[0].Count := Length(C.Encrypted);
+  If C.Encrypted <> '' Then InBuf[0].Data := @C.Encrypted[1];
+  InDesc.Version := 0; InDesc.Count := 2; InDesc.Buffers := @InBuf;
+  FillChar(OutBuf, SizeOf(OutBuf), 0); OutBuf.Kind := 2;
+  OutDesc.Version := 0; OutDesc.Count := 1; OutDesc.Buffers := @OutBuf;
+  Old := nil; If C.HasContext Then Old := @C.Context;
+  If Old = nil Then
+   Status := MailInitialize(@C.Credential, nil, PAnsiChar(C.Host), RequestFlags,
+                0, 0, nil, 0, C.Context, @OutDesc, Attr, nil)
+  Else
+   Status := MailInitialize(@C.Credential, Old, PAnsiChar(C.Host), RequestFlags,
+                0, 0, @InDesc, 0, C.Context, @OutDesc, Attr, nil);
+  If (Status = 0) Or (Status = $00090312) Then C.HasContext := True;
+  If OutBuf.Data <> nil Then Begin
+   If OutBuf.Count > 0 Then Begin
+    SetLength(C.Pending, OutBuf.Count);
+    Move(OutBuf.Data^, C.Pending[1], OutBuf.Count);
+    If Not MailWriteSocket(C, C.Pending) Then Begin
+     MailFreeBuffer(OutBuf.Data); C.Pending := ''; Exit;
+    End;
+    C.Pending := '';
+   End;
+   MailFreeBuffer(OutBuf.Data);
+  End;
+  If Status = LongInt($80090318) Then NeedRead := True
+  Else Begin
+   If InBuf[1].Kind = 5 Then
+    C.Encrypted := Copy(C.Encrypted, Length(C.Encrypted)-InBuf[1].Count+1, InBuf[1].Count)
+   Else C.Encrypted := '';
+   NeedRead := C.Encrypted = '';
+  End;
+  If (Status <> 0) And (Status <> $00090312) And
+     (Status <> LongInt($80090318)) Then Begin
+   MailError := 'Echec TLS: certificat, nom du serveur ou protocole refuse'; Exit;
+  End;
+ Until Status = 0;
+ If MailQuery(C.Context, 4, @C.Sizes) <> 0 Then Begin
+  MailError := 'Impossible de lire les parametres TLS'; Exit;
+ End;
+ C.Secure := True;
+ MailStartTLS := True;
+ {$ELSE}
+ MailError := 'TLS disponible uniquement sous Windows';
+ {$ENDIF}
+End;
+
+Function MailOpen(Var C: TMailConnection; Host: String; Port: Integer; SSL: Boolean): Boolean;
+{$IFDEF WINDOWS}
+Var WSAData: Array[0..511] of Byte; Hints: TMailAddress;
+ Addr, Item: PMailAddress; Service: AnsiString;
+ Timeout, NonBlocking: LongWord; SocketError, OptLen: LongInt;
+{$ENDIF}
+Begin
+ MailOpen := False; MailClose(C); MailError := '';
+ If UserPrefs.Connection.OfflineMode Then Begin MailError:='Mode hors ligne actif'; Exit; End;
+ {$IFDEF WINDOWS}
+ If Not MailWinsockReady Then Begin
+  If MailWSAStartup($0202, @WSAData) <> 0 Then Begin MailError := 'Echec Winsock'; Exit; End;
+  MailWinsockReady := True;
+ End;
+ If (Host = '') Or (Port <= 0) Then Begin
+  MailError := 'Serveur ou port invalide'; Exit;
+ End;
+ BusyStage('Resolution du serveur...');
+ C.Host := Host; Str(Port, Service);
+ FillChar(Hints, SizeOf(Hints), 0); Hints.SocketType := 1; Hints.Protocol := 6;
+ If MailAddressInfo(PAnsiChar(C.Host), PAnsiChar(Service), @Hints, Addr) <> 0 Then Begin
+  MailError := 'Resolution DNS impossible'; Exit;
+ End;
+ BusyStage('Connexion au serveur...');
+ Item := Addr;
+ While Item <> nil Do Begin
+  C.Socket := MailSocket(Item^.Family, 1, 6);
+  If C.Socket <> High(PtrUInt) Then Begin
+   NonBlocking := 1; MailIoctl(C.Socket, $8004667E, NonBlocking);
+   SocketError := MailConnect(C.Socket, Item^.Address, Item^.AddressLength);
+   If SocketError <> 0 Then Begin
+    If MailWaitSocket(C,True) Then Begin
+     SocketError := -1; OptLen := SizeOf(SocketError);
+     If MailGetSocketOption(C.Socket, $FFFF, $1007, @SocketError, OptLen) <> 0 Then SocketError := -1;
+    End Else SocketError := -1;
+   End;
+   NonBlocking := 0; MailIoctl(C.Socket, $8004667E, NonBlocking);
+   If SocketError = 0 Then Begin C.Open := True; Break; End;
+   MailCloseSocket(C.Socket);
+  End;
+  Item := Item^.Next;
+ End;
+ MailFreeAddress(Addr);
+ If Not C.Open Then Begin MailError := 'Connexion au serveur impossible ou delai depasse'; Exit; End;
+ Timeout:=10000;
+ If OptionsReady Then Timeout:=LongWord(UserPrefs.Connection.ConnectionTimeout)*1000;
+ MailSocketOption(C.Socket, $FFFF, $1006, @Timeout, SizeOf(Timeout));
+ MailSocketOption(C.Socket, $FFFF, $1005, @Timeout, SizeOf(Timeout));
+ If SSL Then If Not MailStartTLS(C) Then Begin MailClose(C); Exit; End;
+ MailOpen := True;
+ {$ELSE}
+ MailError := 'Reseau disponible uniquement sous Windows';
+ {$ENDIF}
+End;
+
+Function MailWrite(Var C: TMailConnection; Const Text: TMailText): Boolean;
+{$IFDEF WINDOWS}
+Var B: Array[0..3] of TMailSecBuffer; D: TMailSecDesc;
+ Packet, Part: AnsiString; Offset, N, I: LongInt;
+{$ENDIF}
+Begin
+ MailWrite := False;
+ If Not C.Open Then Begin MailError := 'Non connecte'; Exit; End;
+ If Not C.Secure Then Begin MailWrite := MailWriteSocket(C, Text); Exit; End;
+ {$IFDEF WINDOWS}
+ Offset := 1;
+ While Offset <= Length(Text) Do Begin
+  N := Length(Text)-Offset+1; If N > C.Sizes.Maximum Then N := C.Sizes.Maximum;
+  SetLength(Packet, C.Sizes.Header+N+C.Sizes.Trailer);
+  Move(Text[Offset], Packet[C.Sizes.Header+1], N);
+  FillChar(B, SizeOf(B), 0);
+  B[0].Kind := 7; B[0].Count := C.Sizes.Header; B[0].Data := @Packet[1];
+  B[1].Kind := 1; B[1].Count := N; B[1].Data := @Packet[C.Sizes.Header+1];
+  B[2].Kind := 6; B[2].Count := C.Sizes.Trailer; B[2].Data := @Packet[C.Sizes.Header+N+1];
+  D.Version := 0; D.Count := 4; D.Buffers := @B;
+  If MailEncrypt(C.Context, 0, D, 0) <> 0 Then Begin MailError := 'Erreur chiffrement TLS'; Exit; End;
+  For I := 0 To 2 Do
+   If B[I].Count > 0 Then Begin
+    SetString(Part, PAnsiChar(B[I].Data), B[I].Count);
+    If Not MailWriteSocket(C, Part) Then Exit;
+   End;
+  Inc(Offset, N);
+ End;
+ MailWrite := True;
+ {$ENDIF}
+End;
+
+Function MailFill(Var C: TMailConnection): Boolean;
+{$IFDEF WINDOWS}
+Var B: Array[0..3] of TMailSecBuffer; D: TMailSecDesc;
+ Status: LongInt; I: Integer; Part, Extra: AnsiString;
+{$ENDIF}
+Begin
+ MailFill := False;
+ If Not C.Open Then Begin MailError := 'Non connecte'; Exit; End;
+ If Not C.Secure Then Begin MailFill := MailReadSocket(C, C.Pending); Exit; End;
+ {$IFDEF WINDOWS}
+ Repeat
+  If C.Encrypted = '' Then If Not MailReadSocket(C, C.Encrypted) Then Exit;
+  FillChar(B, SizeOf(B), 0);
+  B[0].Kind := 1; B[0].Count := Length(C.Encrypted); B[0].Data := @C.Encrypted[1];
+  D.Version := 0; D.Count := 4; D.Buffers := @B;
+  Status := MailDecrypt(C.Context, D, 0, nil);
+  If Status = LongInt($80090318) Then Begin
+   If Length(C.Encrypted) > 1048576 Then Begin MailError := 'Paquet TLS trop grand'; Exit; End;
+   If Not MailReadSocket(C, C.Encrypted) Then Exit;
+  End Else If Status <> 0 Then Begin MailError := 'Connexion TLS fermee ou renegociation requise'; Exit; End;
+ Until Status = 0;
+ Extra := '';
+ For I := 0 To 3 Do Begin
+  If (B[I].Kind = 1) And (B[I].Count > 0) Then Begin
+   SetString(Part, PAnsiChar(B[I].Data), B[I].Count); C.Pending := C.Pending + Part;
+  End;
+  If B[I].Kind = 5 Then
+   Extra := Copy(C.Encrypted, Length(C.Encrypted)-B[I].Count+1, B[I].Count);
+ End;
+ C.Encrypted := Extra;
+ MailFill := True;
+ {$ENDIF}
+End;
+
+Function MailReadLine(Var C: TMailConnection; Var Line: TMailText): Boolean;
+Var P: LongInt;
+Begin
+ MailReadLine := False; Line := '';
+ Repeat
+  P := Pos(#13#10, C.Pending);
+  If P > 0 Then Begin
+   Line := Copy(C.Pending, 1, P-1); Delete(C.Pending, 1, P+1);
+   MailReadLine := True; Exit;
+  End;
+  If Length(C.Pending) > 1048576 Then Begin MailError := 'Ligne serveur trop longue'; Exit; End;
+  If Not MailFill(C) Then Exit;
+ Until False;
+End;
+
+Function MailReadBytes(Var C: TMailConnection; Count: LongInt; Var Data: TMailText): Boolean;
+Begin
+ MailReadBytes := False; Data := '';
+ If (Count < 0) Or (Count > 10485760) Then Begin MailError := 'Message trop grand (10 Mo maximum)'; Exit; End;
+ While Length(C.Pending) < Count Do If Not MailFill(C) Then Exit;
+ Data := Copy(C.Pending, 1, Count); Delete(C.Pending, 1, Count);
+ MailReadBytes := True;
+End;
+
+Function MailSafe(Const Text: TMailText): Boolean;
+Begin
+ MailSafe := (Pos(#13, Text)=0) And (Pos(#10, Text)=0) And (Pos(#0, Text)=0);
+ If Not MailSafe Then MailError := 'Caractere interdit dans une commande';
+End;
+
+Function MailQuote(Const Text: TMailText): TMailText;
+Var I: Integer;
+Begin
+ MailQuote := '"';
+ For I := 1 To Length(Text) Do Begin
+  If Text[I] In ['"', '\'] Then MailQuote := MailQuote + '\';
+  MailQuote := MailQuote + Text[I];
+ End;
+ MailQuote := MailQuote + '"';
+End;
+
 { Declarations avancees pour utilisation avant definition }
 Procedure DrawInterface; Forward;
+Procedure DrawMenuBar; Forward;
+Procedure DrawRibbonTabs; Forward;
+Procedure DrawRibbon; Forward;
+Procedure RibbonSelectTab(Index: Integer; Keyboard: Boolean); Forward;
+Function RibbonTabAt(X,Y: Integer): Integer; Forward;
+Procedure DrawComposerWindow; Forward;
+Procedure OpenMessageFile; Forward;
+Procedure SaveMessageAs; Forward;
+Procedure ShowSortDialog; Forward;
+Procedure ShowColumnsDialog; Forward;
+Procedure Rules_Show; Forward;
+Procedure Prefs_Show; Forward;
+Procedure ShowAboutDialog; Forward;
+Procedure CalendarShow(Visible: Boolean); Forward;
+Procedure FocusMail; Forward;
+Procedure CalendarMoveMonth(Delta: Integer); Forward;
+Procedure CalendarToday; Forward;
+Procedure CalendarUpdateMenus; Forward;
+Function CalendarPaneWidth: Integer; Forward;
+Procedure EventNew(Meeting: Boolean); Forward;
+Procedure EventAgenda; Forward;
+Function EventOnDay(Const E: TCalendarEvent; Y,M,D: Integer): Boolean; Forward;
+Procedure EventDraw; Forward;
+Function WriteMessageFile(Path: TMailText; AllowReplace: Boolean): Boolean; Forward;
+Function MailTextBody(Const Raw: TMailText; Depth: Integer): TMailText; Forward;
+Procedure DrawColumnsDialog; Forward;
+Procedure DrawSortDialog; Forward;
+Procedure DrawOpenFileDialog; Forward;
 Procedure CalculateLayout; Forward;
 Procedure DrawFolderPane; Forward;
 Procedure OpenNewMessage; Forward;
@@ -3327,21 +3971,69 @@ Procedure Offline_StartSync; Forward;
   PROCÉDURES D'INITIALISATION GRAPHIQUE
   ============================================================================ }
 
+{ Meme selection que BROWSER.PAS: palette indexee et resolution maximale. }
+Procedure SelectScreenDriverMode(WantMaxScreen: Boolean;
+ Var Driver, Mode: Integer);
+{$IFDEF FPC}
+Var LoMode, HiMode: SmallInt;
+{$ENDIF}
+Begin
+ {$IFDEF FPC}
+ If WantMaxScreen Then Begin
+  Driver := D8bit;
+  GetModeRange(Driver, LoMode, HiMode);
+  If HiMode >= LoMode Then Mode := HiMode
+  Else Begin Driver := Detect; Mode := 0; End;
+ End Else Begin
+  Driver := VGA;
+  Mode := VGAHi;
+ End;
+ {$ELSE}
+ Driver := Detect;
+ Mode := VGAHi;
+ {$ENDIF}
+End;
+
+Procedure UpdateScreenGeometry(Width, Height: Integer);
+Begin
+ SCREEN_WIDTH := Width;
+ SCREEN_HEIGHT := Height;
+ DIALOG_X := (SCREEN_WIDTH - DIALOG_WIDTH) Div 2;
+ DIALOG_Y := (SCREEN_HEIGHT - DIALOG_HEIGHT) Div 2;
+ COMPOSER_X := (SCREEN_WIDTH - COMPOSER_WIDTH) Div 2;
+ COMPOSER_Y := (SCREEN_HEIGHT - COMPOSER_HEIGHT) Div 2;
+ ATTACH_PANEL_Y := COMPOSER_Y + COMPOSER_HEADER_HEIGHT - ATTACH_PANEL_HEIGHT - 5;
+End;
+
+{ Les seize couleurs de l interface restent identiques dans le pilote D8bit. }
+Procedure InitializeScreenPalette;
+{$IFDEF FPC}
+Const
+ RGB: Array[0..15, 0..2] of Byte = (
+  (0,0,0), (0,0,170), (0,170,0), (0,170,170),
+  (170,0,0), (170,0,170), (170,85,0), (170,170,170),
+  (85,85,85), (85,85,255), (85,255,85), (85,255,255),
+  (255,85,85), (255,85,255), (255,255,85), (255,255,255));
+Var I: Integer;
+{$ENDIF}
+Begin
+ {$IFDEF FPC}
+ If GetMaxColor > 15 Then
+  For I := 0 To 15 Do SetRGBPalette(I, RGB[I,0], RGB[I,1], RGB[I,2]);
+ {$ENDIF}
+End;
+
 Procedure InitializeGraphics;
 Var
  Driver, Mode: Integer;
  ErrCode: Integer;
 Begin
- {$IFDEF FPC}
-  Driver:=VGA;
-  Mode:=VGAHi;
- {$ELSE}
-  Driver:=Detect;
-  Mode:=VGAHi;
- {$ENDIF}
+ SelectScreenDriverMode(MaxScreen, Driver, Mode);
  InitGraph(Driver,Mode,'');
  ErrCode:=GraphResult;
  If ErrCode=grOk Then Begin
+  UpdateScreenGeometry(GetMaxX + 1, GetMaxY + 1);
+  InitializeScreenPalette;
   SetColor(White);
   SetLineStyle(0,0,1);
  End
@@ -3410,7 +4102,7 @@ End;
 
 {$ENDIF}
 
-{ Fonction pour obtenir le temps actuel en millisecondes (approximatif) }
+{ Horloge en millisecondes: runtime FPC ou heure DOS, sans unite utilitaire. }
 Function GetTickCount: LongInt;
 {$IFNDEF FPC}
 Var
@@ -3421,9 +4113,29 @@ Begin
                  (LongInt(Sec) * 1000) + (LongInt(Sec100) * 10);
 End;
 {$ELSE}
+ {$IFDEF MSWINDOWS}
 Begin
- GetTickCount := Trunc(Now * 86400000) Mod 2147483647;
+ GetTickCount := NativeTickCount And $7FFFFFFF;
 End;
+ {$ELSE}
+  {$IFDEF UNIX}
+Var ClockValue: TNativeClock;
+Begin
+ { CLOCK_MONOTONIC differe entre les plateformes POSIX. }
+   {$IFDEF DARWIN}
+ NativeClockGetTime(6, ClockValue);
+   {$ELSE}
+    {$IFDEF FREEBSD}
+ NativeClockGetTime(4, ClockValue);
+    {$ELSE}
+ NativeClockGetTime(1, ClockValue);
+    {$ENDIF}
+   {$ENDIF}
+ GetTickCount := ((Int64(ClockValue.Seconds) * 1000) +
+                  (ClockValue.Nanoseconds Div 1000000)) And $7FFFFFFF;
+End;
+  {$ENDIF}
+ {$ENDIF}
 {$ENDIF}
 
 { Initialise les variables de gestion de la souris }
@@ -3950,7 +4662,7 @@ End;
 { Initialise tous les menus de la barre }
 Procedure InitializeMenus;
 Var
- I: Integer;
+ I,J,NeededWidth: Integer;
  MenuX: Integer;
 Begin
  MenuCount := 6;
@@ -3967,6 +4679,8 @@ Begin
  Menus[0].Width := TextWidth('Fichier') + 16;
  Menus[0].ItemCount := 0;
  AddMenuItem(Menus[0], 'Nouveau message', 'Ctrl+N', False, CMD_FILE_NEW);
+ AddMenuItem(Menus[0], 'Nouveau rendez-vous...', '', False, CMD_EVENT_NEW);
+ AddMenuItem(Menus[0], 'Nouvelle reunion...', '', False, CMD_EVENT_MEETING);
  AddMenuItem(Menus[0], 'Ouvrir', 'Ctrl+O', False, CMD_FILE_OPEN);
  AddMenuItem(Menus[0], '', '', True, 0); { Séparateur }
  AddMenuItem(Menus[0], 'Enregistrer sous...', 'Ctrl+S', False, CMD_FILE_SAVEAS);
@@ -4004,6 +4718,13 @@ Begin
  AddMenuItem(Menus[2], 'Colonnes...', '', False, CMD_VIEW_COLUMNS);
  AddMenuItem(Menus[2], '', '', True, 0); { Séparateur }
  AddMenuItem(Menus[2], 'Actualiser', 'F5', False, CMD_VIEW_REFRESH);
+ AddMenuItem(Menus[2], '', '', True, 0);
+ AddMenuItem(Menus[2], 'Calendrier', 'Ctrl+2', False, CMD_VIEW_CALENDAR);
+ AddMenuItem(Menus[2], 'Courrier', 'Ctrl+1', False, CMD_VIEW_MAIL);
+ AddMenuItem(Menus[2], 'Mois precedent', 'PgPrec', False, CMD_CAL_PREVIOUS);
+ AddMenuItem(Menus[2], 'Mois suivant', 'PgSuiv', False, CMD_CAL_NEXT);
+ AddMenuItem(Menus[2], 'Aujourd''hui', 'Debut', False, CMD_CAL_TODAY);
+ AddMenuItem(Menus[2], 'Agenda du jour...', '', False, CMD_EVENT_AGENDA);
 
  MenuX := MenuX + Menus[2].Width;
 
@@ -4032,6 +4753,11 @@ Begin
  AddMenuItem(Menus[4], 'Transferer', 'Ctrl+F', False, CMD_MSG_FORWARD);
  AddMenuItem(Menus[4], '', '', True, 0); { Séparateur }
  AddMenuItem(Menus[4], 'Supprimer', 'Suppr', False, CMD_MSG_DELETE);
+ If RibbonMode Then Begin
+  AddMenuItem(Menus[4], '', '', True, 0);
+  AddMenuItem(Menus[4], 'Envoyer/Recevoir', '', False, CMD_TB_SENDRECV);
+  AddMenuItem(Menus[4], 'Carnet d''adresses', '', False, CMD_TB_ADDRESSBOOK);
+ End;
 
  MenuX := MenuX + Menus[4].Width;
 
@@ -4044,11 +4770,19 @@ Begin
  AddMenuItem(Menus[5], '', '', True, 0); { Séparateur }
  AddMenuItem(Menus[5], 'A propos...', '', False, CMD_HELP_ABOUT);
 
+ CalendarUpdateMenus;
+
  { Calculer les dimensions des menus déroulants }
  For I := 0 To MenuCount - 1 Do Begin
   Menus[I].DropX := Menus[I].X;
   Menus[I].DropY := Layout.MenuBarRect.Y2 + 1;
   Menus[I].DropWidth := 180;
+  For J:=0 To Menus[I].ItemCount-1 Do Begin
+   NeededWidth:=TextWidth(Menus[I].Items[J].Caption)+TextWidth(Menus[I].Items[J].Shortcut)+32;
+   If NeededWidth>Menus[I].DropWidth Then Menus[I].DropWidth:=NeededWidth;
+  End;
+  If Menus[I].DropX+Menus[I].DropWidth>SCREEN_WIDTH Then
+   Menus[I].DropX:=SCREEN_WIDTH-Menus[I].DropWidth;
   Menus[I].DropHeight := Menus[I].ItemCount * 18 + 4;
  End;
 End;
@@ -4061,8 +4795,10 @@ Var
  ItemX1, ItemY1, ItemX2, ItemY2: Integer;
 Begin
  If (MenuIndex < 0) Or (MenuIndex >= MenuCount) Then Exit;
+ If RibbonMode Then Begin RibbonSelectTab(MenuIndex,True); Exit; End;
 
  HideMouse;
+ DrawMenuBar;
 
  { Fond du menu déroulant }
  FillRect(Menus[MenuIndex].DropX, Menus[MenuIndex].DropY,
@@ -4137,6 +4873,7 @@ Var
  I: Integer;
 Begin
  GetMenuAtPoint := -1;
+ If RibbonMode Then Begin GetMenuAtPoint:=RibbonTabAt(X,Y); Exit; End;
  If (Y >= Layout.MenuBarRect.Y1) And (Y <= Layout.MenuBarRect.Y2) Then Begin
   For I := 0 To MenuCount - 1 Do Begin
    If (X >= Menus[I].X) And (X < Menus[I].X + Menus[I].Width) Then Begin
@@ -4180,6 +4917,20 @@ Begin
  CloseDropdownMenu;
 
  Case CmdID Of
+  CMD_EVENT_NEW: EventNew(False);
+  CMD_EVENT_MEETING: EventNew(True);
+  CMD_EVENT_AGENDA: EventAgenda;
+  CMD_VIEW_CALENDAR: CalendarShow(Not CalendarVisible);
+  CMD_VIEW_MAIL: FocusMail;
+  CMD_CAL_PREVIOUS: Begin CalendarMoveMonth(-1); DrawInterface; End;
+  CMD_CAL_NEXT: Begin CalendarMoveMonth(1); DrawInterface; End;
+  CMD_CAL_TODAY: Begin CalendarToday; DrawInterface; End;
+  CMD_TOOLS_RULES: Rules_Show;
+  CMD_VIEW_COLUMNS: ShowColumnsDialog;
+  CMD_VIEW_SORTBY: ShowSortDialog;
+  CMD_FILE_OPEN: OpenMessageFile;
+  CMD_FILE_SAVE, CMD_FILE_SAVEAS: SaveMessageAs;
+
   CMD_FILE_NEW, CMD_MSG_NEW: Begin
    { Ouvrir le compositeur pour un nouveau message (TODO 12) }
    OpenNewMessage;
@@ -4225,6 +4976,10 @@ Begin
   End;
 
   CMD_VIEW_REFRESH: Begin
+   ReceiveMail; DrawInterface;
+  End;
+  CMD_TB_SENDRECV: Begin
+   ReceiveMail;
    DrawInterface;
   End;
 
@@ -4283,25 +5038,9 @@ Begin
    ShowAccountManagerDialog;
   End;
 
-  CMD_TOOLS_OPTIONS: Begin
-   HideMouse;
-   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
-            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
-   SetColor(COLOR_STATUS_TEXT);
-   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
-             'Commande: Options                  ');
-   ShowMouse;
-  End;
+  CMD_TOOLS_OPTIONS: Prefs_Show;
 
-  CMD_HELP_ABOUT: Begin
-   HideMouse;
-   FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
-            Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
-   SetColor(COLOR_STATUS_TEXT);
-   OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
-             'Outlook Express Clone - NETWORKKIT-P');
-   ShowMouse;
-  End;
+  CMD_HELP_ABOUT: ShowAboutDialog;
 
   Else Begin
    { Commande non implementée }
@@ -4323,10 +5062,12 @@ End;
 { Calcule les rectangles de toutes les zones de l'interface }
 Procedure CalculateLayout;
 Var
- ClientTop, ClientBottom: Integer;
+ ClientTop, ClientBottom,MenuHeight,ToolbarHeight: Integer;
  RightPaneLeft, RightPaneRight: Integer;
  MessageListBottom: Integer;
 Begin
+ MenuHeight:=MENUBAR_HEIGHT; ToolbarHeight:=TOOLBAR_HEIGHT;
+ If RibbonMode Then Begin MenuHeight:=24; ToolbarHeight:=92; End;
  { Barre de titre }
  Layout.TitleBarRect.X1 := 0;
  Layout.TitleBarRect.Y1 := 0;
@@ -4337,13 +5078,13 @@ Begin
  Layout.MenuBarRect.X1 := 0;
  Layout.MenuBarRect.Y1 := TITLEBAR_HEIGHT;
  Layout.MenuBarRect.X2 := SCREEN_WIDTH - 1;
- Layout.MenuBarRect.Y2 := TITLEBAR_HEIGHT + MENUBAR_HEIGHT - 1;
+ Layout.MenuBarRect.Y2 := TITLEBAR_HEIGHT + MenuHeight - 1;
 
  { Barre d'outils }
  Layout.ToolBarRect.X1 := 0;
- Layout.ToolBarRect.Y1 := TITLEBAR_HEIGHT + MENUBAR_HEIGHT;
+ Layout.ToolBarRect.Y1 := TITLEBAR_HEIGHT + MenuHeight;
  Layout.ToolBarRect.X2 := SCREEN_WIDTH - 1;
- Layout.ToolBarRect.Y2 := TITLEBAR_HEIGHT + MENUBAR_HEIGHT + TOOLBAR_HEIGHT - 1;
+ Layout.ToolBarRect.Y2 := TITLEBAR_HEIGHT + MenuHeight + ToolbarHeight - 1;
 
  { Barre d'état }
  Layout.StatusBarRect.X1 := 0;
@@ -4352,7 +5093,7 @@ Begin
  Layout.StatusBarRect.Y2 := SCREEN_HEIGHT - 1;
 
  { Zone cliente (entre toolbar et statusbar) }
- ClientTop := TITLEBAR_HEIGHT + MENUBAR_HEIGHT + TOOLBAR_HEIGHT;
+ ClientTop := Layout.ToolBarRect.Y2+1;
  ClientBottom := SCREEN_HEIGHT - STATUSBAR_HEIGHT - 1;
 
  { Panneau des dossiers (gauche) }
@@ -4370,6 +5111,7 @@ Begin
  { Zone de droite }
  RightPaneLeft := Layout.FolderPaneWidth + SPLITTER_SIZE;
  RightPaneRight := SCREEN_WIDTH - 1;
+ If CalendarVisible Then Dec(RightPaneRight,CalendarPaneWidth+SPLITTER_SIZE);
 
  { Calcul de la hauteur du volet de prévisualisation }
  MessageListBottom := ClientBottom - Layout.PreviewPaneHeight - SPLITTER_SIZE;
@@ -4391,6 +5133,23 @@ Begin
  Layout.PreviewPaneRect.Y1 := MessageListBottom + SPLITTER_SIZE + 1;
  Layout.PreviewPaneRect.X2 := RightPaneRight;
  Layout.PreviewPaneRect.Y2 := ClientBottom;
+ If Not PreviewVisible Then Begin
+  Layout.MessageListRect.Y2:=ClientBottom;
+  Layout.HSplitterRect.X1:=-1; Layout.HSplitterRect.X2:=-1;
+  Layout.HSplitterRect.Y1:=-1; Layout.HSplitterRect.Y2:=-1;
+ End Else If PreviewOrientation=poVertical Then Begin
+  If PreviewPaneWidth<120 Then PreviewPaneWidth:=(RightPaneRight-RightPaneLeft) Div 2;
+  If RightPaneRight-RightPaneLeft<240 Then PreviewPaneWidth:=(RightPaneRight-RightPaneLeft) Div 2
+  Else If PreviewPaneWidth>RightPaneRight-RightPaneLeft-120 Then
+   PreviewPaneWidth:=RightPaneRight-RightPaneLeft-120;
+  Layout.MessageListRect.Y2:=ClientBottom;
+  Layout.MessageListRect.X2:=RightPaneRight-PreviewPaneWidth-SPLITTER_SIZE;
+  Layout.HSplitterRect.X1:=Layout.MessageListRect.X2+1;
+  Layout.HSplitterRect.X2:=Layout.MessageListRect.X2+SPLITTER_SIZE;
+  Layout.HSplitterRect.Y1:=ClientTop; Layout.HSplitterRect.Y2:=ClientBottom;
+  Layout.PreviewPaneRect.X1:=Layout.HSplitterRect.X2+1;
+  Layout.PreviewPaneRect.Y1:=ClientTop;
+ End;
 End;
 
 { ============================================================================
@@ -4410,7 +5169,7 @@ Begin
 
  { Titre de la fenêtre }
  SetColor(COLOR_TITLEBAR_TEXT);
- OutTextXY(22, 5, 'Outlook Express');
+ OutTextXY(22, 5, 'Outlook');
 
  { Boutons de contrôle de fenêtre (Minimiser, Maximiser, Fermer) }
  { Bouton Minimiser }
@@ -4430,35 +5189,237 @@ Begin
  Line(SCREEN_WIDTH - 16, 13, SCREEN_WIDTH - 8, 6);
 End;
 
+{ Ruban graphique : les commandes et leurs etats proviennent des menus existants. }
+Function RibbonTitle(Index: Integer): String;
+Begin
+ RibbonTitle:=''; If (Index<0) Or (Index>=MenuCount) Then Exit;
+ RibbonTitle:=Menus[Index].Title; If Index=5 Then RibbonTitle:='Aide';
+End;
+
+Function RibbonTabAt(X,Y: Integer): Integer;
+Var I,Left,Width: Integer;
+Begin
+ RibbonTabAt:=-1;
+ If (Y<Layout.MenuBarRect.Y1) Or (Y>Layout.MenuBarRect.Y2) Then Exit;
+ Left:=8;
+ For I:=0 To MenuCount-1 Do Begin
+  Width:=TextWidth(RibbonTitle(I))+24;
+  If (X>=Left) And (X<Left+Width) Then Begin RibbonTabAt:=I; Exit; End;
+  Inc(Left,Width+2);
+ End;
+End;
+
+Procedure RibbonBuild;
+Var Counts,Used: Array[0..7] Of Integer;
+ I,G,Cols,TotalCols,ColW,Left,Slot: Integer;
+Begin
+ RibbonCount:=0; RibbonGroupCount:=0;
+ If MenuCount=0 Then Exit;
+ If (RibbonTab<0) Or (RibbonTab>=MenuCount) Then RibbonTab:=0;
+ FillChar(Counts,SizeOf(Counts),0); FillChar(Used,SizeOf(Used),0); G:=0;
+ For I:=0 To Menus[RibbonTab].ItemCount-1 Do
+  If Menus[RibbonTab].Items[I].Separator Then Begin If G<7 Then Inc(G); End
+  Else Inc(Counts[G]);
+ RibbonGroupCount:=G+1; TotalCols:=0;
+ For G:=0 To RibbonGroupCount-1 Do Inc(TotalCols,(Counts[G]+1) Div 2);
+ If TotalCols=0 Then Exit;
+ ColW:=(SCREEN_WIDTH-16-RibbonGroupCount*6) Div TotalCols;
+ If ColW>160 Then ColW:=160;
+ Left:=8;
+ For G:=0 To RibbonGroupCount-1 Do Begin
+  Cols:=(Counts[G]+1) Div 2; RibbonGroupX[G]:=Left;
+  RibbonGroupW[G]:=Cols*ColW; Inc(Left,Cols*ColW+6);
+ End;
+ G:=0;
+ For I:=0 To Menus[RibbonTab].ItemCount-1 Do
+  If Menus[RibbonTab].Items[I].Separator Then Begin If G<7 Then Inc(G); End
+  Else If RibbonCount<15 Then Begin
+   Slot:=Used[G]; Inc(Used[G]);
+   With RibbonButtons[RibbonCount] Do Begin
+    X:=RibbonGroupX[G]+(Slot Div 2)*ColW; Y:=Layout.ToolBarRect.Y1+5+(Slot Mod 2)*33;
+    W:=ColW-4; H:=30; MenuItem:=I; Group:=G;
+   End;
+   Inc(RibbonCount);
+  End;
+End;
+
+Function RibbonButtonAt(MX,MY: Integer): Integer;
+Var I: Integer;
+Begin
+ RibbonBuild; RibbonButtonAt:=-1;
+ For I:=0 To RibbonCount-1 Do With RibbonButtons[I] Do
+  If (MX>=RibbonButtons[I].X) And (MX<RibbonButtons[I].X+W) And
+     (MY>=RibbonButtons[I].Y) And (MY<RibbonButtons[I].Y+H) Then Begin
+   RibbonButtonAt:=I; Exit;
+  End;
+End;
+
+Function RibbonGroupTitle(Group: Integer): String;
+Begin
+ RibbonGroupTitle:=RibbonTitle(RibbonTab);
+ Case RibbonTab Of
+  0: Case Group Of
+   0: RibbonGroupTitle:='Nouveau / Ouvrir'; 1: RibbonGroupTitle:='Enregistrer';
+   2: RibbonGroupTitle:='Imprimer'; 3: RibbonGroupTitle:='Fermer'; End;
+  1: Case Group Of
+   0: RibbonGroupTitle:='Annuler'; 1: RibbonGroupTitle:='Presse-papiers'; 2: RibbonGroupTitle:='Selection'; End;
+  2: Case Group Of
+   0: RibbonGroupTitle:='Lecture'; 1: RibbonGroupTitle:='Liste';
+   2: RibbonGroupTitle:='Actualiser'; 3: RibbonGroupTitle:='Calendrier'; End;
+  3: Case Group Of
+   0: RibbonGroupTitle:='Comptes'; 1: RibbonGroupTitle:='Regles'; 2: RibbonGroupTitle:='Options'; End;
+  4: Case Group Of
+   0: RibbonGroupTitle:='Nouveau'; 1: RibbonGroupTitle:='Repondre';
+   2: RibbonGroupTitle:='Actions'; 3: RibbonGroupTitle:='Communiquer'; End;
+ End;
+End;
+
+Function RibbonFit(Text: String; Width: Integer): String;
+Begin
+ If TextWidth(Text)>Width Then Begin
+  While (Length(Text)>0) And (TextWidth(Text+'...')>Width) Do Delete(Text,Length(Text),1);
+  Text:=Text+'...';
+ End;
+ RibbonFit:=Text;
+End;
+
+Procedure DrawRibbonTabs;
+Var I,Left,Width: Integer; Title: String;
+Begin
+ FillRect(0,Layout.MenuBarRect.Y1,SCREEN_WIDTH-1,Layout.MenuBarRect.Y2,LightGray); Left:=8;
+ For I:=0 To MenuCount-1 Do Begin
+  Title:=RibbonTitle(I); Width:=TextWidth(Title)+24;
+  If I=RibbonTab Then Begin
+   FillRect(Left,Layout.MenuBarRect.Y1+1,Left+Width,Layout.MenuBarRect.Y2,White);
+   Draw3DRect(Left,Layout.MenuBarRect.Y1+1,Left+Width,Layout.MenuBarRect.Y2,True); SetColor(Blue);
+  End Else SetColor(Black);
+  OutTextXY(Left+12,Layout.MenuBarRect.Y1+7,Title);
+  If RibbonKeyboardActive And (RibbonFocus<0) And (I=RibbonTab) Then
+   Line(Left+10,Layout.MenuBarRect.Y2-3,Left+Width-10,Layout.MenuBarRect.Y2-3);
+  Inc(Left,Width+2);
+ End;
+End;
+
+Procedure DrawRibbon;
+Var I,J,P,Width,Command: Integer; Caption,First,Second: String; Icon: TToolIconType; Enabled,Selected: Boolean;
+Begin
+ RibbonBuild;
+ FillRect(0,Layout.ToolBarRect.Y1,SCREEN_WIDTH-1,Layout.ToolBarRect.Y2,White);
+ SetColor(DarkGray); Line(0,Layout.ToolBarRect.Y2,SCREEN_WIDTH-1,Layout.ToolBarRect.Y2);
+ For I:=0 To RibbonGroupCount-1 Do Begin
+  J:=RibbonGroupX[I]+RibbonGroupW[I]+1;
+  SetColor(LightGray); Line(J,Layout.ToolBarRect.Y1+5,J,Layout.ToolBarRect.Y2-6);
+  SetColor(DarkGray);
+  Caption:=RibbonFit(RibbonGroupTitle(I),RibbonGroupW[I]-4);
+  OutTextXY(RibbonGroupX[I]+2,Layout.ToolBarRect.Y2-13,Caption);
+ End;
+ For I:=0 To RibbonCount-1 Do With RibbonButtons[I] Do Begin
+  Enabled:=Menus[RibbonTab].Items[MenuItem].Enabled;
+  Selected:=Enabled And ((RibbonHover=I) Or (RibbonPressed=I) Or (RibbonKeyboardActive And (RibbonFocus=I)));
+  If Selected Then Begin
+   FillRect(X,Y,X+W-1,Y+H-1,LightCyan); Draw3DRect(X,Y,X+W-1,Y+H-1,RibbonPressed<>I);
+  End;
+  Command:=Menus[RibbonTab].Items[MenuItem].ItemID; Icon:=tiAddressBook;
+  Case Command Of
+   CMD_FILE_NEW,CMD_MSG_NEW,CMD_EVENT_NEW,CMD_EVENT_MEETING: Icon:=tiNewMsg;
+   CMD_MSG_REPLY: Icon:=tiReply; CMD_MSG_REPLYALL: Icon:=tiReplyAll;
+   CMD_MSG_FORWARD: Icon:=tiForward; CMD_MSG_DELETE: Icon:=tiDelete;
+   CMD_TB_SENDRECV,CMD_VIEW_REFRESH: Icon:=tiSendRecv; CMD_FILE_PRINT: Icon:=tiPrint;
+  End;
+  DrawToolbarIcon(X+4,Y+7,Icon,Not Enabled);
+  Caption:=Menus[RibbonTab].Items[MenuItem].Caption; Width:=W-28;
+  First:=Caption; Second:='';
+  If TextWidth(First)>Width Then Begin
+   P:=Length(First);
+   While (P>1) And ((First[P]<>' ') Or (TextWidth(Copy(First,1,P-1))>Width)) Do Dec(P);
+   If P>1 Then Begin Second:=Copy(First,P+1,255); First:=Copy(First,1,P-1); End;
+  End;
+  If Enabled Then SetColor(Black) Else SetColor(DarkGray);
+  If Second='' Then OutTextXY(X+25,Y+11,RibbonFit(First,Width)) Else Begin
+   OutTextXY(X+25,Y+5,RibbonFit(First,Width)); OutTextXY(X+25,Y+17,RibbonFit(Second,Width));
+  End;
+ End;
+End;
+
+Procedure RibbonSelectTab(Index: Integer; Keyboard: Boolean);
+Var I: Integer;
+Begin
+ If (Index<0) Or (Index>=MenuCount) Then Exit;
+ RibbonTab:=Index; RibbonKeyboardActive:=Keyboard; RibbonFocus:=-1; RibbonPressed:=-1; RibbonHover:=-1;
+ ActiveMenu:=-1; ActiveMenuItem:=-1; MenuBarActive:=False; TooltipVisible:=False;
+ RibbonBuild;
+ If Keyboard Then For I:=0 To RibbonCount-1 Do
+  If Menus[RibbonTab].Items[RibbonButtons[I].MenuItem].Enabled Then Begin RibbonFocus:=I; Break; End;
+ DrawInterface;
+End;
+
+Procedure RibbonAdvance(Delta: Integer; TabCycle: Boolean);
+Var Index,Step,Count: Integer;
+Begin
+ RibbonBuild; If RibbonCount=0 Then Exit;
+ Step:=1; If Delta<0 Then Step:=-1;
+ If RibbonFocus<0 Then Begin
+  If Delta<0 Then Index:=RibbonCount-1 Else Index:=0;
+ End Else Index:=RibbonFocus+Delta;
+ For Count:=0 To RibbonCount Do Begin
+  If (Index<0) Or (Index>=RibbonCount) Then Begin
+   If TabCycle Then Begin RibbonFocus:=-1; Exit; End;
+   If Index<0 Then Index:=RibbonCount-1 Else Index:=0;
+  End;
+  If Menus[RibbonTab].Items[RibbonButtons[Index].MenuItem].Enabled Then Begin RibbonFocus:=Index; Exit; End;
+  Inc(Index,Step);
+ End;
+ RibbonFocus:=-1;
+End;
+
+Procedure RibbonKey(Key: Char; Extended: Boolean);
+Var Index: Integer;
+Begin
+ If Extended Then Case Key Of
+  #15: RibbonAdvance(-1,True);
+  #75,#77: If RibbonFocus<0 Then Begin
+   Index:=-1; If Key=#77 Then Index:=1;
+   RibbonSelectTab((RibbonTab+Index+MenuCount) Mod MenuCount,False);
+   RibbonKeyboardActive:=True; RibbonFocus:=-1;
+  End Else If Key=#75 Then RibbonAdvance(-2,False) Else RibbonAdvance(2,False);
+  #72: RibbonAdvance(-1,False); #80: RibbonAdvance(1,False);
+  #71: Begin RibbonFocus:=-1; RibbonAdvance(1,False); End;
+  #79: Begin RibbonFocus:=-1; RibbonAdvance(-1,False); End;
+ End Else Case Key Of
+  #27: If RibbonFocus>=0 Then RibbonFocus:=-1 Else RibbonKeyboardActive:=False;
+  #9: RibbonAdvance(1,True);
+  #13,' ': If (RibbonFocus>=0) And (RibbonFocus<RibbonCount) Then Begin
+   Index:=RibbonButtons[RibbonFocus].MenuItem;
+   If Menus[RibbonTab].Items[Index].Enabled Then Begin
+    RibbonKeyboardActive:=False; RibbonFocus:=-1;
+    ExecuteMenuCommand(Menus[RibbonTab].Items[Index].ItemID);
+   End;
+  End;
+ End;
+ DrawInterface;
+End;
+
 { Dessine la barre de menu }
 Procedure DrawMenuBar;
 Var
- MenuX: Integer;
+ I: Integer;
 Begin
+ If RibbonMode Then Begin DrawRibbonTabs; Exit; End;
  FillRect(Layout.MenuBarRect.X1, Layout.MenuBarRect.Y1,
           Layout.MenuBarRect.X2, Layout.MenuBarRect.Y2, COLOR_MENU_BG);
  Draw3DRect(Layout.MenuBarRect.X1, Layout.MenuBarRect.Y1,
             Layout.MenuBarRect.X2, Layout.MenuBarRect.Y2, True);
 
- SetColor(COLOR_MENU_TEXT);
- MenuX := 8;
-
- OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Fichier');
- MenuX := MenuX + TextWidth('Fichier') + 16;
-
- OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Edition');
- MenuX := MenuX + TextWidth('Edition') + 16;
-
- OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Affichage');
- MenuX := MenuX + TextWidth('Affichage') + 16;
-
- OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Outils');
- MenuX := MenuX + TextWidth('Outils') + 16;
-
- OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, 'Message');
- MenuX := MenuX + TextWidth('Message') + 16;
-
- OutTextXY(MenuX, Layout.MenuBarRect.Y1 + 4, '?');
+ For I := 0 To MenuCount - 1 Do Begin
+  If I = ActiveMenu Then Begin
+   FillRect(Menus[I].X, Layout.MenuBarRect.Y1 + 1,
+            Menus[I].X + Menus[I].Width - 1, Layout.MenuBarRect.Y2 - 1,
+            COLOR_MENU_HIGHLIGHT);
+   SetColor(COLOR_MENU_HIGHLIGHT_TEXT);
+  End Else
+   SetColor(COLOR_MENU_TEXT);
+  OutTextXY(Menus[I].X + 8, Layout.MenuBarRect.Y1 + 4, Menus[I].Title);
+ End;
 End;
 
 { Dessine la barre d'outils avec icônes et états }
@@ -4469,6 +5430,7 @@ Var
  TextX: Integer;
  TextColor: Word;
 Begin
+ If RibbonMode Then Begin DrawRibbon; Exit; End;
  { Dessiner le fond de la barre d'outils }
  FillRect(Layout.ToolBarRect.X1, Layout.ToolBarRect.Y1,
           Layout.ToolBarRect.X2, Layout.ToolBarRect.Y2, COLOR_TOOLBAR_BG);
@@ -4679,36 +5641,29 @@ End;
 
 { Initialise l'arbre de dossiers avec une structure multi-comptes }
 Procedure InitializeFolderTree;
+Var I, Root: Integer;
 Begin
- FolderCount := 0;
- SelectedFolder := 1; { Sélectionner la boîte de réception par défaut }
- HoveredFolder := -1;
- FolderScrollOffset := 0;
- DraggedFolder := -1;
-
- { Compte local }
- AddFolder('Compte local', ftAccount, 0, -1, True, 0, 0);
-   AddFolder('Boite de reception', ftInbox, 1, 0, False, 5, 23);
-   AddFolder('Elements envoyes', ftSent, 1, 0, False, 0, 15);
-   AddFolder('Brouillons', ftDrafts, 1, 0, False, 2, 2);
-   AddFolder('Elements supprimes', ftDeleted, 1, 0, False, 0, 8);
-   AddFolder('Courrier indesirable', ftJunk, 1, 0, False, 3, 12);
-
- { Compte travail }
- AddFolder('Travail (IMAP)', ftAccount, 0, -1, True, 0, 0);
-   AddFolder('Boite de reception', ftInbox, 1, 6, True, 12, 156);
-     AddFolder('Projets', ftCustom, 2, 7, False, 0, 45);
-     AddFolder('Clients', ftCustom, 2, 7, False, 2, 32);
-   AddFolder('Elements envoyes', ftSent, 1, 6, False, 0, 89);
-   AddFolder('Brouillons', ftDrafts, 1, 6, False, 1, 3);
-   AddFolder('Elements supprimes', ftDeleted, 1, 6, False, 0, 5);
-   AddFolder('Courrier indesirable', ftJunk, 1, 6, False, 0, 2);
-
- { Marquer le dossier sélectionné }
- If SelectedFolder >= 0 Then
-  Folders[SelectedFolder].Selected := True;
-
+ FillChar(Folders,SizeOf(Folders),0);
+ FolderCount:=0; SelectedFolder:=-1; HoveredFolder:=-1;
+ FolderScrollOffset:=0; DraggedFolder:=-1;
+ For I:=0 To MAX_FOLDERS-1 Do MailFolderAccount[I]:=-1;
+ For I:=0 To EmailAccountCount-1 Do Begin
+  Root:=FolderCount;
+  AddFolder(EmailAccounts[I].AccountName,ftAccount,0,-1,True,0,0);
+  MailFolderAccount[Root]:=I;
+  AddFolder('Boite de reception',ftInbox,1,Root,False,0,0);
+  MailFolderAccount[Root+1]:=I;
+  If (SelectedFolder<0) Or EmailAccounts[I].IsDefault Then SelectedFolder:=Root+1;
+ End;
+ If SelectedFolder>=0 Then Folders[SelectedFolder].Selected:=True;
  UpdateFolderVisibility;
+End;
+
+Procedure RefreshAccountFolders;
+Begin
+ InitializeFolderTree;
+ MessageCount:=0; SelectedMessage:=-1; MailLoadedFolder:=-1;
+ MailStatus:='Comptes modifies - cliquez sur Envoyer/Recevoir';
 End;
 
 { Trouve le dossier à une position Y donnée }
@@ -4765,6 +5720,11 @@ Begin
     Folders[SelectedFolder].Selected := False;
    SelectedFolder := FolderIdx;
    Folders[FolderIdx].Selected := True;
+   If MailLoadedFolder<>FolderIdx Then Begin
+    MessageCount:=0; SelectedMessage:=-1; PreviewScrollY:=0; MailLoadedFolder:=-1;
+    MailStatus:='Cliquez sur Envoyer/Recevoir pour charger cette boite';
+    DrawInterface;
+   End;
   End;
 
   { Redessiner le panneau }
@@ -4803,42 +5763,49 @@ Begin
  Columns[0].Title := '!';
  Columns[0].Width := 20;
  Columns[0].Sortable := True;
+ Columns[0].Visible := True;
 
  { Colonne Piece jointe (icone) }
  Columns[1].ColType := ctAttachment;
  Columns[1].Title := '@';
  Columns[1].Width := 20;
  Columns[1].Sortable := True;
+ Columns[1].Visible := True;
 
  { Colonne Drapeau (icone) }
  Columns[2].ColType := ctFlag;
  Columns[2].Title := '*';
  Columns[2].Width := 20;
  Columns[2].Sortable := True;
+ Columns[2].Visible := True;
 
  { Colonne De }
  Columns[3].ColType := ctFrom;
  Columns[3].Title := 'De';
  Columns[3].Width := 120;
  Columns[3].Sortable := True;
+ Columns[3].Visible := True;
 
  { Colonne Objet }
  Columns[4].ColType := ctSubject;
  Columns[4].Title := 'Objet';
  Columns[4].Width := 200;
  Columns[4].Sortable := True;
+ Columns[4].Visible := True;
 
  { Colonne Date }
  Columns[5].ColType := ctDate;
  Columns[5].Title := 'Date';
  Columns[5].Width := 70;
  Columns[5].Sortable := True;
+ Columns[5].Visible := True;
 
  { Colonne Taille }
  Columns[6].ColType := ctSize;
  Columns[6].Title := 'Taille';
  Columns[6].Width := 60;
  Columns[6].Sortable := True;
+ Columns[6].Visible := True;
 End;
 
 { Formate une taille en octets pour l'affichage }
@@ -4959,186 +5926,89 @@ Begin
  IMAPClient.UseSSL := UseSSL;
 End;
 
-{ Simule l'envoi d'une commande IMAP et la reception de la reponse }
-{ Note: Dans une implementation reelle, cela utiliserait des sockets }
+{ Envoie une commande IMAP et lit la reponse taguee et ses literals. }
 Function IMAP_SendCommand(Command: String): TIMAPResponse;
-Var
- Response: TIMAPResponse;
- Tag: String;
+Var R: TIMAPResponse; Tag, Line, LiteralData, Cmd, NumberText: TMailText;
+ N, P, Q, Code: LongInt;
 Begin
- Tag := IMAP_GenerateTag;
- IMAPClient.LastTag := Tag;
-
- { Initialiser la reponse }
- Response.Tag := Tag;
- Response.HasData := False;
- Response.Data := '';
- Response.Text := '';
-
- { Simuler le comportement du serveur selon la commande }
- If Pos('LOGIN', Command) > 0 Then Begin
-  { Authentification LOGIN }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'LOGIN completed';
-  IMAPClient.State := isAuthenticated;
- End
- Else If Pos('AUTHENTICATE PLAIN', Command) > 0 Then Begin
-  { Authentification PLAIN }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'AUTHENTICATE completed';
-  IMAPClient.State := isAuthenticated;
- End
- Else If Pos('CAPABILITY', Command) > 0 Then Begin
-  { Capacites du serveur }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'CAPABILITY completed';
-  Response.HasData := True;
-  Response.Data := 'IMAP4rev1 IDLE NAMESPACE LITERAL+ ID AUTH=PLAIN AUTH=LOGIN';
-  IMAPClient.Capabilities := Response.Data;
-  IMAPClient.IdleSupported := Pos('IDLE', Response.Data) > 0;
- End
- Else If Pos('SELECT', Command) > 0 Then Begin
-  { Selection de boite aux lettres }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := '[READ-WRITE] SELECT completed';
-  IMAPClient.State := isSelected;
-  IMAPClient.IsMailboxSelected := True;
-  { Simuler les donnees de la boite }
-  IMAPClient.CurrentMailbox.Exists := 8;
-  IMAPClient.CurrentMailbox.Recent := 2;
-  IMAPClient.CurrentMailbox.Unseen := 3;
-  IMAPClient.CurrentMailbox.UIDValidity := 1234567890;
-  IMAPClient.CurrentMailbox.UIDNext := 100;
-  IMAPClient.CurrentMailbox.ReadOnly := False;
- End
- Else If Pos('EXAMINE', Command) > 0 Then Begin
-  { Examen de boite aux lettres (lecture seule) }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := '[READ-ONLY] EXAMINE completed';
-  IMAPClient.State := isSelected;
-  IMAPClient.IsMailboxSelected := True;
-  IMAPClient.CurrentMailbox.ReadOnly := True;
- End
- Else If Pos('FETCH', Command) > 0 Then Begin
-  { Recuperation de messages }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'FETCH completed';
-  Response.HasData := True;
- End
- Else If Pos('STORE', Command) > 0 Then Begin
-  { Modification des drapeaux }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'STORE completed';
- End
- Else If Pos('COPY', Command) > 0 Then Begin
-  { Copie de messages }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'COPY completed';
- End
- Else If Pos('UID', Command) > 0 Then Begin
-  { Commande UID }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'UID command completed';
- End
- Else If Pos('LIST', Command) > 0 Then Begin
-  { Liste des boites aux lettres }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'LIST completed';
-  Response.HasData := True;
- End
- Else If Pos('LSUB', Command) > 0 Then Begin
-  { Liste des abonnements }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'LSUB completed';
-  Response.HasData := True;
- End
- Else If Pos('IDLE', Command) > 0 Then Begin
-  { Mode IDLE }
-  If IMAPClient.IdleSupported Then Begin
-   Response.ResponseType := irContinue;
-   Response.StatusCode := '+';
-   Response.Text := 'idling';
-   IMAPClient.IdleActive := True;
-  End
-  Else Begin
-   Response.ResponseType := irBAD;
-   Response.StatusCode := 'BAD';
-   Response.Text := 'IDLE not supported';
-  End;
- End
- Else If Pos('DONE', Command) > 0 Then Begin
-  { Fin du mode IDLE }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'IDLE terminated';
-  IMAPClient.IdleActive := False;
- End
- Else If Pos('NOOP', Command) > 0 Then Begin
-  { Commande NOOP }
-  Response.ResponseType := irOK;
-  Response.StatusCode := 'OK';
-  Response.Text := 'NOOP completed';
- End
- Else If Pos('LOGOUT', Command) > 0 Then Begin
-  { Deconnexion }
-  Response.ResponseType := irBYE;
-  Response.StatusCode := 'BYE';
-  Response.Text := 'Logging out';
-  IMAPClient.State := isLogout;
- End
- Else Begin
-  { Commande inconnue }
-  Response.ResponseType := irBAD;
-  Response.StatusCode := 'BAD';
-  Response.Text := 'Unknown command';
+ FillChar(R, SizeOf(R), 0); R.ResponseType := irBAD;
+ R.Text := 'Erreur reseau'; MailRaw := ''; MailFetchFlags:=''; MailFetchUID:=0;
+ Cmd := Command;
+ If (Cmd = 'IDLE') Or (Cmd = 'DONE') Then Begin
+  R.Text := 'IDLE non pris en charge'; IMAP_SendCommand := R; Exit;
  End;
-
- IMAP_SendCommand := Response;
+ If Not MailSafe(Cmd) Then Begin R.Text := MailError; IMAP_SendCommand := R; Exit; End;
+ Tag := IMAP_GenerateTag; R.Tag := Tag; IMAPClient.LastTag := Tag;
+ If MailWrite(IMAPWire, Tag + ' ' + Cmd + #13#10) Then
+ Repeat
+  If Not MailReadLine(IMAPWire, Line) Then Break;
+  If Copy(Line, 1, Length(Tag)+1) = Tag + ' ' Then Begin
+   Line := Copy(Line, Length(Tag)+2, Length(Line));
+   P := Pos(' ', Line); If P=0 Then P := Length(Line)+1;
+   R.StatusCode := Copy(Line, 1, P-1); R.Text := Copy(Line, P+1, 200);
+   If R.StatusCode = 'OK' Then R.ResponseType := irOK
+   Else If R.StatusCode = 'NO' Then R.ResponseType := irNO;
+   If R.ResponseType = irOK Then Begin
+    If (Pos('LOGIN ', Cmd)=1) Or (Pos('AUTHENTICATE ', Cmd)=1) Then IMAPClient.State := isAuthenticated;
+    If (Pos('SELECT ', Cmd)=1) Or (Pos('EXAMINE ', Cmd)=1) Then Begin
+     IMAPClient.State := isSelected; IMAPClient.IsMailboxSelected := True;
+    End;
+   End;
+   IMAP_SendCommand := R; Exit;
+  End;
+  If Copy(Line,1,1)='+' Then Begin
+   If Pos('AUTHENTICATE PLAIN ', Cmd)=1 Then Begin
+    If Not MailWrite(IMAPWire, Copy(Cmd,20,Length(Cmd))+#13#10) Then Break;
+   End Else Begin MailError := 'Continuation IMAP inattendue'; Break; End;
+  End;
+  If Pos('FETCH',Line)>0 Then Begin
+   MailFetchFlags:=MailFetchFlags+Line;
+   P:=Pos('UID ',Line);
+   If P>0 Then Begin
+    NumberText:=''; Q:=P+4;
+    While (Q<=Length(Line)) And (Line[Q] In ['0'..'9']) Do Begin
+     NumberText:=NumberText+Line[Q]; Inc(Q);
+    End;
+    Val(NumberText,N,Code); If Code=0 Then MailFetchUID:=N;
+   End;
+  End;
+  If Pos(' EXISTS', Line)>0 Then Begin
+   NumberText := Copy(Line,3,Pos(' EXISTS',Line)-3);
+   Val(NumberText,N,Code); If (Code=0) And (N>=0) Then IMAPClient.CurrentMailbox.Exists := N;
+  End;
+  If Copy(Line,1,13)='* CAPABILITY ' Then IMAPClient.Capabilities := Copy(Line,14,200);
+  If (Length(Line)>0) And (Line[Length(Line)]='}') Then Begin
+   P := 0; For Q := Length(Line)-1 DownTo 1 Do If Line[Q]='{' Then Begin P:=Q; Break; End;
+   If P>0 Then Begin
+    NumberText := Copy(Line,P+1,Length(Line)-P-1); Val(NumberText,N,Code);
+    If Code<>0 Then Begin MailError := 'Taille de literal IMAP invalide'; Break; End;
+    If Not MailReadBytes(IMAPWire,N,LiteralData) Then Break;
+    MailRaw := MailRaw + LiteralData;
+   End;
+  End;
+  R.HasData := True; R.Data := Copy(Line,1,255);
+ Until False;
+ R.Text := MailError; IMAPClient.LastError := MailError;
+ MailClose(IMAPWire); IMAPClient.Connected := False;
+ IMAP_SendCommand := R;
 End;
 
 { Connecte au serveur IMAP }
 Function IMAP_Connect: Integer;
-Var
- Response: TIMAPResponse;
+Var Line: TMailText; R: TIMAPResponse;
 Begin
- If IMAPClient.Host = '' Then Begin
-  IMAPClient.LastError := 'Serveur non configure';
-  IMAP_Connect := IMAP_ERR_CONNECT;
-  Exit;
+ IMAP_Connect := IMAP_ERR_CONNECT; IMAPClient.Connected := False;
+ If Not MailOpen(IMAPWire,IMAPClient.Host,IMAPClient.Port,IMAPClient.UseSSL) Then Begin
+  IMAPClient.LastError := MailError; Exit;
  End;
-
- IMAPConnecting := True;
-
- { Simuler la connexion socket }
- { Dans une vraie implementation, on utiliserait les sockets }
- IMAPClient.Connected := True;
- IMAPClient.SocketHandle := 1;
- IMAPClient.State := isConnected;
-
- { Recevoir le message de bienvenue }
- { Normalement le serveur envoie "* OK ... ready" }
-
- { Demander les capacites }
- Response := IMAP_SendCommand('CAPABILITY');
- If Response.ResponseType <> irOK Then Begin
-  IMAPClient.LastError := 'Echec CAPABILITY';
-  IMAP_Connect := IMAP_ERR_PROTOCOL;
-  IMAPConnecting := False;
-  Exit;
+ If Not MailReadLine(IMAPWire,Line) Or
+    ((Copy(Line,1,5)<>'* OK ') And (Copy(Line,1,10)<>'* PREAUTH ')) Then Begin
+  IMAPClient.LastError := 'Accueil IMAP invalide: '+Copy(Line,1,50); MailClose(IMAPWire); Exit;
  End;
-
- IMAPConnecting := False;
+ IMAPClient.Connected := True; IMAPClient.State := isConnected;
+ If Copy(Line,1,10)='* PREAUTH ' Then IMAPClient.State := isAuthenticated;
+ R := IMAP_SendCommand('CAPABILITY');
+ If R.ResponseType<>irOK Then Begin IMAPClient.LastError:=R.Text; MailClose(IMAPWire); Exit; End;
  IMAP_Connect := IMAP_OK;
 End;
 
@@ -5154,7 +6024,10 @@ Begin
   Exit;
  End;
 
- Command := 'LOGIN "' + IMAPClient.Username + '" "' + IMAPClient.Password + '"';
+ If Not MailSafe(IMAPClient.Username) Or Not MailSafe(IMAPClient.Password) Then Begin
+  IMAPClient.LastError := MailError; IMAP_LoginAuth := IMAP_ERR_AUTH; Exit;
+ End;
+ Command := 'LOGIN ' + MailQuote(IMAPClient.Username) + ' ' + MailQuote(IMAPClient.Password);
  Response := IMAP_SendCommand(Command);
 
  If Response.ResponseType = irOK Then
@@ -5273,7 +6146,7 @@ Begin
  End;
 
  Str(SeqNum, SeqStr);
- Response := IMAP_SendCommand('FETCH ' + SeqStr + ' BODY[]');
+ Response := IMAP_SendCommand('FETCH ' + SeqStr + ' BODY.PEEK[]');
 
  If Response.ResponseType = irOK Then
   IMAP_FetchBody := IMAP_OK
@@ -5533,6 +6406,7 @@ Begin
   IMAP_StopIdle;
 
  Response := IMAP_SendCommand('LOGOUT');
+ MailClose(IMAPWire);
 
  { Fermer la connexion }
  IMAPClient.Connected := False;
@@ -5593,37 +6467,8 @@ End;
 
 { Synchronise la liste des messages avec le serveur }
 Procedure IMAP_SyncMessages;
-Var
- I: Integer;
 Begin
- If Not IMAPClient.IsMailboxSelected Then Exit;
-
- { Dans une implementation reelle, on recupererait les messages du serveur }
- { Pour la demonstration, on utilise les messages existants }
-
- { Simuler la mise a jour du nombre de messages }
- IMAPMessageCount := MessageCount;
-
- { Copier les messages locaux vers le cache IMAP }
- For I := 0 To IMAPMessageCount - 1 Do Begin
-  IMAPMessages[I].UID := I + 1;
-  IMAPMessages[I].SeqNum := I + 1;
-  IMAPMessages[I].Flags.Seen := Messages[I].IsRead;
-  IMAPMessages[I].Flags.Flagged := Messages[I].IsFlagged;
-  IMAPMessages[I].Flags.Answered := False;
-  IMAPMessages[I].Flags.Deleted := False;
-  IMAPMessages[I].Flags.Draft := False;
-  IMAPMessages[I].Flags.Recent := Not Messages[I].IsRead;
-  IMAPMessages[I].Size := Messages[I].Size;
-  IMAPMessages[I].Envelope.Subject := Messages[I].Subject;
-  IMAPMessages[I].Envelope.FromName := Messages[I].FromName;
-  IMAPMessages[I].Envelope.FromEmail := Messages[I].FromEmail;
-  IMAPMessages[I].Envelope.ToName := Messages[I].ToName;
-  IMAPMessages[I].Envelope.ToEmail := Messages[I].ToEmail;
-  IMAPMessages[I].Envelope.CcEmail := Messages[I].CcEmail;
-  IMAPMessages[I].Envelope.MsgDate := Messages[I].DateFull;
-  IMAPMessages[I].BodyLoaded := True;
- End;
+ ReceiveMail;
 End;
 
 { Convertit les drapeaux IMAP en chaine }
@@ -5754,193 +6599,57 @@ End;
 { Calcule le hash MD5 pour l'authentification APOP }
 { Note: Implementation simplifiee, retourne une chaine hexadecimale }
 Function POP3_MD5Hash(Input: String): String;
-Var
- I: Integer;
- Hash: LongInt;
- HexStr: String;
- HexChars: String;
 Begin
- { Implementation simplifiee du hash MD5 }
- { Dans une vraie implementation, on utiliserait une bibliotheque MD5 }
- HexChars := '0123456789abcdef';
- Hash := 0;
- For I := 1 To Length(Input) Do
-  Hash := (Hash * 31 + Ord(Input[I])) Mod 2147483647;
-
- HexStr := '';
- For I := 1 To 32 Do Begin
-  HexStr := HexStr + HexChars[(Abs(Hash) Mod 16) + 1];
-  Hash := Hash Div 16;
-  If Hash = 0 Then Hash := I * 7919;
- End;
- POP3_MD5Hash := HexStr;
+ POP3_MD5Hash := ''; { APOP non pris en charge; utiliser USER/PASS sur TLS. }
 End;
 
-{ Simule l'envoi d'une commande POP3 et la reception de la reponse }
-{ Note: Dans une implementation reelle, cela utiliserait des sockets }
+
+
+{ Echanges POP3, reponses multilignes et transparence des points. }
 Function POP3_SendCommand(Command: String): TPOP3Response;
-Var
- Response: TPOP3Response;
- CmdUpper: String;
- I: Integer;
+Var R: TPOP3Response; Line, Cmd, Part: TMailText; Multi: Boolean;
 Begin
- { Initialiser la reponse }
- Response.HasMultiline := False;
- Response.Data := '';
- Response.Text := '';
-
- { Convertir la commande en majuscules pour la comparaison }
- CmdUpper := '';
- For I := 1 To Length(Command) Do
-  If Command[I] In ['a'..'z'] Then
-   CmdUpper := CmdUpper + Chr(Ord(Command[I]) - 32)
-  Else
-   CmdUpper := CmdUpper + Command[I];
-
- { Simuler le comportement du serveur selon la commande }
- If Pos('USER', CmdUpper) = 1 Then Begin
-  { Commande USER }
-  Response.ResponseType := prOK;
-  Response.Text := 'User accepted';
- End
- Else If Pos('PASS', CmdUpper) = 1 Then Begin
-  { Commande PASS }
-  Response.ResponseType := prOK;
-  Response.Text := 'Authentication successful';
-  POP3Client.State := psTransaction;
- End
- Else If Pos('APOP', CmdUpper) = 1 Then Begin
-  { Authentification APOP }
-  Response.ResponseType := prOK;
-  Response.Text := 'APOP authentication successful';
-  POP3Client.State := psTransaction;
- End
- Else If Pos('STAT', CmdUpper) = 1 Then Begin
-  { Commande STAT - statistiques }
-  Response.ResponseType := prOK;
-  Response.Text := '8 45678';
-  POP3Client.Stats.MessageCount := 8;
-  POP3Client.Stats.TotalSize := 45678;
- End
- Else If Pos('LIST', CmdUpper) = 1 Then Begin
-  { Commande LIST }
-  If Length(CmdUpper) > 4 Then Begin
-   { LIST avec numero de message }
-   Response.ResponseType := prOK;
-   Response.Text := '1 2450';
-  End
-  Else Begin
-   { LIST sans parametre - liste complete }
-   Response.ResponseType := prOK;
-   Response.Text := '8 messages';
-   Response.HasMultiline := True;
-   Response.Data := '1 2450' + Chr(13) + Chr(10) +
-                    '2 1520' + Chr(13) + Chr(10) +
-                    '3 3200' + Chr(13) + Chr(10) +
-                    '4 980'  + Chr(13) + Chr(10) +
-                    '5 15400'+ Chr(13) + Chr(10) +
-                    '6 1100' + Chr(13) + Chr(10) +
-                    '7 890'  + Chr(13) + Chr(10) +
-                    '8 20138';
+ FillChar(R,SizeOf(R),0); R.ResponseType:=prERR; MailRaw:=''; Cmd:=Command;
+ If Not MailSafe(Cmd) Then Begin R.Text:=MailError; POP3_SendCommand:=R; Exit; End;
+ If MailWrite(POP3Wire,Cmd+#13#10) And MailReadLine(POP3Wire,Line) Then Begin
+  R.Text:=Copy(Line,5,200);
+  If Copy(Line,1,3)='+OK' Then Begin
+   R.ResponseType:=prOK;
+   If Pos('PASS ',Cmd)=1 Then POP3Client.State:=psTransaction;
+   Multi := (Pos('RETR ',Cmd)=1) Or (Pos('TOP ',Cmd)=1) Or (Cmd='LIST') Or (Cmd='UIDL') Or (Cmd='CAPA');
+   R.HasMultiline:=Multi;
+   If Multi Then Repeat
+    If Not MailReadLine(POP3Wire,Part) Then Begin R.ResponseType:=prERR; Break; End;
+    If Part='.' Then Break;
+    If Copy(Part,1,2)='..' Then Delete(Part,1,1);
+    If Length(MailRaw)+Length(Part)>10485760 Then Begin
+     MailError:='Message trop grand (10 Mo maximum)'; R.ResponseType:=prERR; Break;
+    End;
+    MailRaw:=MailRaw+Part+#13#10;
+   Until False;
+   R.Data:=Copy(MailRaw,1,255);
   End;
- End
- Else If Pos('RETR', CmdUpper) = 1 Then Begin
-  { Commande RETR - recuperer message complet }
-  Response.ResponseType := prOK;
-  Response.Text := 'Message follows';
-  Response.HasMultiline := True;
-  Response.Data := 'From: test@example.com' + Chr(13) + Chr(10) +
-                   'To: user@example.com' + Chr(13) + Chr(10) +
-                   'Subject: Test message' + Chr(13) + Chr(10) +
-                   'Date: Sat, 11 Apr 2026 10:00:00 +0000' + Chr(13) + Chr(10) +
-                   Chr(13) + Chr(10) +
-                   'This is a test message body.';
- End
- Else If Pos('DELE', CmdUpper) = 1 Then Begin
-  { Commande DELE - marquer pour suppression }
-  Response.ResponseType := prOK;
-  Response.Text := 'Message marked for deletion';
- End
- Else If Pos('TOP', CmdUpper) = 1 Then Begin
-  { Commande TOP - en-tetes + N lignes du corps }
-  Response.ResponseType := prOK;
-  Response.Text := 'Headers follow';
-  Response.HasMultiline := True;
-  Response.Data := 'From: test@example.com' + Chr(13) + Chr(10) +
-                   'To: user@example.com' + Chr(13) + Chr(10) +
-                   'Subject: Test message' + Chr(13) + Chr(10) +
-                   'Date: Sat, 11 Apr 2026 10:00:00 +0000';
- End
- Else If Pos('UIDL', CmdUpper) = 1 Then Begin
-  { Commande UIDL - identifiants uniques }
-  If Length(CmdUpper) > 4 Then Begin
-   { UIDL avec numero de message }
-   Response.ResponseType := prOK;
-   Response.Text := '1 ABC123DEF456';
-  End
-  Else Begin
-   { UIDL sans parametre - liste complete }
-   Response.ResponseType := prOK;
-   Response.Text := 'Unique-ID listing follows';
-   Response.HasMultiline := True;
-   Response.Data := '1 ABC123DEF456' + Chr(13) + Chr(10) +
-                    '2 GHI789JKL012' + Chr(13) + Chr(10) +
-                    '3 MNO345PQR678' + Chr(13) + Chr(10) +
-                    '4 STU901VWX234' + Chr(13) + Chr(10) +
-                    '5 YZA567BCD890' + Chr(13) + Chr(10) +
-                    '6 EFG123HIJ456' + Chr(13) + Chr(10) +
-                    '7 KLM789NOP012' + Chr(13) + Chr(10) +
-                    '8 QRS345TUV678';
-  End;
- End
- Else If Pos('NOOP', CmdUpper) = 1 Then Begin
-  { Commande NOOP }
-  Response.ResponseType := prOK;
-  Response.Text := 'OK';
- End
- Else If Pos('RSET', CmdUpper) = 1 Then Begin
-  { Commande RSET - annuler les suppressions }
-  Response.ResponseType := prOK;
-  Response.Text := 'Reset OK';
- End
- Else If Pos('QUIT', CmdUpper) = 1 Then Begin
-  { Commande QUIT }
-  Response.ResponseType := prOK;
-  Response.Text := 'Goodbye';
-  POP3Client.State := psUpdate;
- End
- Else Begin
-  { Commande inconnue }
-  Response.ResponseType := prERR;
-  Response.Text := 'Unknown command';
+ End Else R.Text:=MailError;
+ If (R.ResponseType<>prOK) And (MailError<>'') Then Begin
+  R.Text:=MailError; MailClose(POP3Wire); POP3Client.Connected:=False;
  End;
-
- POP3_SendCommand := Response;
+ POP3_SendCommand:=R;
 End;
 
 { Connecte au serveur POP3 }
 Function POP3_Connect: Integer;
+Var Line: TMailText;
 Begin
- If POP3Client.Host = '' Then Begin
-  POP3Client.LastError := 'Serveur non configure';
-  POP3_Connect := POP3_ERR_CONNECT;
-  Exit;
+ POP3_Connect:=POP3_ERR_CONNECT; POP3Client.Connected:=False;
+ If Not MailOpen(POP3Wire,POP3Client.Host,POP3Client.Port,POP3Client.UseSSL) Then Begin
+  POP3Client.LastError:=MailError; Exit;
  End;
-
- POP3Connecting := True;
-
- { Simuler la connexion socket }
- { Dans une vraie implementation, on utiliserait les sockets }
- POP3Client.Connected := True;
- POP3Client.SocketHandle := 2;
- POP3Client.State := psAuthorization;
-
- { Simuler le message de bienvenue avec timestamp APOP }
- POP3Client.ServerGreeting := '+OK POP3 server ready <1234.5678@pop.example.com>';
- POP3Client.APOPTimestamp := POP3_ExtractAPOPTimestamp(POP3Client.ServerGreeting);
-
- POP3Connecting := False;
- POP3_Connect := POP3_OK;
+ If Not MailReadLine(POP3Wire,Line) Or (Copy(Line,1,3)<>'+OK') Then Begin
+  POP3Client.LastError:='Accueil POP3 invalide'; MailClose(POP3Wire); Exit;
+ End;
+ POP3Client.ServerGreeting:=Line; POP3Client.APOPTimestamp:='';
+ POP3Client.Connected:=True; POP3Client.State:=psAuthorization;
+ POP3_Connect:=POP3_OK;
 End;
 
 { Authentifie avec la methode USER/PASS }
@@ -5974,35 +6683,9 @@ End;
 
 { Authentifie avec la methode APOP }
 Function POP3_AuthAPOP: Integer;
-Var
- Response: TPOP3Response;
- DigestInput, Digest: String;
 Begin
- If POP3Client.State <> psAuthorization Then Begin
-  POP3Client.LastError := 'Pas en etat AUTHORIZATION';
-  POP3_AuthAPOP := POP3_ERR_AUTH;
-  Exit;
- End;
-
- If POP3Client.APOPTimestamp = '' Then Begin
-  POP3Client.LastError := 'Serveur ne supporte pas APOP';
-  POP3_AuthAPOP := POP3_ERR_AUTH;
-  Exit;
- End;
-
- { Calculer le digest MD5(timestamp + password) }
- DigestInput := POP3Client.APOPTimestamp + POP3Client.Password;
- Digest := POP3_MD5Hash(DigestInput);
-
- { Envoyer APOP }
- Response := POP3_SendCommand('APOP ' + POP3Client.Username + ' ' + Digest);
-
- If Response.ResponseType = prOK Then
-  POP3_AuthAPOP := POP3_OK
- Else Begin
-  POP3Client.LastError := 'APOP echoue: ' + Response.Text;
-  POP3_AuthAPOP := POP3_ERR_AUTH;
- End;
+ POP3Client.LastError:='APOP non pris en charge; utiliser USER/PASS';
+ POP3_AuthAPOP:=POP3_ERR_AUTH;
 End;
 
 { Obtient les statistiques de la boite (STAT) }
@@ -6206,6 +6889,7 @@ Begin
  End;
 
  Response := POP3_SendCommand('QUIT');
+ MailClose(POP3Wire);
 
  { Fermer la connexion }
  POP3Client.Connected := False;
@@ -6217,50 +6901,13 @@ End;
 
 { Synchronise la liste des messages avec le serveur }
 Procedure POP3_SyncMessages;
-Var
- I: Integer;
 Begin
- If POP3Client.State <> psTransaction Then Exit;
-
- { Obtenir les statistiques }
- POP3_Stat;
-
- { Simuler le remplissage de la liste }
- POP3MessageCount := POP3Client.Stats.MessageCount;
- If POP3MessageCount > POP3_MAX_MESSAGES Then
-  POP3MessageCount := POP3_MAX_MESSAGES;
-
- { Initialiser la liste des messages }
- For I := 0 To POP3MessageCount - 1 Do Begin
-  POP3ListItems[I].MsgNum := I + 1;
-  POP3ListItems[I].Size := 1000 + (I * 500);
-  POP3ListItems[I].Deleted := False;
-  POP3ListItems[I].UIDL := '';
- End;
-
- { Obtenir les UIDLs }
- POP3_UIDL(0);
+ ReceiveMail;
 End;
 
-{ Telecharge les messages selon les options }
 Procedure POP3_DownloadMessages;
-Var
- I: Integer;
 Begin
- If POP3Client.State <> psTransaction Then Exit;
-
- For I := 0 To POP3MessageCount - 1 Do Begin
-  If POP3Client.HeadersOnly Then
-   { Telecharger seulement les en-tetes }
-   POP3_Top(I + 1, 0)
-  Else
-   { Telecharger le message complet }
-   POP3_Retr(I + 1);
-
-  { Supprimer si option activee et pas "Laisser sur serveur" }
-  If Not POP3Client.LeaveOnServer Then
-   POP3_Dele(I + 1);
- End;
+ ReceiveMail;
 End;
 
 { Retourne l'etat de connexion sous forme de chaine }
@@ -6441,166 +7088,29 @@ Begin
  SMTP_ParseResponse := Response;
 End;
 
-{ Envoie une commande SMTP et recoit la reponse (simule) }
+{ Echanges SMTP et reponses multilignes du serveur. }
 Function SMTP_SendCommand(Command: String): TSMTPResponse;
-Var
- Response: TSMTPResponse;
- CmdUpper: String;
- I: Integer;
- NumStr: String;
+Var R: TSMTPResponse; Line, Cmd: TMailText;
 Begin
- Response.Code := 0;
- Response.ResponseClass := srcUnknown;
- Response.Text := '';
- Response.IsMultiline := False;
- Response.IsContinue := False;
-
- { Convertir en majuscules pour la comparaison }
- CmdUpper := '';
- For I := 1 To Length(Command) Do
-  If (Command[I] >= 'a') And (Command[I] <= 'z') Then
-   CmdUpper := CmdUpper + Chr(Ord(Command[I]) - 32)
-  Else
-   CmdUpper := CmdUpper + Command[I];
-
- { Simuler les reponses selon la commande }
- If (Pos('EHLO', CmdUpper) = 1) Or (Pos('HELO', CmdUpper) = 1) Then Begin
-  Response.Code := SMTP_CODE_OK;
-  Response.ResponseClass := srcPositiveComplete;
-  Response.Text := 'smtp.example.com Hello';
-  { Simuler les extensions supportees }
-  SMTPClient.Extensions.STARTTLS := True;
-  SMTPClient.Extensions.AUTH_PLAIN := True;
-  SMTPClient.Extensions.AUTH_LOGIN := True;
-  SMTPClient.Extensions.AUTH_CRAM_MD5 := True;
-  SMTPClient.Extensions.EIGHTBITMIME := True;
-  SMTPClient.Extensions.SIZE := 52428800;
-  SMTPClient.Extensions.PIPELINING := True;
-  SMTPClient.Extensions.DSN := True;
-  SMTPClient.ServerDomain := 'smtp.example.com';
- End
- Else If Pos('STARTTLS', CmdUpper) = 1 Then Begin
-  If SMTPClient.Extensions.STARTTLS Then Begin
-   Response.Code := SMTP_CODE_READY;
-   Response.ResponseClass := srcPositiveComplete;
-   Response.Text := 'Ready to start TLS';
-   SMTPClient.TLSActive := True;
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_NOT_IMPLEMENTED;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'STARTTLS not supported';
+ FillChar(R,SizeOf(R),0); R.ResponseClass:=srcUnknown; Cmd:=Command;
+ If Not MailSafe(Cmd) Then Begin R.Text:=MailError; SMTP_SendCommand:=R; Exit; End;
+ If Cmd<>'' Then If Not MailWrite(SMTPWire,Cmd+#13#10) Then Begin R.Text:=MailError; SMTP_SendCommand:=R; Exit; End;
+ Repeat
+  If Not MailReadLine(SMTPWire,Line) Then Begin R.Code:=0; R.Text:=MailError; Break; End;
+  R:=SMTP_ParseResponse(Copy(Line,1,255));
+  If Pos('EHLO ',Cmd)=1 Then Begin
+   If Pos('STARTTLS',Line)>0 Then SMTPClient.Extensions.STARTTLS:=True;
+   If Pos('AUTH',Line)>0 Then Begin
+    SMTPClient.Extensions.AUTH_PLAIN:=Pos('PLAIN',Line)>0;
+    SMTPClient.Extensions.AUTH_LOGIN:=Pos('LOGIN',Line)>0;
+   End;
   End;
- End
- Else If Pos('AUTH PLAIN', CmdUpper) = 1 Then Begin
-  If SMTPClient.Extensions.AUTH_PLAIN Then Begin
-   Response.Code := SMTP_CODE_AUTH_OK;
-   Response.ResponseClass := srcPositiveComplete;
-   Response.Text := 'Authentication successful';
-   SMTPClient.Authenticated := True;
-   SMTPClient.AuthMethod := samPLAIN;
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_AUTH_FAILED;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'AUTH PLAIN not supported';
-  End;
- End
- Else If Pos('AUTH LOGIN', CmdUpper) = 1 Then Begin
-  If SMTPClient.Extensions.AUTH_LOGIN Then Begin
-   Response.Code := SMTP_CODE_AUTH_CONTINUE;
-   Response.ResponseClass := srcPositiveInterm;
-   Response.Text := 'VXNlcm5hbWU6'; { Base64 pour "Username:" }
-   SMTPClient.AuthMethod := samLOGIN;
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_AUTH_FAILED;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'AUTH LOGIN not supported';
-  End;
- End
- Else If Pos('AUTH CRAM-MD5', CmdUpper) = 1 Then Begin
-  If SMTPClient.Extensions.AUTH_CRAM_MD5 Then Begin
-   Response.Code := SMTP_CODE_AUTH_CONTINUE;
-   Response.ResponseClass := srcPositiveInterm;
-   Response.Text := 'PDEyMzQ1LjY3ODkwQHNtdHAuZXhhbXBsZS5jb20+'; { Challenge simule }
-   SMTPClient.AuthMethod := samCRAMMD5;
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_AUTH_FAILED;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'AUTH CRAM-MD5 not supported';
-  End;
- End
- Else If Pos('MAIL FROM:', CmdUpper) = 1 Then Begin
-  If SMTPClient.Authenticated Or (SMTPClient.AuthMethod = samNone) Then Begin
-   Response.Code := SMTP_CODE_OK;
-   Response.ResponseClass := srcPositiveComplete;
-   Response.Text := 'OK';
-   SMTPClient.State := ssMailFrom;
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_AUTH_REQUIRED;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'Authentication required';
-  End;
- End
- Else If Pos('RCPT TO:', CmdUpper) = 1 Then Begin
-  If SMTPClient.State >= ssMailFrom Then Begin
-   Response.Code := SMTP_CODE_OK;
-   Response.ResponseClass := srcPositiveComplete;
-   Response.Text := 'OK';
-   SMTPClient.State := ssRcptTo;
-   Inc(SMTPClient.RcptAccepted);
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_BAD_SEQUENCE;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'Need MAIL command first';
-  End;
- End
- Else If Pos('DATA', CmdUpper) = 1 Then Begin
-  If SMTPClient.State >= ssRcptTo Then Begin
-   Response.Code := SMTP_CODE_START_MAIL;
-   Response.ResponseClass := srcPositiveInterm;
-   Response.Text := 'Start mail input; end with <CRLF>.<CRLF>';
-   SMTPClient.State := ssData;
-  End
-  Else Begin
-   Response.Code := SMTP_CODE_BAD_SEQUENCE;
-   Response.ResponseClass := srcNegativePermanent;
-   Response.Text := 'Need RCPT command first';
-  End;
- End
- Else If Pos('RSET', CmdUpper) = 1 Then Begin
-  Response.Code := SMTP_CODE_OK;
-  Response.ResponseClass := srcPositiveComplete;
-  Response.Text := 'OK';
-  SMTPClient.State := ssAuthenticated;
-  SMTPClient.MailFrom := '';
-  SMTPClient.RcptCount := 0;
-  SMTPClient.RcptAccepted := 0;
- End
- Else If Pos('NOOP', CmdUpper) = 1 Then Begin
-  Response.Code := SMTP_CODE_OK;
-  Response.ResponseClass := srcPositiveComplete;
-  Response.Text := 'OK';
- End
- Else If Pos('QUIT', CmdUpper) = 1 Then Begin
-  Response.Code := SMTP_CODE_CLOSING;
-  Response.ResponseClass := srcPositiveComplete;
-  Response.Text := 'Closing connection';
-  SMTPClient.State := ssQuit;
- End
- Else Begin
-  Response.Code := SMTP_CODE_SYNTAX_ERROR;
-  Response.ResponseClass := srcNegativePermanent;
-  Response.Text := 'Syntax error, command unrecognized';
- End;
-
- SMTPClient.LastCode := Response.Code;
- SMTP_SendCommand := Response;
+ Until Not R.IsContinue;
+ SMTPClient.LastCode:=R.Code;
+ SMTP_SendCommand:=R;
 End;
+
+
 
 { Encode une chaine en Base64 (implementation simplifiee) }
 Function SMTP_Base64Encode(Input: String): String;
@@ -6637,58 +7147,25 @@ End;
 
 { Calcule un hash simplifie pour CRAM-MD5 }
 Function SMTP_CRAMMD5Hash(Challenge, Password: String): String;
-Var
- I: Integer;
- Hash: LongInt;
- HexStr: String;
- HexChars: String;
 Begin
- { Implementation simplifiee - en production, utiliser une vraie HMAC-MD5 }
- HexChars := '0123456789abcdef';
- Hash := 0;
- For I := 1 To Length(Challenge) Do
-  Hash := (Hash * 31 + Ord(Challenge[I])) Mod 2147483647;
- For I := 1 To Length(Password) Do
-  Hash := (Hash * 37 + Ord(Password[I])) Mod 2147483647;
-
- HexStr := '';
- For I := 1 To 32 Do Begin
-  HexStr := HexStr + HexChars[(Hash Mod 16) + 1];
-  Hash := Hash Div 16;
-  If Hash = 0 Then Hash := Ord(Password[(I Mod Length(Password)) + 1]) * 12345;
- End;
-
- SMTP_CRAMMD5Hash := HexStr;
+ SMTP_CRAMMD5Hash := ''; { Non pris en charge; AUTH LOGIN/PLAIN sur TLS. }
 End;
+
+
 
 { Connecte au serveur SMTP }
 Function SMTP_Connect: Integer;
-Var
- Response: TSMTPResponse;
+Var R: TSMTPResponse;
 Begin
- If SMTPClient.Host = '' Then Begin
-  SMTPClient.LastError := 'Serveur non configure';
-  SMTP_Connect := SMTP_ERR_CONNECT;
-  Exit;
+ SMTP_Connect:=SMTP_ERR_CONNECT; SMTPClient.Connected:=False;
+ If Not MailOpen(SMTPWire,SMTPClient.Host,SMTPClient.Port,SMTPClient.UseSSL) Then Begin
+  SMTPClient.LastError:=MailError; Exit;
  End;
-
- SMTPSending := True;
-
- { Simuler la connexion socket }
- SMTPClient.Connected := True;
- SMTPClient.SocketHandle := 3;
- SMTPClient.State := ssConnected;
-
- { Si SSL implicite, activer TLS }
- If SMTPClient.UseSSL Then
-  SMTPClient.TLSActive := True;
-
- { Simuler le message de bienvenue }
- SMTPClient.ServerGreeting := '220 smtp.example.com ESMTP ready';
- SMTPClient.LastCode := SMTP_CODE_READY;
-
- SMTPSending := False;
- SMTP_Connect := SMTP_OK;
+ R:=SMTP_SendCommand('');
+ If R.Code<>220 Then Begin SMTPClient.LastError:=R.Text; MailClose(SMTPWire); Exit; End;
+ SMTPClient.ServerGreeting:=R.Text; SMTPClient.Connected:=True;
+ SMTPClient.TLSActive:=SMTPWire.Secure; SMTPClient.State:=ssConnected;
+ SMTP_Connect:=SMTP_OK;
 End;
 
 { Envoie la commande EHLO }
@@ -6738,9 +7215,14 @@ Begin
 
  Response := SMTP_SendCommand('STARTTLS');
  If Response.Code = SMTP_CODE_READY Then Begin
-  { Simuler la negociation TLS }
-  SMTPClient.TLSActive := True;
-  SMTP_STARTTLS := SMTP_OK;
+  If MailStartTLS(SMTPWire) Then Begin
+   SMTPClient.TLSActive := True;
+   FillChar(SMTPClient.Extensions,SizeOf(SMTPClient.Extensions),0);
+   SMTP_STARTTLS := SMTP_EHLO('localhost');
+  End Else Begin
+   SMTPClient.LastError := MailError; MailClose(SMTPWire);
+   SMTP_STARTTLS := SMTP_ERR_STARTTLS;
+  End;
  End
  Else Begin
   SMTPClient.LastError := 'STARTTLS echoue: ' + Response.Text;
@@ -6833,52 +7315,9 @@ End;
 
 { Authentification CRAM-MD5 (RFC 2195) }
 Function SMTP_AuthCRAMMD5: Integer;
-Var
- Response: TSMTPResponse;
- Challenge: String;
- Digest: String;
- AuthResponse: String;
 Begin
- If SMTPClient.State < ssConnected Then Begin
-  SMTPClient.LastError := 'Non connecte';
-  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
-  Exit;
- End;
-
- If Not SMTPClient.Extensions.AUTH_CRAM_MD5 Then Begin
-  SMTPClient.LastError := 'AUTH CRAM-MD5 non supporte';
-  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
-  Exit;
- End;
-
- { Envoyer AUTH CRAM-MD5 }
- Response := SMTP_SendCommand('AUTH CRAM-MD5');
- If Response.Code <> SMTP_CODE_AUTH_CONTINUE Then Begin
-  SMTPClient.LastError := 'AUTH CRAM-MD5 echoue: ' + Response.Text;
-  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
-  Exit;
- End;
-
- { Le challenge est dans Response.Text (en Base64) }
- Challenge := Response.Text;
-
- { Calculer la reponse HMAC-MD5 }
- Digest := SMTP_CRAMMD5Hash(Challenge, SMTPClient.Password);
-
- { Envoyer username + espace + digest en Base64 }
- AuthResponse := SMTP_Base64Encode(SMTPClient.Username + ' ' + Digest);
- Response := SMTP_SendCommand(AuthResponse);
-
- If Response.Code = SMTP_CODE_AUTH_OK Then Begin
-  SMTPClient.Authenticated := True;
-  SMTPClient.AuthMethod := samCRAMMD5;
-  SMTPClient.State := ssAuthenticated;
-  SMTP_AuthCRAMMD5 := SMTP_OK;
- End
- Else Begin
-  SMTPClient.LastError := 'CRAM-MD5 echoue: ' + Response.Text;
-  SMTP_AuthCRAMMD5 := SMTP_ERR_AUTH;
- End;
+ SMTPClient.LastError:='CRAM-MD5 non pris en charge; utiliser LOGIN/PLAIN';
+ SMTP_AuthCRAMMD5:=SMTP_ERR_AUTH;
 End;
 
 { Envoie la commande MAIL FROM }
@@ -6925,6 +7364,7 @@ Begin
    SMTPRecipients[SMTPClient.RcptCount].ErrorMsg := '';
    Inc(SMTPClient.RcptCount);
   End;
+  Inc(SMTPClient.RcptAccepted);
   SMTPClient.State := ssRcptTo;
   SMTP_RcptTo := SMTP_OK;
  End
@@ -6941,9 +7381,11 @@ Begin
 End;
 
 { Envoie la commande DATA et le contenu du message }
-Function SMTP_Data(MessageBody: String): Integer;
+Function SMTP_Data(MessageBody: TMailText): Integer;
 Var
  Response: TSMTPResponse;
+ WireBody: TMailText;
+ I: LongInt;
 Begin
  If SMTPClient.State < ssRcptTo Then Begin
   SMTPClient.LastError := 'RCPT TO requis d''abord';
@@ -6967,13 +7409,17 @@ Begin
 
  SMTPClient.State := ssData;
 
- { Dans une vraie implementation, on enverrait le corps du message ici }
- { puis on terminerait avec CRLF.CRLF }
-
- { Simuler l'envoi reussi }
- Response.Code := SMTP_CODE_OK;
- Response.ResponseClass := srcPositiveComplete;
- Response.Text := 'Message accepted for delivery';
+ WireBody:='';
+ For I:=1 To Length(MessageBody) Do Begin
+  If (MessageBody[I]='.') Then
+   If (I=1) Or (MessageBody[I-1]=#10) Then WireBody:=WireBody+'.';
+  WireBody:=WireBody+MessageBody[I];
+ End;
+ If Copy(WireBody,Length(WireBody)-1,2)<>#13#10 Then WireBody:=WireBody+#13#10;
+ If Not MailWrite(SMTPWire, WireBody + '.'#13#10) Then Begin
+  SMTPClient.LastError:=MailError; SMTP_Data:=SMTP_ERR_SEND; Exit;
+ End;
+ Response:=SMTP_SendCommand('');
 
  If Response.Code = SMTP_CODE_OK Then Begin
   SMTPClient.State := ssAuthenticated;
@@ -7045,6 +7491,7 @@ Begin
   { Ignorer la reponse, on deconnecte quand meme }
  End;
 
+ MailClose(SMTPWire);
  SMTPClient.Connected := False;
  SMTPClient.State := ssDisconnected;
  SMTPClient.SocketHandle := -1;
@@ -7058,7 +7505,7 @@ Function SMTP_SendMessage(Msg: TSMTPMessage): Integer;
 Var
  I: Integer;
  Result: Integer;
- Headers: String;
+ Headers: TMailText;
 Begin
  { Verifier qu'on est connecte et authentifie }
  If SMTPClient.State < ssConnected Then Begin
@@ -7091,7 +7538,7 @@ Begin
  { Construire les en-tetes et le corps }
  Headers := 'From: ';
  If Msg.FromName <> '' Then
-  Headers := Headers + '"' + Msg.FromName + '" '
+  Headers := Headers + '"' + Msg.FromName + '" <' + Msg.From + '>'
  Else
   Headers := Headers + Msg.From;
  Headers := Headers + Chr(13) + Chr(10);
@@ -7192,6 +7639,186 @@ Begin
  XORPassword := Result;
 End;
 
+{ Ouvrir et authentifier le serveur entrant du compte reel. }
+Function OpenIncomingAccount(Const Account: TEmailAccount): Boolean;
+Var R: TIMAPResponse; P: TPOP3Response;
+Begin
+ OpenIncomingAccount:=False; MailError:='';
+ If Account.IncomingType=istIMAP Then Begin
+  IMAP_InitClient;
+  IMAP_Configure(Account.IncomingHost,Account.IncomingPort,
+   Account.IncomingUsername,XORPassword(Account.IncomingPassword),Account.IncomingSecurity=csSSL);
+  If IMAP_Connect<>IMAP_OK Then Begin MailError:=IMAPClient.LastError; Exit; End;
+  If Account.IncomingSecurity=csSTARTTLS Then Begin
+   R:=IMAP_SendCommand('STARTTLS');
+   If R.ResponseType<>irOK Then Begin MailError:='IMAP STARTTLS refuse: '+R.Text; MailClose(IMAPWire); Exit; End;
+   If Not MailStartTLS(IMAPWire) Then Begin MailClose(IMAPWire); Exit; End;
+  End;
+  BusyStage('Authentification IMAP...');
+  If IMAPClient.State<>isAuthenticated Then
+   If IMAP_LoginAuth<>IMAP_OK Then Begin MailError:=IMAPClient.LastError; MailClose(IMAPWire); Exit; End;
+ End Else Begin
+  POP3_InitClient;
+  POP3_Configure(Account.IncomingHost,Account.IncomingPort,
+   Account.IncomingUsername,XORPassword(Account.IncomingPassword),Account.IncomingSecurity=csSSL);
+  If POP3_Connect<>POP3_OK Then Begin MailError:=POP3Client.LastError; Exit; End;
+  If Account.IncomingSecurity=csSTARTTLS Then Begin
+   P:=POP3_SendCommand('STLS');
+   If P.ResponseType<>prOK Then Begin MailError:='POP3 STLS refuse: '+P.Text; MailClose(POP3Wire); Exit; End;
+   If Not MailStartTLS(POP3Wire) Then Begin MailClose(POP3Wire); Exit; End;
+  End;
+  BusyStage('Authentification POP3...');
+  If POP3_AuthUserPass<>POP3_OK Then Begin MailError:=POP3Client.LastError; MailClose(POP3Wire); Exit; End;
+ End;
+ OpenIncomingAccount:=True;
+End;
+
+Function OpenOutgoingAccount(Const Account: TEmailAccount): Boolean;
+Var User, Pass: String; ResultCode: Integer;
+Begin
+ OpenOutgoingAccount:=False; MailError:=''; SMTP_InitClient;
+ User:=Account.OutgoingUsername; Pass:=XORPassword(Account.OutgoingPassword);
+ If Account.OutgoingUseSameAuth Then Begin
+  User:=Account.IncomingUsername; Pass:=XORPassword(Account.IncomingPassword);
+ End;
+ SMTP_Configure(Account.OutgoingHost,Account.OutgoingPort,User,Pass,
+  Account.OutgoingSecurity=csSSL,Account.OutgoingSecurity=csSTARTTLS);
+ ResultCode:=SMTP_Connect;
+ If ResultCode=SMTP_OK Then ResultCode:=SMTP_EHLO('localhost');
+ If (ResultCode=SMTP_OK) And (Account.OutgoingSecurity=csSTARTTLS) Then ResultCode:=SMTP_STARTTLS;
+ If (ResultCode=SMTP_OK) And Account.OutgoingAuthRequired Then Begin
+  BusyStage('Authentification SMTP...');
+  If SMTPClient.Extensions.AUTH_PLAIN Then ResultCode:=SMTP_AuthPLAIN
+  Else ResultCode:=SMTP_AuthLOGIN;
+ End;
+ If ResultCode<>SMTP_OK Then Begin MailError:=SMTPClient.LastError; MailClose(SMTPWire); Exit; End;
+ OpenOutgoingAccount:=True;
+End;
+
+{ Sans option, le fichier des comptes suit le repertoire de l executable. }
+Function AccountFileName: String;
+Var
+ S: String;
+ I: Integer;
+Begin
+ If CommandLineAccountsFile <> '' Then Begin
+  AccountFileName := CommandLineAccountsFile;
+  Exit;
+ End;
+ S := ParamStr(0);
+ I := Length(S);
+ While (I > 0) And (S[I] <> '\') And (S[I] <> '/') And
+       (S[I] <> ':') Do Dec(I);
+ AccountFileName := Copy(S, 1, I) + 'OUTLOOK.ACC';
+End;
+
+{ Format versionne: signature, taille d un compte, nombre, comptes complets.
+  Les mots de passe conservent le codage XOR utilise par l assistant. }
+Procedure SaveAccounts;
+Var
+ F: File;
+ Name, TempName, BackupName: String;
+ Header: Array[0..2] of LongInt;
+ Written: LongInt;
+ Err: Integer;
+Begin
+ AccountStorageError := '';
+ Name := AccountFileName;
+ TempName := Name + '.TMP';
+ BackupName := Name + '.BAK';
+ Header[0] := $4F414301;
+ Header[1] := SizeOf(TEmailAccount);
+ Header[2] := EmailAccountCount;
+ {$I-}
+ Assign(F, TempName);
+ Rewrite(F, 1);
+ Err := IOResult;
+ If Err = 0 Then Begin
+  BlockWrite(F, Header, SizeOf(Header), Written);
+  Err := IOResult;
+  If Written <> SizeOf(Header) Then Err := 101;
+  If Err = 0 Then Begin
+   BlockWrite(F, EmailAccounts, EmailAccountCount * SizeOf(TEmailAccount), Written);
+   Err := IOResult;
+   If Written <> EmailAccountCount * SizeOf(TEmailAccount) Then Err := 101;
+  End;
+  Close(F);
+  If IOResult <> 0 Then Err := 101;
+ End;
+ If Err = 0 Then Begin
+  Assign(F, BackupName);
+  Erase(F);
+  If IOResult <> 0 Then Begin End;
+  Assign(F, Name);
+  Rename(F, BackupName);
+  Err := IOResult;
+  { Un fichier absent est normal lors du premier enregistrement. }
+  If Err = 2 Then Err := 0;
+  If Err = 0 Then Begin
+   Assign(F, TempName);
+   Rename(F, Name);
+   Err := IOResult;
+   If Err <> 0 Then Begin
+    Assign(F, BackupName);
+    Rename(F, Name);
+    If IOResult <> 0 Then Begin End;
+   End;
+  End;
+ End;
+ {$I+}
+ If Err <> 0 Then
+  AccountStorageError := 'Erreur: impossible de sauvegarder le fichier des comptes';
+End;
+
+Procedure LoadAccounts;
+Var
+ F: File;
+ Header: Array[0..2] of LongInt;
+ Loaded: Array[0..MAX_EMAIL_ACCOUNTS-1] of TEmailAccount;
+ ReadCount, ExpectedSize: LongInt;
+ Err: Integer;
+Begin
+ AccountStorageError := '';
+ FillChar(Loaded, SizeOf(Loaded), 0);
+ FillChar(Header, SizeOf(Header), 0);
+ {$I-}
+ Assign(F, AccountFileName);
+ Reset(F, 1);
+ Err := IOResult;
+ If Err = 2 Then Begin
+  { Recuperer la derniere sauvegarde si une ecriture a ete interrompue. }
+  Assign(F, AccountFileName + '.BAK');
+  Reset(F, 1);
+  Err := IOResult;
+  If Err = 2 Then Exit;
+ End;
+ If Err = 0 Then Begin
+  BlockRead(F, Header, SizeOf(Header), ReadCount);
+  Err := IOResult;
+  If (ReadCount <> SizeOf(Header)) Or (Header[0] <> $4F414301) Or
+     (Header[1] <> SizeOf(TEmailAccount)) Or (Header[2] < 0) Or
+     (Header[2] > MAX_EMAIL_ACCOUNTS) Then Err := 100;
+  If Err = 0 Then Begin
+   ExpectedSize := Header[2] * SizeOf(TEmailAccount);
+   If FileSize(F) <> SizeOf(Header) + ExpectedSize Then Err := 100;
+   If IOResult <> 0 Then Err := 100;
+   If Err = 0 Then Begin
+    BlockRead(F, Loaded, ExpectedSize, ReadCount);
+    Err := IOResult;
+    If ReadCount <> ExpectedSize Then Err := 100;
+   End;
+  End;
+  Close(F);
+  If IOResult <> 0 Then Err := 100;
+ End;
+ {$I+}
+ If Err = 0 Then Begin
+  Move(Loaded, EmailAccounts, SizeOf(EmailAccounts));
+  EmailAccountCount := Header[2];
+ End
+ Else AccountStorageError := 'Erreur: impossible de charger le fichier des comptes';
+End;
+
 { Initialise le gestionnaire de comptes }
 Procedure InitializeAccountManager;
 Var
@@ -7215,26 +7842,7 @@ Begin
   EmailAccounts[I].IsActive := False;
  End;
 
- { Creer un compte de demonstration }
- EmailAccounts[0].AccountName := 'Compte principal';
- EmailAccounts[0].DisplayName := 'Utilisateur';
- EmailAccounts[0].EmailAddress := 'user@example.com';
- EmailAccounts[0].IncomingType := istIMAP;
- EmailAccounts[0].IncomingHost := 'imap.example.com';
- EmailAccounts[0].IncomingPort := DEFAULT_IMAPS_PORT;
- EmailAccounts[0].IncomingSecurity := csSSL;
- EmailAccounts[0].IncomingUsername := 'user@example.com';
- EmailAccounts[0].IncomingPassword := XORPassword('password');
- EmailAccounts[0].OutgoingHost := 'smtp.example.com';
- EmailAccounts[0].OutgoingPort := DEFAULT_SMTP_SUBMISSION_PORT;
- EmailAccounts[0].OutgoingSecurity := csSTARTTLS;
- EmailAccounts[0].OutgoingAuthRequired := True;
- EmailAccounts[0].OutgoingUseSameAuth := True;
- EmailAccounts[0].IsActive := True;
- EmailAccounts[0].IsDefault := True;
- EmailAccounts[0].LastConnectionTest := ctrNotTested;
- EmailAccounts[0].CheckIntervalMins := 5;
- EmailAccountCount := 1;
+ LoadAccounts;
 End;
 
 { Initialise un compte vide }
@@ -7319,6 +7927,73 @@ Begin
   Inc(TextY);
  End;
  OutTextXY(TextX, TextY, Caption);
+End;
+
+{ Boite d activite, avec progression reelle quand le total est connu. }
+Procedure DrawBusyDialog;
+Var X,Y,Width,Offset,Filled: Integer; Text,TotalText: String; Elapsed: LongInt;
+Begin
+ If Not BusyVisible Or Not BusyGraphicsReady Then Exit;
+ X:=(SCREEN_WIDTH-440) Div 2; Y:=(SCREEN_HEIGHT-190) Div 2;
+ HideMouse; SetViewPort(0,0,SCREEN_WIDTH-1,SCREEN_HEIGHT-1,True);
+ DrawDialogBox(X,Y,440,190,BusyTitle);
+ SetColor(Black); OutTextXY(X+18,Y+40,Copy(BusyStageText,1,50));
+ OutTextXY(X+18,Y+62,Copy(BusyDetail,1,50));
+ Width:=400;
+ FillRect(X+18,Y+90,X+18+Width,Y+110,White);
+ Draw3DRect(X+18,Y+90,X+18+Width,Y+110,False);
+ If BusyTotal>0 Then Begin
+  Filled:=(BusyDone*LongInt(Width-4)) Div BusyTotal;
+  If Filled>0 Then FillRect(X+20,Y+92,X+19+Filled,Y+108,Blue);
+  Str(BusyDone,Text); Str(BusyTotal,TotalText); SetColor(Black);
+  OutTextXY(X+18,Y+124,Text+' / '+TotalText+' messages');
+ End Else Begin
+  Offset:=(BusyFrame Mod 24)*(Width-64) Div 23;
+  FillRect(X+20+Offset,Y+92,X+78+Offset,Y+108,Blue); SetColor(Black);
+  OutTextXY(X+18,Y+124,'En cours...');
+ End;
+ Elapsed:=(LongWord(GetTickCount)-LongWord(BusyStarted)) And $7FFFFFFF;
+ Str(Elapsed Div 1000,Text); SetColor(Black); OutTextXY(X+18,Y+146,'Duree : '+Text+' s');
+ Case BusyFrame Mod 4 Of 0: Text:='|'; 1: Text:='/'; 2: Text:='-'; 3: Text:=Chr(92); End;
+ OutTextXY(X+18,Y+168,'Veuillez patienter... '+Text); ShowMouse;
+End;
+
+Procedure BusyPulse(Force: Boolean);
+Var Tick,Elapsed: LongInt;
+Begin
+ If Not BusyVisible Or Not BusyGraphicsReady Then Exit;
+ Tick:=GetTickCount; Elapsed:=(LongWord(Tick)-LongWord(BusyLastPaint)) And $7FFFFFFF;
+ If Not Force And (Elapsed<100) Then Exit;
+ BusyLastPaint:=Tick; Inc(BusyFrame); DrawBusyDialog;
+ { Laisser le pilote graphique presenter l image, sans executer de commande utilisateur. }
+ Delay(1);
+End;
+
+Procedure BusyBegin(Title,Detail: String);
+Begin
+ BusyTitle:=Title; BusyDetail:=Detail; BusyStageText:='Preparation...';
+ BusyDone:=0; BusyTotal:=0; BusyFrame:=0; BusyStarted:=GetTickCount; BusyLastPaint:=BusyStarted;
+ BusyVisible:=True; BusyPulse(True);
+End;
+
+Procedure BusyUpdate(Stage: String; Done,Total: LongInt);
+Begin
+ If Not BusyVisible Then Exit;
+ BusyStageText:=Stage; BusyDone:=Done; BusyTotal:=Total;
+ If BusyTotal<0 Then BusyTotal:=0;
+ If BusyDone<0 Then BusyDone:=0;
+ If (BusyTotal>0) And (BusyDone>BusyTotal) Then BusyDone:=BusyTotal;
+ BusyPulse(True);
+End;
+
+Procedure BusyStage(Stage: String);
+Begin If BusyVisible Then BusyUpdate(Stage,BusyDone,BusyTotal); End;
+
+Procedure BusyEnd;
+Begin
+ If Not BusyVisible Then Exit;
+ BusyVisible:=False;
+ If BusyGraphicsReady Then DrawInterface;
 End;
 
 { Dessine un champ de saisie }
@@ -7740,43 +8415,27 @@ End;
 { Teste la connexion au serveur entrant }
 Function TestIncomingConnection: TConnectionTestResult;
 Begin
- { Simulation du test de connexion }
- { Dans une implementation reelle, on utiliserait les clients IMAP/POP3 }
- If (TempAccount.IncomingHost = '') Or (TempAccount.IncomingUsername = '') Then Begin
-  TestIncomingConnection := ctrFailedIncoming;
-  Exit;
- End;
-
- { Simuler un delai de test }
- Delay(500);
-
- { Test simule reussi si les champs sont remplis }
- TestIncomingConnection := ctrSuccess;
+ If OpenIncomingAccount(TempAccount) Then TestIncomingConnection:=ctrSuccess
+ Else TestIncomingConnection:=ctrFailedIncoming;
+ MailClose(IMAPWire); MailClose(POP3Wire);
 End;
 
-{ Teste la connexion au serveur sortant }
+{ Verifie la connexion SMTP, TLS et l authentification sans envoyer de message. }
 Function TestOutgoingConnection: TConnectionTestResult;
 Begin
- { Simulation du test de connexion SMTP }
- If TempAccount.OutgoingHost = '' Then Begin
-  TestOutgoingConnection := ctrFailedOutgoing;
-  Exit;
- End;
-
- { Simuler un delai de test }
- Delay(500);
-
- { Test simule reussi si les champs sont remplis }
- TestOutgoingConnection := ctrSuccess;
+ If OpenOutgoingAccount(TempAccount) Then TestOutgoingConnection:=ctrSuccess
+ Else TestOutgoingConnection:=ctrFailedOutgoing;
+ MailClose(SMTPWire);
 End;
 
 { Execute le test de connexion complet }
-Procedure RunConnectionTest;
+Procedure RunConnectionTestWork;
 Var
  Result: TConnectionTestResult;
 Begin
  ConnectionTestInProgress := True;
  ConnectionTestResult := ctrTesting;
+ MailError := '';
 
  { Tester le serveur entrant }
  Result := TestIncomingConnection;
@@ -7786,6 +8445,7 @@ Begin
   Exit;
  End;
 
+ BusyDetail:=TempAccount.OutgoingHost; BusyStage('Verification du serveur sortant...');
  { Tester le serveur sortant }
  Result := TestOutgoingConnection;
  If Result <> ctrSuccess Then Begin
@@ -7797,6 +8457,14 @@ Begin
  ConnectionTestResult := ctrSuccess;
  TempAccount.LastConnectionTest := ctrSuccess;
  ConnectionTestInProgress := False;
+End;
+
+Procedure RunConnectionTest;
+Begin
+ If BusyVisible Then Exit;
+ BusyBegin('Test de connexion du compte',TempAccount.IncomingHost);
+ RunConnectionTestWork;
+ BusyEnd;
 End;
 
 { Retourne le texte du resultat du test }
@@ -7954,6 +8622,8 @@ Begin
  End;
  SetColor(ResultColor);
  OutTextXY(DIALOG_X + DIALOG_MARGIN + 20, Y, GetConnectionTestResultText(ConnectionTestResult));
+ If (ConnectionTestResult<>ctrSuccess) And (MailError<>'') Then
+  OutTextXY(DIALOG_X + DIALOG_MARGIN, Y+18, Copy(MailError,1,60));
 
  Y := Y + 40;
  SetColor(COLOR_MENU_TEXT);
@@ -8123,6 +8793,11 @@ Begin
  BtnY := BtnY + 30;
  DrawDialogButton(BtnX, BtnY, 95, DIALOG_BUTTON_HEIGHT, 'Proprietes', False, SelectedAccountInList >= 0);
 
+ If AccountStorageError <> '' Then Begin
+  SetColor(LightRed);
+  OutTextXY(DIALOG_X + DIALOG_MARGIN, DIALOG_Y + 245, AccountStorageError);
+ End;
+
  { Boutons de fermeture }
  BtnY := DIALOG_Y + DIALOG_HEIGHT - DIALOG_BUTTON_HEIGHT - DIALOG_MARGIN;
  BtnX := DIALOG_X + DIALOG_WIDTH - DIALOG_BUTTON_WIDTH - DIALOG_MARGIN;
@@ -8215,6 +8890,8 @@ Begin
    Else Begin
     EmailAccounts[CurrentAccountIndex] := TempAccount;
    End;
+   SaveAccounts;
+   RefreshAccountFolders;
    AccountWizardMode := False;
    AccountDialogVisible := True;
   End;
@@ -8255,12 +8932,15 @@ End;
 { Ouvre la boite de dialogue de gestion des comptes }
 Procedure ShowAccountManagerDialog;
 Begin
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or ColumnsDialogVisible Or
+    RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ RibbonKeyboardActive:=False; RibbonFocus:=-1;
  AccountDialogVisible := True;
  AccountWizardMode := False;
  SelectedAccountInList := -1;
  If EmailAccountCount > 0 Then
   SelectedAccountInList := 0;
- DrawAccountManagerDialog;
+ DrawInterface;
 End;
 
 { Ferme la boite de dialogue de gestion des comptes }
@@ -8306,6 +8986,13 @@ Begin
   EmailAccounts[I] := EmailAccounts[I + 1];
 
  Dec(EmailAccountCount);
+ If EmailAccountCount > 0 Then Begin
+  For I := 0 To EmailAccountCount - 1 Do
+   If EmailAccounts[I].IsDefault Then Break;
+  If Not EmailAccounts[I].IsDefault Then EmailAccounts[0].IsDefault := True;
+ End;
+ SaveAccounts;
+ RefreshAccountFolders;
 
  { Ajuster la selection }
  If SelectedAccountInList >= EmailAccountCount Then
@@ -8323,6 +9010,8 @@ Begin
 
  For I := 0 To EmailAccountCount - 1 Do
   EmailAccounts[I].IsDefault := (I = Index);
+ SaveAccounts;
+ RefreshAccountFolders;
 
  DrawAccountManagerDialog;
 End;
@@ -8518,7 +9207,15 @@ Var
  FieldValue: String;
 Begin
  If Not AccountDialogVisible Then Exit;
- If Not AccountWizardMode Then Exit;
+ If Not AccountWizardMode Then Begin
+  If Key=#27 Then HideAccountManagerDialog;
+  If Key=#13 Then Begin
+   If SelectedAccountInList>=0 Then EditExistingAccount(SelectedAccountInList) Else StartNewAccountWizard;
+  End;
+  Exit;
+ End;
+ If Key=#27 Then Begin WizardCancel; Exit; End;
+ If Key=#13 Then Begin WizardNextStep; Exit; End;
  If FocusedInputField < 0 Then Exit;
 
  FieldValue := AccountDialogInputFields[FocusedInputField].Value;
@@ -8578,6 +9275,7 @@ Begin
  Composer.CcField := '';
  Composer.BccField := '';
  Composer.SubjectField := '';
+ Composer.AccountIndex := -1;
  Composer.LineCount := 1;
  Composer.CursorX := 0;
  Composer.CursorY := 0;
@@ -8614,6 +9312,12 @@ Procedure InitComposerFields;
 Var
  BaseX, BaseY: Integer;
 Begin
+ ActiveMenu := -1;
+ ActiveMenuItem := -1;
+ MenuBarActive := False;
+ TooltipVisible := False;
+ ContextMenuVisible := False;
+ DragState := dsNone;
  BaseX := COMPOSER_X + COMPOSER_LABEL_WIDTH + 10;
  BaseY := COMPOSER_Y + 28;
 
@@ -8936,7 +9640,7 @@ End;
 { Ouvre le compositeur pour une reponse }
 Procedure OpenReplyMessage(ReplyAll: Boolean);
 Var
- OrigMsg: TMessage;
+ OrigMsg: TMessage; I: Integer; Prefix: String;
 Begin
  If SelectedMessage < 0 Then Exit;
 
@@ -8968,6 +9672,12 @@ Begin
  Composer.Lines[4].Text := 'Objet: ' + OrigMsg.Subject;
  Composer.Lines[5].Text := '';
  Composer.LineCount := 6;
+ If (Not OptionsReady) Or UserPrefs.Composing.IncludeOriginal Then Begin
+  Prefix:='> '; If OptionsReady Then Prefix:=UserPrefs.Composing.QuotePrefix;
+  For I:=0 To OrigMsg.BodyLineCount-1 Do Begin
+   Composer.Lines[Composer.LineCount].Text:=Prefix+OrigMsg.Body[I]; Inc(Composer.LineCount);
+  End;
+ End Else Begin Composer.LineCount:=1; Composer.Lines[0].Text:=''; End;
 
  ComposerVisible := True;
  InitComposerFields;
@@ -9033,34 +9743,71 @@ Begin
 End;
 
 { Envoie le message }
-Procedure SendMessage;
+{ Traiter les destinataires To/Cc/Bcc sans annoncer un succes avant DATA 250. }
+Function MailRecipients(List: TMailText): Boolean;
+Var P, Q: LongInt; Address: TMailText;
+Begin
+ MailRecipients:=False;
+ While List<>'' Do Begin
+  P:=1; While (P<=Length(List)) And Not (List[P] In [',',';']) Do Inc(P);
+  Address:=MailTrim(Copy(List,1,P-1)); Delete(List,1,P);
+  If Address<>'' Then Begin
+   P:=Pos('<',Address); Q:=Pos('>',Address);
+   If (P>0) And (Q>P) Then Address:=Copy(Address,P+1,Q-P-1);
+   If (Length(Address)>60) Or Not MailSafe(Address) Then Begin MailError:='Destinataire invalide'; Exit; End;
+   If SMTP_RcptTo(Address)<>SMTP_OK Then Begin MailError:='Destinataire refuse: '+Copy(Address,1,55); Exit; End;
+  End;
+ End;
+ MailRecipients:=True;
+End;
+
+Procedure SendMessageWork;
+Var A, I: Integer; Body: TMailText; OK: Boolean;
 Begin
  SaveComposerFields;
-
- { Verifier les champs obligatoires }
- If Composer.ToField = '' Then Begin
-  { Afficher erreur }
-  HideMouse;
-  FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
-           Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
-  SetColor(LightRed);
-  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
-            'Erreur: Destinataire requis!        ');
-  ShowMouse;
-  Exit;
+ MailError:=''; A:=Composer.AccountIndex;
+ If (A<0) And (SelectedFolder>=0) And (SelectedFolder<FolderCount) Then A:=MailFolderAccount[SelectedFolder];
+ If A<0 Then For I:=0 To EmailAccountCount-1 Do
+  If EmailAccounts[I].IsDefault Then A:=I;
+ If A<0 Then Begin MailStatus:='Configurez un compte avant envoi'; DrawStatusBar; Exit; End;
+ If Composer.ToField='' Then Begin MailStatus:='Destinataire requis'; DrawStatusBar; Exit; End;
+ If Composer.AttachmentCount>0 Then Begin
+  MailStatus:='Envoi des pieces jointes non implemente'; DrawStatusBar; Exit;
  End;
+ If Not MailSafe(Composer.SubjectField) Or Not MailSafe(Composer.ToField) Or
+    Not MailSafe(Composer.CcField) Or Not MailSafe(Composer.BccField) Or
+    Not MailSafe(EmailAccounts[A].EmailAddress) Then Begin
+  MailStatus:=MailError; DrawStatusBar; Exit;
+ End;
+ BusyBegin('Envoi du message',EmailAccounts[A].OutgoingHost);
+ OK:=OpenOutgoingAccount(EmailAccounts[A]);
+ If OK Then BusyStage('Envoi du message et attente de confirmation SMTP...');
+ If OK Then OK:=SMTP_MailFrom(EmailAccounts[A].EmailAddress)=SMTP_OK;
+ If OK Then OK:=MailRecipients(Composer.ToField);
+ If OK Then OK:=MailRecipients(Composer.CcField);
+ If OK Then OK:=MailRecipients(Composer.BccField);
+ If OK Then Begin
+  Body:='From: '+EmailAccounts[A].EmailAddress+#13#10+
+   'To: '+Composer.ToField+#13#10;
+  If Composer.CcField<>'' Then Body:=Body+'Cc: '+Composer.CcField+#13#10;
+  Body:=Body+'Subject: '+Composer.SubjectField+#13#10+
+   'MIME-Version: 1.0'#13#10'Content-Type: text/plain; charset=windows-1252'#13#10+
+   'Content-Transfer-Encoding: 8bit'#13#10#13#10;
+  For I:=0 To Composer.LineCount-1 Do Body:=Body+Composer.Lines[I].Text+#13#10;
+  OK:=SMTP_Data(Body)=SMTP_OK;
+ End;
+ If OK Then Begin MailStatus:='Message accepte par le serveur SMTP'; MailClose(SMTPWire); CloseComposer; End
+ Else Begin
+  If MailError='' Then MailError:=SMTPClient.LastError;
+  MailStatus:='Echec envoi: '+MailError; MailClose(SMTPWire); DrawStatusBar;
+ End;
+End;
 
- { Ici on enverrait le message via SMTP }
- { Pour l'instant, simuler l'envoi }
- HideMouse;
- FillRect(Layout.StatusBarRect.X1 + 1, Layout.StatusBarRect.Y1 + 1,
-          Layout.StatusBarRect.X2 - 1, Layout.StatusBarRect.Y2 - 1, COLOR_STATUS_BG);
- SetColor(LightGreen);
- OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
-           'Message envoye avec succes!         ');
- ShowMouse;
-
- CloseComposer;
+Procedure SendMessage;
+Begin
+ If BusyVisible Then Exit;
+ SendMessageWork;
+ BusyEnd;
 End;
 
 { Gere les clics dans le compositeur }
@@ -9072,12 +9819,9 @@ Var
 Begin
  If Not ComposerVisible Then Exit;
 
- { Verifier si clic hors de la fenetre }
+ { Le compositeur conserve le focus, meme lors d un clic a l exterieur. }
  If (X < COMPOSER_X) Or (X > COMPOSER_X + COMPOSER_WIDTH) Or
-    (Y < COMPOSER_Y) Or (Y > COMPOSER_Y + COMPOSER_HEIGHT) Then Begin
-  CloseComposer;
-  Exit;
- End;
+    (Y < COMPOSER_Y) Or (Y > COMPOSER_Y + COMPOSER_HEIGHT) Then Exit;
 
  { Verifier les boutons d'action }
  BtnY := COMPOSER_Y + COMPOSER_HEIGHT - 30;
@@ -12681,9 +13425,9 @@ Begin
  RuleCount := 0;
  RuleNextID := 1;
  RulesWindowState := rwsHidden;
- RulesWindowX := (640 - RULES_WINDOW_WIDTH) Div 2;
- RulesWindowY := (480 - RULES_WINDOW_HEIGHT) Div 2;
- RulesVisible := False;
+ RulesWindowX := (SCREEN_WIDTH - RULES_WINDOW_WIDTH) Div 2;
+ RulesWindowY := (SCREEN_HEIGHT - RULES_WINDOW_HEIGHT) Div 2;
+ RulesVisible := False; RulesFocus:=0; RulesError:=''; RulesDeletePending:=False;
  RulesScrollOffset := 0;
  RulesSelectedIndex := -1;
  EditingRuleIndex := -1;
@@ -12791,7 +13535,7 @@ End;
 Function Rules_EvaluateCondition(MsgIndex: Integer;
                                   Const Cond: TRuleCondition): Boolean;
 Var
- Body: String;
+ Body, Needle: TMailText;
  PriorityStr: String;
 Begin
  Rules_EvaluateCondition := False;
@@ -12816,8 +13560,10 @@ Begin
     Messages[MsgIndex].Subject, Cond.Value, Cond.CaseSensitive);
 
   rctBodyContains: Begin
-   Body := Rules_GetMessageBody(MsgIndex);
-   Rules_EvaluateCondition := Rules_StrContains(Body, Cond.Value, Cond.CaseSensitive);
+   Body:=MailTextBody(MessageSources[MsgIndex],0); Needle:=Cond.Value;
+   If MessageSources[MsgIndex]='' Then Body:=Rules_GetMessageBody(MsgIndex);
+   If Not Cond.CaseSensitive Then Begin Body:=MailUpper(Body); Needle:=MailUpper(Needle); End;
+   Rules_EvaluateCondition:=Pos(Needle,Body)>0;
   End;
 
   rctSizeGreaterThan:
@@ -12993,11 +13739,15 @@ End;
 
 { Applique toutes les regles a tous les messages }
 Procedure Rules_ApplyToAllMessages;
-Var
- I: Integer;
+Var I,Unread: Integer;
 Begin
- For I := 0 To MessageCount - 1 Do
-  Rules_ApplyToMessage(I, True);
+ Unread:=0;
+ For I:=0 To MessageCount-1 Do Begin
+  Rules_ApplyToMessage(I,True);
+  If Not Messages[I].IsRead Then Inc(Unread);
+ End;
+ If (SelectedFolder>=0) And (SelectedFolder<FolderCount) Then
+  Folders[SelectedFolder].UnreadCount:=Unread;
 End;
 
 { Ajoute une nouvelle regle }
@@ -13132,6 +13882,235 @@ Begin
  End;
 End;
 
+{ Fichier binaire versionne; chargement transactionnel et remplacement avec sauvegarde. }
+Function Rules_Path: String;
+Var Path: String; I: Integer;
+Begin
+ Path:=AccountFileName; I:=Length(Path);
+ While (I>0) And Not (Path[I] In ['.',Chr(92),'/']) Do Dec(I);
+ If (I>0) And (Path[I]='.') Then Delete(Path,I,255);
+ Rules_Path:=Path+'.RUL';
+End;
+
+Function Rules_Valid(Const R: TFilterRule): Boolean;
+Var I: Integer;
+Begin
+ Rules_Valid:=False;
+ If (R.ID<1) Or (Ord(R.Enabled)>1) Or (Ord(R.ApplyToIncoming)>1) Or
+    (Ord(R.ApplyToOutgoing)>1) Or (Length(R.Name)>40) Or (Length(R.Description)>80) Or
+    (R.ConditionCount<1) Or (R.ConditionCount>MAX_RULE_CONDITIONS) Or
+    (R.ActionCount<1) Or (R.ActionCount>MAX_RULE_ACTIONS) Or
+    (Ord(R.RuleOperator)>Ord(High(TRuleOperator))) Then Exit;
+ For I:=0 To R.ConditionCount-1 Do Begin
+  If (Length(R.Conditions[I].Value)>80) Or (Ord(R.Conditions[I].CaseSensitive)>1) Then Exit;
+  If Not (R.Conditions[I].ConditionType In [rctSenderContains,rctSenderEquals,
+    rctSubjectContains,rctSubjectStartsWith,rctBodyContains,rctSizeGreaterThan,
+    rctSizeLessThan,rctHasAttachment,rctPriorityEquals,rctToContains,rctCcContains]) Then Exit;
+ End;
+ For I:=0 To R.ActionCount-1 Do
+  If Not (R.Actions[I].ActionType In [ratMarkAsRead,ratMarkAsUnread,ratSetFlag,
+    ratClearFlag,ratSetPriority,ratStopProcessing]) Or
+    (Ord(R.Actions[I].PriorityValue)>Ord(High(TMessagePriority))) Then Exit;
+ Rules_Valid:=True;
+End;
+
+Function Rules_Save: Boolean;
+Var F: File; Path,Temp,Backup: String; Signature: String[12];
+ I,Err: Integer; Written: LongInt; Count,RecordSize: Word; HadFile: Boolean;
+ Procedure WritePart(Var Data; Size: Word);
+ Begin
+  If Err<>0 Then Exit;
+  {$I-}
+  BlockWrite(F,Data,Size,Written); Err:=IOResult;
+  {$I+}
+  If Written<>Size Then Err:=101;
+ End;
+Begin
+ Rules_Save:=False; RulesError:=''; Path:=Rules_Path; Temp:=Path+'.TMP'; Backup:=Path+'.BAK';
+ {$I-}
+ Assign(F,Temp); Reset(F,1); Err:=IOResult;
+ If Err=0 Then Begin Close(F); Err:=IOResult;
+  RulesError:='Fichier temporaire deja present.'; Exit; End;
+ If (Err<>2) And (Err<>3) Then Begin RulesError:='Fichier temporaire inaccessible.'; Exit; End;
+ Assign(F,Temp); Rewrite(F,1); Err:=IOResult;
+ If Err<>0 Then Begin RulesError:='Impossible de sauvegarder les regles.'; Exit; End;
+ FillChar(Signature,SizeOf(Signature),0);
+ Signature:='OE-RULES-1'; Count:=RuleCount; RecordSize:=SizeOf(TFilterRule);
+ WritePart(Signature,SizeOf(Signature)); WritePart(RecordSize,SizeOf(RecordSize));
+ WritePart(Count,SizeOf(Count));
+ For I:=0 To RuleCount-1 Do WritePart(FilterRules[I],SizeOf(TFilterRule));
+ Close(F); I:=IOResult; If Err=0 Then Err:=I;
+ If Err<>0 Then Begin Erase(F); I:=IOResult;
+  RulesError:='Erreur ecriture des regles.'; Exit; End;
+ Assign(F,Path); Reset(F,1); HadFile:=IOResult=0;
+ If HadFile Then Begin
+  Close(F); Err:=IOResult;
+  Assign(F,Backup); Erase(F); Err:=IOResult;
+  Assign(F,Path); Rename(F,Backup); Err:=IOResult;
+  If Err<>0 Then Begin Assign(F,Temp); Erase(F); I:=IOResult;
+   RulesError:='Impossible de remplacer les regles.'; Exit; End;
+ End;
+ Assign(F,Temp); Rename(F,Path); Err:=IOResult;
+ If Err<>0 Then Begin
+  If HadFile Then Begin Assign(F,Backup); Rename(F,Path); I:=IOResult; End;
+  RulesError:='Impossible de finaliser les regles.'; Exit;
+ End;
+ {$I+}
+ Rules_Save:=True;
+End;
+
+Procedure Rules_Load;
+Var F: File; Signature: String[12]; Count,RecordSize: Word;
+ I,Err: Integer; ReadCount,Expected: LongInt;
+ Procedure ReadPart(Var Data; Size: Word);
+ Begin
+  If Err<>0 Then Exit;
+  {$I-}
+  BlockRead(F,Data,Size,ReadCount); Err:=IOResult;
+  {$I+}
+  If ReadCount<>Size Then Err:=100;
+ End;
+Begin
+ RulesError:=''; Count:=0; RecordSize:=0; Signature:='';
+ {$I-}
+ Assign(F,Rules_Path); Reset(F,1); Err:=IOResult;
+ If Err=2 Then Exit;
+ If Err<>0 Then Begin RulesError:='Impossible de lire les regles.'; Exit; End;
+ ReadPart(Signature,SizeOf(Signature)); ReadPart(RecordSize,SizeOf(RecordSize)); ReadPart(Count,SizeOf(Count));
+ If (Err=0) And ((Signature<>'OE-RULES-1') Or (RecordSize<>SizeOf(TFilterRule)) Or
+    (Count>MAX_RULES)) Then Err:=100;
+ If Err=0 Then Begin
+  Expected:=SizeOf(Signature)+4+LongInt(Count)*RecordSize;
+  If FileSize(F)<>Expected Then Err:=100;
+ End;
+ For I:=0 To Count-1 Do Begin
+  If Err<>0 Then Break;
+  ReadPart(RulesBackup[I],SizeOf(TFilterRule));
+  If (Err=0) And Not Rules_Valid(RulesBackup[I]) Then Err:=100;
+ End;
+ Close(F); I:=IOResult; If Err=0 Then Err:=I;
+ {$I+}
+ If Err<>0 Then Begin RulesError:='Fichier de regles invalide ou incompatible.'; Exit; End;
+ RuleCount:=Count; RuleNextID:=1;
+ For I:=0 To RuleCount-1 Do Begin
+  FilterRules[I]:=RulesBackup[I]; FilterRules[I].Order:=I;
+  If FilterRules[I].ID>=RuleNextID Then RuleNextID:=FilterRules[I].ID+1;
+ End;
+End;
+
+Function Rules_Condition(Index: Integer): TRuleConditionType;
+Begin
+ Case Index Of
+  0: Rules_Condition:=rctSenderContains; 1: Rules_Condition:=rctSenderEquals;
+  2: Rules_Condition:=rctSubjectContains; 3: Rules_Condition:=rctSubjectStartsWith;
+  4: Rules_Condition:=rctBodyContains; 5: Rules_Condition:=rctSizeGreaterThan;
+  6: Rules_Condition:=rctSizeLessThan; 7: Rules_Condition:=rctHasAttachment;
+  8: Rules_Condition:=rctPriorityEquals; 9: Rules_Condition:=rctToContains;
+ Else Rules_Condition:=rctCcContains;
+ End;
+End;
+
+Function Rules_Action(Index: Integer): TRuleActionType;
+Begin
+ Case Index Of
+  0: Rules_Action:=ratMarkAsRead; 1: Rules_Action:=ratMarkAsUnread;
+  2: Rules_Action:=ratSetFlag; 3: Rules_Action:=ratClearFlag;
+  4: Rules_Action:=ratSetPriority;
+ Else Rules_Action:=ratStopProcessing;
+ End;
+End;
+
+Procedure Rules_BeginEdit(IsNew: Boolean);
+Begin
+ If IsNew Then Begin
+  If RuleCount>=MAX_RULES Then Begin RulesError:='Nombre maximal de regles atteint.'; Exit; End;
+  Rules_InitRule(EditingRule); EditingRuleIndex:=-1;
+  EditingRule.ConditionCount:=1; EditingRule.ActionCount:=1;
+  EditingRule.Conditions[0].ConditionType:=rctSubjectContains;
+  EditingRule.Actions[0].ActionType:=ratMarkAsRead;
+  RulesWindowState:=rwsNew;
+ End Else Begin
+  If (RulesSelectedIndex<0) Or (RulesSelectedIndex>=RuleCount) Then Exit;
+  If (FilterRules[RulesSelectedIndex].ConditionCount<>1) Or
+     (FilterRules[RulesSelectedIndex].ActionCount>2) Or
+     ((FilterRules[RulesSelectedIndex].ActionCount=2) And
+      (FilterRules[RulesSelectedIndex].Actions[1].ActionType<>ratStopProcessing)) Then Begin
+   RulesError:='Cette regle complexe ne peut pas etre editee ici.'; Exit;
+  End;
+  EditingRule:=FilterRules[RulesSelectedIndex]; EditingRuleIndex:=RulesSelectedIndex;
+  RulesWindowState:=rwsEdit;
+ End;
+ RulesStopAfter:=(EditingRule.ActionCount>1) And
+  (EditingRule.Actions[1].ActionType=ratStopProcessing);
+ RulesFocus:=0; RulesTextCursor:=Length(EditingRule.Name); RulesError:='';
+End;
+
+Procedure Rules_DrawEditor;
+Var X,Y,I: Integer; Text,LabelText: String;
+Begin
+ X:=RulesWindowX; Y:=RulesWindowY;
+ DrawDialogBox(X,Y,RULES_WINDOW_WIDTH,RULES_WINDOW_HEIGHT,'Regle de message');
+ For I:=0 To 6 Do Begin
+  Text:=''; LabelText:='';
+  Case I Of
+   0: Begin LabelText:='Nom :'; Text:=EditingRule.Name; End;
+   1: Begin LabelText:='Condition :'; Text:=Rules_GetConditionTypeName(EditingRule.Conditions[0].ConditionType); End;
+   2: Begin LabelText:='Valeur :'; Text:=EditingRule.Conditions[0].Value; End;
+   3: Begin LabelText:='Action :'; Text:=Rules_GetActionTypeName(EditingRule.Actions[0].ActionType); End;
+   4: Begin LabelText:='Priorite :'; Case EditingRule.Actions[0].PriorityValue Of
+    mpHigh: Text:='HIGH'; mpNormal: Text:='NORMAL'; mpLow: Text:='LOW'; End; End;
+   5: Begin LabelText:='Arreter ensuite :'; Text:='Non'; If RulesStopAfter Then Text:='Oui'; End;
+   6: Begin LabelText:='Active :'; Text:='Non'; If EditingRule.Enabled Then Text:='Oui'; End;
+  End;
+  SetColor(Black); OutTextXY(X+16,Y+40+I*36,LabelText);
+  FillRect(X+164,Y+34+I*36,X+500,Y+60+I*36,White);
+  SetColor(Black);
+  If ((I=0) Or (I=2)) And (RulesFocus=I) Then Begin
+   Text:=Copy(Text,1,RulesTextCursor)+'|'+Copy(Text,RulesTextCursor+1,255);
+   If RulesTextCursor>38 Then Delete(Text,1,RulesTextCursor-38);
+  End;
+  If RulesFocus=I Then Text:='> '+Text;
+  OutTextXY(X+168,Y+42+I*36,Copy(Text,1,40));
+ End;
+ SetColor(Black); OutTextXY(X+16,Y+300,'Fleches / Espace : choisir. Tab : champ suivant.');
+ OutTextXY(X+16,Y+322,RulesError);
+ DrawDialogButton(X+304,Y+356,90,28,'OK',RulesFocus=7,True);
+ DrawDialogButton(X+406,Y+356,98,28,'Annuler',RulesFocus=8,True);
+End;
+
+Procedure Rules_CommitEditor;
+Var Code,I,OldCount,OldNext: Integer; Value: LongInt; Old: TFilterRule;
+Begin
+ RulesError:='';
+ If MailTrim(EditingRule.Name)='' Then Begin RulesError:='Saisir un nom.'; Exit; End;
+ If EditingRule.Conditions[0].ConditionType<>rctHasAttachment Then
+  If MailTrim(EditingRule.Conditions[0].Value)='' Then Begin RulesError:='Saisir une valeur.'; Exit; End;
+ If EditingRule.Conditions[0].ConditionType In [rctSizeGreaterThan,rctSizeLessThan] Then Begin
+  Val(EditingRule.Conditions[0].Value,Value,Code);
+  If (Code<>0) Or (Value<0) Then Begin RulesError:='Taille : nombre positif en octets.'; Exit; End;
+  EditingRule.Conditions[0].NumericValue:=Value;
+ End;
+ If EditingRule.Conditions[0].ConditionType=rctPriorityEquals Then Begin
+  EditingRule.Conditions[0].Value:=Copy(MailUpper(MailTrim(EditingRule.Conditions[0].Value)),1,80);
+  If (EditingRule.Conditions[0].Value<>'HIGH') And (EditingRule.Conditions[0].Value<>'NORMAL') And
+     (EditingRule.Conditions[0].Value<>'LOW') Then Begin RulesError:='Priorite : HIGH, NORMAL ou LOW.'; Exit; End;
+ End;
+ EditingRule.ConditionCount:=1; EditingRule.ActionCount:=1;
+ If RulesStopAfter Then Begin EditingRule.ActionCount:=2;
+  EditingRule.Actions[1].ActionType:=ratStopProcessing; End;
+ OldCount:=RuleCount; OldNext:=RuleNextID;
+ If EditingRuleIndex<0 Then I:=Rules_AddRule(EditingRule)
+ Else Begin I:=EditingRuleIndex; Old:=FilterRules[I]; FilterRules[I]:=EditingRule; End;
+ If Not Rules_Save Then Begin
+  RuleCount:=OldCount; RuleNextID:=OldNext;
+  If EditingRuleIndex>=0 Then FilterRules[I]:=Old;
+  Exit;
+ End;
+ RulesSelectedIndex:=I;
+ If I>=RulesScrollOffset+RULES_VISIBLE Then RulesScrollOffset:=I-RULES_VISIBLE+1;
+ RulesWindowState:=rwsList; RulesFocus:=0;
+End;
+
 { Dessine la fenetre des regles }
 Procedure Rules_DrawWindow;
 Var
@@ -13141,6 +14120,12 @@ Var
  EnabledStr: String;
 Begin
  If Not RulesVisible Then Exit;
+ If RulesWindowState In [rwsNew,rwsEdit] Then Begin Rules_DrawEditor; Exit; End;
+ If RulesSelectedIndex<RulesScrollOffset Then RulesScrollOffset:=RulesSelectedIndex;
+ If RulesSelectedIndex>=RulesScrollOffset+RULES_VISIBLE Then
+  RulesScrollOffset:=RulesSelectedIndex-RULES_VISIBLE+1;
+ If RulesScrollOffset>RuleCount-RULES_VISIBLE Then RulesScrollOffset:=RuleCount-RULES_VISIBLE;
+ If RulesScrollOffset<0 Then RulesScrollOffset:=0;
 
  X := RulesWindowX;
  Y := RulesWindowY;
@@ -13283,186 +14268,191 @@ Begin
  SetColor(Black);
  Rectangle(X + W - 80, Y1, X + W - 10, Y1 + 28);
  OutTextXY(X + W - 62, Y1 + 9, 'Fermer');
+ DrawDialogButton(X+10,Y+30,90,22,'Nouveau',RulesFocus=1,RuleCount<MAX_RULES);
+ DrawDialogButton(X+110,Y+30,80,22,'Modifier',RulesFocus=2,RulesSelectedIndex>=0);
+ DrawDialogButton(X+200,Y+30,90,22,'Supprimer',RulesFocus=3,RulesSelectedIndex>=0);
+ DrawDialogButton(X+350,Y+30,80,22,'Monter',RulesFocus=4,RulesSelectedIndex>0);
+ DrawDialogButton(X+440,Y+30,70,22,'Descendre',RulesFocus=5,
+                  (RulesSelectedIndex>=0) And (RulesSelectedIndex<RuleCount-1));
+ DrawDialogButton(X+10,Y+H-40,170,28,'Appliquer maintenant',RulesFocus=6,True);
+ DrawDialogButton(X+W-80,Y+H-40,70,28,'Fermer',RulesFocus=7,True);
+ SetColor(Black); OutTextXY(X+12,Y+H-58,RulesError);
+ If RulesDeletePending Then Begin
+  FillRect(X+8,Y+H-60,X+W-8,Y+H-4,LightGray);
+  SetColor(Black); OutTextXY(X+12,Y+H-56,'Supprimer cette regle ?');
+  DrawDialogButton(X+10,Y+H-34,90,26,'Oui (O)',False,True);
+  DrawDialogButton(X+110,Y+H-34,110,26,'Non (N)',True,True);
+ End;
 End;
 
 { Affiche la fenetre des regles }
 Procedure Rules_Show;
 Begin
- RulesVisible := True;
- RulesWindowState := rwsList;
- RulesSelectedIndex := -1;
- RulesScrollOffset := 0;
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or
+    ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ RulesWindowX:=(SCREEN_WIDTH-RULES_WINDOW_WIDTH) Div 2;
+ RulesWindowY:=(SCREEN_HEIGHT-RULES_WINDOW_HEIGHT) Div 2;
+ RulesVisible:=True; RulesWindowState:=rwsList; RulesFocus:=0; RulesDeletePending:=False;
+ RulesSelectedIndex:=-1; If RuleCount>0 Then RulesSelectedIndex:=0;
+ RulesScrollOffset:=0; ContextMenuVisible:=False; DrawInterface;
 End;
 
-{ Cache la fenetre des regles }
 Procedure Rules_Hide;
+Begin RulesVisible:=False; RulesWindowState:=rwsHidden; DrawInterface; End;
+
+Procedure Rules_ListAction(Action: Integer);
+Var I,OldSelection,OldCount: Integer;
 Begin
- RulesVisible := False;
- RulesWindowState := rwsHidden;
+ If Action=1 Then Begin Rules_BeginEdit(True); Exit; End;
+ If Action=2 Then Begin Rules_BeginEdit(False); Exit; End;
+ If Action=3 Then Begin
+  RulesDeletePending:=(RulesSelectedIndex>=0) And (RulesSelectedIndex<RuleCount); Exit;
+ End;
+ If Action=6 Then Begin Rules_ApplyToAllMessages; RulesError:='Regles appliquees aux messages charges.'; Exit; End;
+ If Action=7 Then Begin Rules_Hide; Exit; End;
+ If (RulesSelectedIndex<0) Or (RulesSelectedIndex>=RuleCount) Then Exit;
+ OldSelection:=RulesSelectedIndex; OldCount:=RuleCount;
+ For I:=0 To RuleCount-1 Do RulesBackup[I]:=FilterRules[I];
+ Case Action Of
+  0: Rules_ToggleEnabled(RulesSelectedIndex);
+  4: If Rules_MoveUp(RulesSelectedIndex) Then Dec(RulesSelectedIndex);
+  5: If Rules_MoveDown(RulesSelectedIndex) Then Inc(RulesSelectedIndex);
+  8: Rules_DeleteRule(RulesSelectedIndex);
+ End;
+ If Not Rules_Save Then Begin
+  RuleCount:=OldCount; RulesSelectedIndex:=OldSelection;
+  For I:=0 To RuleCount-1 Do FilterRules[I]:=RulesBackup[I];
+ End;
 End;
 
-{ Gere un clic dans la fenetre des regles }
-Function Rules_HandleClick(MX, MY: Integer): Boolean;
-Var
- X, Y, W, H: Integer;
- I, Y1: Integer;
+Procedure Rules_Cycle(Delta: Integer);
+Var I,N: Integer;
 Begin
- Rules_HandleClick := False;
- If Not RulesVisible Then Exit;
-
- X := RulesWindowX;
- Y := RulesWindowY;
- W := RULES_WINDOW_WIDTH;
- H := RULES_WINDOW_HEIGHT;
-
- { Verifier si clic dans la fenetre }
- If (MX < X) Or (MX > X + W) Or (MY < Y) Or (MY > Y + H) Then Exit;
-
- Rules_HandleClick := True;
-
- { Bouton fermer }
- If (MX >= X + W - 20) And (MX <= X + W - 4) And (MY >= Y + 4) And (MY <= Y + 20) Then Begin
-  Rules_Hide;
-  Exit;
- End;
-
- Y1 := Y + 30;
-
- { Bouton Nouveau }
- If (MX >= X + 10) And (MX <= X + 100) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
-  Rules_InitRule(EditingRule);
-  EditingRule.Name := 'Nouvelle regle';
-  EditingRuleIndex := -1;
-  RulesWindowState := rwsNew;
-  Exit;
- End;
-
- { Bouton Modifier }
- If (MX >= X + 110) And (MX <= X + 190) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
-  If RulesSelectedIndex >= 0 Then Begin
-   EditingRule := FilterRules[RulesSelectedIndex];
-   EditingRuleIndex := RulesSelectedIndex;
-   RulesWindowState := rwsEdit;
+ Case RulesFocus Of
+  1: Begin
+   N:=0; For I:=0 To 10 Do If Rules_Condition(I)=EditingRule.Conditions[0].ConditionType Then N:=I;
+   EditingRule.Conditions[0].ConditionType:=Rules_Condition((N+Delta+11) Mod 11);
   End;
-  Exit;
- End;
-
- { Bouton Supprimer }
- If (MX >= X + 200) And (MX <= X + 290) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
-  If RulesSelectedIndex >= 0 Then
-   Rules_DeleteRule(RulesSelectedIndex);
-  Exit;
- End;
-
- { Bouton Monter }
- If (MX >= X + W - 170) And (MX <= X + W - 90) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
-  If RulesSelectedIndex > 0 Then Begin
-   Rules_MoveUp(RulesSelectedIndex);
-   Dec(RulesSelectedIndex);
+  3: Begin
+   N:=0; For I:=0 To 5 Do If Rules_Action(I)=EditingRule.Actions[0].ActionType Then N:=I;
+   EditingRule.Actions[0].ActionType:=Rules_Action((N+Delta+6) Mod 6);
   End;
-  Exit;
+  4: EditingRule.Actions[0].PriorityValue:=
+      TMessagePriority((Ord(EditingRule.Actions[0].PriorityValue)+Delta+3) Mod 3);
+  5: RulesStopAfter:=Not RulesStopAfter;
+  6: EditingRule.Enabled:=Not EditingRule.Enabled;
  End;
+End;
 
- { Bouton Descendre }
- If (MX >= X + W - 80) And (MX <= X + W - 10) And (MY >= Y1) And (MY <= Y1 + 22) Then Begin
-  If (RulesSelectedIndex >= 0) And (RulesSelectedIndex < RuleCount - 1) Then Begin
-   Rules_MoveDown(RulesSelectedIndex);
-   Inc(RulesSelectedIndex);
+Procedure Rules_HandleKey(Key: Char; Extended: Boolean);
+Var Text: String; Limit: Integer;
+Begin
+ If RulesDeletePending Then Begin
+  If Not Extended Then Case UpCase(Key) Of
+   'O': Begin Rules_ListAction(8); RulesDeletePending:=False; End;
+   'N',#27,#13: RulesDeletePending:=False;
   End;
-  Exit;
+ End Else If RulesWindowState In [rwsNew,rwsEdit] Then Begin
+  Text:=''; Limit:=80;
+  If RulesFocus=0 Then Begin Text:=EditingRule.Name; Limit:=40; End;
+  If RulesFocus=2 Then Text:=EditingRule.Conditions[0].Value;
+  If Extended Then Begin
+   If RulesFocus In [0,2] Then Case Key Of
+    #75: If RulesTextCursor>0 Then Dec(RulesTextCursor);
+    #77: If RulesTextCursor<Length(Text) Then Inc(RulesTextCursor);
+    #71: RulesTextCursor:=0; #79: RulesTextCursor:=Length(Text);
+    #83: Delete(Text,RulesTextCursor+1,1);
+   End Else If Key In [#75,#72] Then Rules_Cycle(-1)
+   Else If Key In [#77,#80] Then Rules_Cycle(1);
+   If Key=#15 Then Begin RulesFocus:=(RulesFocus+8) Mod 9; RulesTextCursor:=0; End;
+  End Else Case Key Of
+   #27: Begin RulesWindowState:=rwsList; RulesError:=''; RulesFocus:=0; End;
+   #9: Begin RulesFocus:=(RulesFocus+1) Mod 9; RulesTextCursor:=0; End;
+   #13: If RulesFocus=8 Then Begin RulesWindowState:=rwsList; RulesError:=''; RulesFocus:=0; End
+        Else Rules_CommitEditor;
+   #8: If (RulesFocus In [0,2]) And (RulesTextCursor>0) Then Begin
+    Delete(Text,RulesTextCursor,1); Dec(RulesTextCursor); End;
+   #32..#255: If RulesFocus In [0,2] Then Begin
+    If Length(Text)<Limit Then Begin Insert(Key,Text,RulesTextCursor+1); Inc(RulesTextCursor); End;
+   End Else If Key=' ' Then Rules_Cycle(1);
+  End;
+  { Ne pas reecrire un champ apres un changement de focus ou une validation. }
+  If RulesWindowState In [rwsNew,rwsEdit] Then Begin
+   If (RulesFocus=0) And Not ((Not Extended And (Key=#9)) Or (Extended And (Key=#15))) Then
+    EditingRule.Name:=Text;
+   If (RulesFocus=2) And Not ((Not Extended And (Key=#9)) Or (Extended And (Key=#15))) Then
+    EditingRule.Conditions[0].Value:=Text;
+  End;
+ End Else Begin
+  If Extended Then Case Key Of
+   #72: If RulesSelectedIndex>0 Then Dec(RulesSelectedIndex);
+   #80: If RulesSelectedIndex<RuleCount-1 Then Inc(RulesSelectedIndex);
+   #71: If RuleCount>0 Then RulesSelectedIndex:=0;
+   #79: RulesSelectedIndex:=RuleCount-1;
+   #73: Begin Dec(RulesSelectedIndex,RULES_VISIBLE); If RulesSelectedIndex<0 Then RulesSelectedIndex:=0; End;
+   #81: Begin Inc(RulesSelectedIndex,RULES_VISIBLE);
+    If RulesSelectedIndex>=RuleCount Then RulesSelectedIndex:=RuleCount-1; End;
+   #83: Rules_ListAction(3);
+   #15: RulesFocus:=(RulesFocus+7) Mod 8;
+  End Else Case Key Of
+   #27: Rules_Hide;
+   #9: RulesFocus:=(RulesFocus+1) Mod 8;
+   #13: If RulesFocus=0 Then Rules_BeginEdit(False) Else Rules_ListAction(RulesFocus);
+   ' ': Rules_ListAction(RulesFocus);
+   'n','N': Rules_BeginEdit(True);
+  End;
  End;
+ If RulesSelectedIndex<RulesScrollOffset Then RulesScrollOffset:=RulesSelectedIndex;
+ If RulesSelectedIndex>=RulesScrollOffset+RULES_VISIBLE Then
+  RulesScrollOffset:=RulesSelectedIndex-RULES_VISIBLE+1;
+ If RulesScrollOffset<0 Then RulesScrollOffset:=0;
+ DrawInterface;
+End;
 
- { Liste des regles }
- Y1 := Y + 80;
- For I := 0 To RULES_VISIBLE - 1 Do Begin
-  If I + RulesScrollOffset >= RuleCount Then Break;
-
-  If (MY >= Y1 + I * RULE_LINE_HEIGHT) And
-     (MY < Y1 + (I + 1) * RULE_LINE_HEIGHT) Then Begin
-
-   { Clic sur la case a cocher }
-   If (MX >= X + 15) And (MX <= X + 45) Then Begin
-    Rules_ToggleEnabled(I + RulesScrollOffset);
-   End
-   Else Begin
-    RulesSelectedIndex := I + RulesScrollOffset;
+Function Rules_HandleClick(MX,MY: Integer): Boolean;
+Var X,Y,I,Row: Integer;
+Begin
+ Rules_HandleClick:=True; X:=MX-RulesWindowX; Y:=MY-RulesWindowY;
+ If (X<0) Or (X>RULES_WINDOW_WIDTH) Or (Y<0) Or (Y>RULES_WINDOW_HEIGHT) Then Exit;
+ If RulesDeletePending Then Begin
+  If (Y>=366) And (Y<=392) Then Begin
+   If (X>=10) And (X<=100) Then Begin Rules_ListAction(8); RulesDeletePending:=False; End
+   Else If (X>=110) And (X<=220) Then RulesDeletePending:=False;
+  End; Exit;
+ End;
+ If RulesWindowState In [rwsNew,rwsEdit] Then Begin
+  If (X>=164) And (X<=500) And (Y>=34) And (Y<286) Then Begin
+   Row:=(Y-34) Div 36;
+   If Y<=60+Row*36 Then Begin
+    RulesFocus:=Row; RulesTextCursor:=0;
+    If Row=0 Then RulesTextCursor:=Length(EditingRule.Name)
+    Else If Row=2 Then RulesTextCursor:=Length(EditingRule.Conditions[0].Value)
+    Else Rules_Cycle(1);
    End;
-   Exit;
+  End Else If (Y>=356) And (Y<=384) Then Begin
+   If (X>=304) And (X<=394) Then Rules_CommitEditor
+   Else If (X>=406) And (X<=504) Then Begin
+    RulesWindowState:=rwsList; RulesError:=''; RulesFocus:=0; End;
   End;
- End;
-
- { Boutons du bas }
- Y1 := Y + H - 40;
-
- { Bouton Appliquer maintenant }
- If (MX >= X + 10) And (MX <= X + 180) And (MY >= Y1) And (MY <= Y1 + 28) Then Begin
-  Rules_ApplyToAllMessages;
   Exit;
  End;
-
- { Bouton Fermer }
- If (MX >= X + W - 80) And (MX <= X + W - 10) And (MY >= Y1) And (MY <= Y1 + 28) Then Begin
-  Rules_Hide;
-  Exit;
+ If (X>=500) And (X<=516) And (Y>=4) And (Y<=20) Then Begin Rules_Hide; Exit; End;
+ If (Y>=30) And (Y<=52) Then Begin
+  I:=-1;
+  If (X>=10) And (X<=100) Then I:=1
+  Else If (X>=110) And (X<=190) Then I:=2
+  Else If (X>=200) And (X<=290) Then I:=3
+  Else If (X>=350) And (X<=430) Then I:=4
+  Else If (X>=440) And (X<=510) Then I:=5;
+  If I>=0 Then Begin RulesFocus:=I; Rules_ListAction(I); End;
+ End Else If (Y>=80) And (Y<80+RULES_VISIBLE*RULE_LINE_HEIGHT) And (X>=10) And (X<=510) Then Begin
+  I:=RulesScrollOffset+(Y-80) Div RULE_LINE_HEIGHT;
+  If I<RuleCount Then Begin RulesSelectedIndex:=I; RulesFocus:=0;
+   If X<=45 Then Rules_ListAction(0); End;
+ End Else If (Y>=360) And (Y<=388) Then Begin
+  If (X>=10) And (X<=180) Then Rules_ListAction(6)
+  Else If (X>=440) And (X<=510) Then Rules_ListAction(7);
  End;
-End;
-
-{ Ajoute des regles de demonstration }
-Procedure Rules_AddDemoRules;
-Var
- R: TFilterRule;
-Begin
- { Regle 1: Marquer les newsletters comme lues }
- Rules_InitRule(R);
- R.Name := 'Newsletters';
- R.Description := 'Marque les newsletters comme lues';
- R.Enabled := True;
- R.ApplyToIncoming := True;
-
- R.Conditions[0].ConditionType := rctSubjectContains;
- R.Conditions[0].Value := 'newsletter';
- R.Conditions[0].CaseSensitive := False;
- R.ConditionCount := 1;
-
- R.Actions[0].ActionType := ratMarkAsRead;
- R.ActionCount := 1;
-
- Rules_AddRule(R);
-
- { Regle 2: Flaguer les messages importants }
- Rules_InitRule(R);
- R.Name := 'Messages importants';
- R.Description := 'Marque les messages urgents';
- R.Enabled := True;
- R.ApplyToIncoming := True;
-
- R.Conditions[0].ConditionType := rctSubjectContains;
- R.Conditions[0].Value := 'URGENT';
- R.Conditions[0].CaseSensitive := False;
- R.ConditionCount := 1;
-
- R.Actions[0].ActionType := ratSetFlag;
- R.Actions[1].ActionType := ratSetPriority;
- R.Actions[1].PriorityValue := mpHigh;
- R.ActionCount := 2;
-
- Rules_AddRule(R);
-
- { Regle 3: Gros fichiers }
- Rules_InitRule(R);
- R.Name := 'Gros messages';
- R.Description := 'Marque les gros messages';
- R.Enabled := True;
- R.ApplyToIncoming := True;
-
- R.Conditions[0].ConditionType := rctSizeGreaterThan;
- R.Conditions[0].NumericValue := 1000000; { 1 Mo }
- R.ConditionCount := 1;
-
- R.Actions[0].ActionType := ratSetFlag;
- R.ActionCount := 1;
-
- Rules_AddRule(R);
 End;
 
 { ============================================================================
@@ -16249,7 +17239,7 @@ Begin
  PrintSettings.Margins.Left := PRINT_DEFAULT_MARGIN_LEFT;
  PrintSettings.Margins.Right := PRINT_DEFAULT_MARGIN_RIGHT;
  PrintSettings.Header.Left := '';
- PrintSettings.Header.Center := 'Outlook Express';
+ PrintSettings.Header.Center := 'Outlook';
  PrintSettings.Header.Right := '';
  PrintSettings.Header.Enabled := True;
  PrintSettings.Footer.Left := '';
@@ -16586,7 +17576,7 @@ Begin
 
  { Pied de page }
  WriteLn(F, '<div class="footer">');
- WriteLn(F, '<p>Imprime depuis Outlook Express - ' + Print_ReplaceVariables('%DATE%', 1, 1) + '</p>');
+ WriteLn(F, '<p>Imprime depuis Outlook - ' + Print_ReplaceVariables('%DATE%', 1, 1) + '</p>');
  WriteLn(F, '</div>');
 
  WriteLn(F, '</body>');
@@ -18465,8 +19455,8 @@ Begin
 
  { Variables de la fenetre }
  PrefsVisible := False;
- PrefsWindowX := (GetMaxX - PREFS_WINDOW_WIDTH) Div 2;
- PrefsWindowY := (GetMaxY - PREFS_WINDOW_HEIGHT) Div 2;
+ PrefsWindowX := (SCREEN_WIDTH-520) Div 2;
+ PrefsWindowY := (SCREEN_HEIGHT-370) Div 2;
  PrefsCurrentTab := ptGeneral;
  PrefsScrollOffset := 0;
  PrefsHoveredTab := -1;
@@ -18475,903 +19465,1143 @@ Begin
  PrefsNeedsSave := False;
 End;
 
-{ Sauvegarde les preferences dans un fichier }
-Procedure Prefs_Save;
-Var
- F: File of Byte;
- B: Byte;
- W: Word;
- I: Integer;
- S: String;
+{ Calendrier gregorien : aucune donnee de demonstration ni dependance externe. }
+Function CalendarDays(Year,Month: Integer): Integer;
 Begin
- {$I-}
- Assign(F, PREFS_FILENAME);
- Rewrite(F);
- If IOResult <> 0 Then Exit;
-
- { Ecrire la version }
- B := PREFS_VERSION;
- Write(F, B);
-
- { Preferences generales }
- B := Ord(UserPrefs.General.Language);
- Write(F, B);
- B := Length(UserPrefs.General.DefaultFolder);
- Write(F, B);
- For I := 1 To Length(UserPrefs.General.DefaultFolder) Do Begin
-  B := Ord(UserPrefs.General.DefaultFolder[I]);
-  Write(F, B);
+ CalendarDays:=31;
+ If Month In [4,6,9,11] Then CalendarDays:=30;
+ If Month=2 Then Begin
+  CalendarDays:=28;
+  If (Year Mod 4=0) And ((Year Mod 100<>0) Or (Year Mod 400=0)) Then CalendarDays:=29;
  End;
- If UserPrefs.General.StartMinimized Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.General.CheckMailOnStart Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.General.EmptyTrashOnExit Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.General.ShowSplash Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.General.MinimizeToTray Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.General.ConfirmExit Then B := 1 Else B := 0;
- Write(F, B);
-
- { Preferences de lecture }
- B := Length(UserPrefs.Reading.FontName);
- Write(F, B);
- For I := 1 To Length(UserPrefs.Reading.FontName) Do Begin
-  B := Ord(UserPrefs.Reading.FontName[I]);
-  Write(F, B);
- End;
- B := UserPrefs.Reading.FontSize;
- Write(F, B);
- B := Ord(UserPrefs.Reading.DefaultEncoding);
- Write(F, B);
- B := UserPrefs.Reading.MarkAsReadDelay;
- Write(F, B);
- If UserPrefs.Reading.ShowPreviewPane Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Reading.PreviewOnRight Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Reading.AutoExpandGroups Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Reading.ShowHeaders Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Reading.UseAlternateRowColor Then B := 1 Else B := 0;
- Write(F, B);
-
- { Preferences de redaction }
- B := Ord(UserPrefs.Composing.DefaultFormat);
- Write(F, B);
- B := Length(UserPrefs.Composing.FontName);
- Write(F, B);
- For I := 1 To Length(UserPrefs.Composing.FontName) Do Begin
-  B := Ord(UserPrefs.Composing.FontName[I]);
-  Write(F, B);
- End;
- B := UserPrefs.Composing.FontSize;
- Write(F, B);
- If UserPrefs.Composing.SpellCheckEnabled Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Composing.SpellCheckOnSend Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Composing.AutoSaveDrafts Then B := 1 Else B := 0;
- Write(F, B);
- B := UserPrefs.Composing.AutoSaveInterval;
- Write(F, B);
- B := UserPrefs.Composing.WrapTextAt;
- Write(F, B);
- If UserPrefs.Composing.IncludeOriginal Then B := 1 Else B := 0;
- Write(F, B);
- B := Length(UserPrefs.Composing.QuotePrefix);
- Write(F, B);
- For I := 1 To Length(UserPrefs.Composing.QuotePrefix) Do Begin
-  B := Ord(UserPrefs.Composing.QuotePrefix[I]);
-  Write(F, B);
- End;
- B := UserPrefs.Composing.DefaultSignature;
- Write(F, B);
-
- { Preferences de connexion }
- B := UserPrefs.Connection.CheckInterval;
- Write(F, B);
- B := UserPrefs.Connection.ConnectionTimeout;
- Write(F, B);
- B := UserPrefs.Connection.MaxRetries;
- Write(F, B);
- B := UserPrefs.Connection.RetryDelay;
- Write(F, B);
- If UserPrefs.Connection.OfflineMode Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Connection.AutoReconnect Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Connection.SavePassword Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Connection.UseSSL Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Connection.VerifyCertificates Then B := 1 Else B := 0;
- Write(F, B);
-
- { Preferences de securite }
- If UserPrefs.Security.WarnOnExternal Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Security.BlockExternalImages Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Security.WarnOnAttachments Then B := 1 Else B := 0;
- Write(F, B);
- B := Length(UserPrefs.Security.BlockedExtensions);
- Write(F, B);
- For I := 1 To Length(UserPrefs.Security.BlockedExtensions) Do Begin
-  B := Ord(UserPrefs.Security.BlockedExtensions[I]);
-  Write(F, B);
- End;
- If UserPrefs.Security.EnableVirusCheck Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Security.WarnOnUnencrypted Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Security.EnablePhishingFilter Then B := 1 Else B := 0;
- Write(F, B);
- If UserPrefs.Security.TrustSenderImages Then B := 1 Else B := 0;
- Write(F, B);
-
- Close(F);
- {$I+}
-
- UserPrefs.Modified := False;
- PrefsNeedsSave := False;
 End;
 
-{ Charge les preferences depuis un fichier }
-Function Prefs_Load: Boolean;
-Var
- F: File of Byte;
- B: Byte;
- I, Len: Integer;
+Function CalendarFirstDay(Year,Month: Integer): Integer;
+Var Days: LongInt; I: Integer;
 Begin
- Prefs_Load := False;
+ Days:=LongInt(Year-1)*365+(Year-1) Div 4-(Year-1) Div 100+(Year-1) Div 400;
+ For I:=1 To Month-1 Do Inc(Days,CalendarDays(Year,I));
+ CalendarFirstDay:=Days Mod 7; { Lundi=0, dimanche=6. }
+End;
 
- {$I-}
- Assign(F, PREFS_FILENAME);
- Reset(F);
- If IOResult <> 0 Then Exit;
+Function CalendarMonthName(Month: Integer): String;
+Begin
+ Case Month Of
+  1: CalendarMonthName:='Janvier'; 2: CalendarMonthName:='Fevrier';
+  3: CalendarMonthName:='Mars'; 4: CalendarMonthName:='Avril';
+  5: CalendarMonthName:='Mai'; 6: CalendarMonthName:='Juin';
+  7: CalendarMonthName:='Juillet'; 8: CalendarMonthName:='Aout';
+  9: CalendarMonthName:='Septembre'; 10: CalendarMonthName:='Octobre';
+  11: CalendarMonthName:='Novembre'; 12: CalendarMonthName:='Decembre';
+ Else CalendarMonthName:='';
+ End;
+End;
 
- { Lire et verifier la version }
- Read(F, B);
- If B > PREFS_VERSION Then Begin
-  Close(F);
+Procedure CalendarUpdateMenus;
+Var I: Integer;
+Begin
+ For I:=0 To Menus[2].ItemCount-1 Do Begin
+  Case Menus[2].Items[I].ItemID Of
+   CMD_VIEW_CALENDAR: If CalendarVisible Then Menus[2].Items[I].Caption:='[x] Calendrier'
+                     Else Menus[2].Items[I].Caption:='[ ] Calendrier';
+   CMD_VIEW_MAIL: Menus[2].Items[I].Caption:='Courrier';
+   CMD_CAL_PREVIOUS,CMD_CAL_NEXT,CMD_CAL_TODAY: Menus[2].Items[I].Enabled:=CalendarVisible;
+   CMD_VIEW_PREVIEW_SHOW,CMD_VIEW_PREVIEW_ORIENT,CMD_VIEW_SORTBY,CMD_VIEW_COLUMNS:
+    Menus[2].Items[I].Enabled:=True;
+  End;
+ End;
+End;
+
+Procedure CalendarToday;
+Var Y,M,D,W: Word;
+Begin
+ GetDate(Y,M,D,W); CalendarYear:=Y; CalendarMonth:=M; CalendarDay:=D;
+ CalendarInitialized:=True;
+End;
+
+Procedure CalendarMoveMonth(Delta: Integer);
+Var N: LongInt;
+Begin
+ If Not CalendarInitialized Then CalendarToday;
+ N:=LongInt(CalendarYear-1)*12+CalendarMonth-1+Delta;
+ If (N<0) Or (N>=9999*12) Then Exit;
+ CalendarYear:=N Div 12+1; CalendarMonth:=N Mod 12+1;
+ If CalendarDay>CalendarDays(CalendarYear,CalendarMonth) Then
+  CalendarDay:=CalendarDays(CalendarYear,CalendarMonth);
+End;
+
+Procedure CalendarShow(Visible: Boolean);
+Begin
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or
+    ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ If Not CalendarInitialized Then CalendarToday;
+ RibbonKeyboardActive:=False; RibbonFocus:=-1; RibbonPressed:=-1;
+ CalendarVisible:=Visible; CalendarHasFocus:=Visible; ContextMenuVisible:=False; TooltipVisible:=False;
+ ActiveMenu:=-1; ActiveMenuItem:=-1; MenuBarActive:=False;
+ DragState:=dsNone; PressedToolButton:=-1; HoveredToolButton:=-1;
+ If Visible And (Layout.FolderPaneWidth>SCREEN_WIDTH-CalendarPaneWidth-144) Then
+  Layout.FolderPaneWidth:=SCREEN_WIDTH-CalendarPaneWidth-144;
+ CalendarUpdateMenus; DrawInterface;
+End;
+
+{ Le focus du courrier est independant de la visibilite du calendrier. }
+Procedure FocusMail;
+Begin
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or
+    ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ RibbonKeyboardActive:=False; RibbonFocus:=-1; RibbonPressed:=-1;
+ CalendarHasFocus:=False; ActiveMenu:=-1; ActiveMenuItem:=-1; MenuBarActive:=False;
+ ContextMenuVisible:=False; TooltipVisible:=False; DragState:=dsNone;
+ DrawInterface;
+End;
+
+Function CalendarPaneWidth: Integer;
+Begin
+ CalendarPaneWidth:=SCREEN_WIDTH Div 4;
+ If CalendarPaneWidth<224 Then CalendarPaneWidth:=224;
+ If CalendarPaneWidth>320 Then CalendarPaneWidth:=320;
+End;
+
+Procedure CalendarGeometry(Var X,Y,W,H: Integer);
+Begin
+ X:=SCREEN_WIDTH-CalendarPaneWidth+8; Y:=Layout.ToolBarRect.Y2+113;
+ W:=(CalendarPaneWidth-16) Div 7;
+ H:=(Layout.StatusBarRect.Y1-Y-76) Div 6;
+ If H>46 Then H:=46;
+ If H<24 Then H:=24;
+End;
+
+Procedure DrawCalendar;
+Const WeekDays: Array[0..6] Of String[3]=('Lun','Mar','Mer','Jeu','Ven','Sam','Dim');
+Var X,Y,W,H,I,Col,Day,First,CX,CY,Top,Left,Width: Integer; TY,TM,TD,TW: Word;
+ Text,Number: String; Bg,Fg: Word; EventIndex: Integer;
+Begin
+ If Not CalendarInitialized Then CalendarToday;
+ GetDate(TY,TM,TD,TW); CalendarGeometry(X,Y,W,H); Top:=Layout.ToolBarRect.Y2+1;
+ Width:=CalendarPaneWidth; Left:=SCREEN_WIDTH-Width;
+ FillRect(Left-SPLITTER_SIZE,Top,SCREEN_WIDTH-1,Layout.StatusBarRect.Y1-1,LightGray);
+ SetColor(DarkGray); Line(Left-2,Top,Left-2,Layout.StatusBarRect.Y1-1);
+ SetColor(Black); OutTextXY(Left+12,Top+12,'Calendrier');
+ If CalendarHasFocus Then Begin SetColor(Blue); Line(Left+12,Top+26,Left+96,Top+26); End;
+ DrawDialogButton(SCREEN_WIDTH-26,Top+5,20,20,'X',False,True);
+ DrawDialogButton(Left+8,Top+36,28,24,'<',False,True);
+ DrawDialogButton(Left+44,Top+36,Width-88,24,'Aujourd''hui',False,True);
+ DrawDialogButton(SCREEN_WIDTH-36,Top+36,28,24,'>',False,True);
+ Str(CalendarYear,Number); Text:=CalendarMonthName(CalendarMonth)+' '+Number;
+ SetColor(Black); OutTextXY(Left+12,Top+74,Text);
+ For I:=0 To 6 Do OutTextXY(X+I*W+2,Y-18,WeekDays[I]);
+ First:=CalendarFirstDay(CalendarYear,CalendarMonth);
+ For I:=0 To 41 Do Begin
+  Col:=I Mod 7; CX:=X+Col*W; CY:=Y+(I Div 7)*H;
+  Day:=I-First+1; Bg:=White; Fg:=Black;
+  If Col>=5 Then Bg:=LightGray;
+  If Day=CalendarDay Then Begin Bg:=Blue; Fg:=White; End;
+  FillRect(CX,CY,CX+W-1,CY+H-1,Bg); SetColor(DarkGray);
+  Rectangle(CX,CY,CX+W-1,CY+H-1);
+  If (Day>=1) And (Day<=CalendarDays(CalendarYear,CalendarMonth)) Then Begin
+   Str(Day,Text); SetColor(Fg); OutTextXY(CX+4,CY+6,Text);
+   For EventIndex:=0 To EventCount-1 Do
+    If EventOnDay(CalendarEvents[EventIndex],CalendarYear,CalendarMonth,Day) Then Begin
+     OutTextXY(CX+W-10,CY+H-12,'*'); Break;
+    End;
+   If (TY=CalendarYear) And (TM=CalendarMonth) And (TD=Day) Then Begin
+    SetColor(LightRed); Rectangle(CX+2,CY+2,CX+W-3,CY+H-3);
+   End;
+  End;
+ End;
+ Str(CalendarDay,Text); SetColor(Black);
+ OutTextXY(Left+10,Y+6*H+12,Text+' '+CalendarMonthName(CalendarMonth)+' '+Number);
+ DrawDialogButton(Left+8,Y+6*H+32,56,26,'RDV',False,True);
+ DrawDialogButton(Left+70,Y+6*H+32,70,26,'Reunion',False,True);
+ DrawDialogButton(Left+146,Y+6*H+32,Width-154,26,'Agenda',False,True);
+End;
+
+Procedure CalendarClick(MX,MY: Integer);
+Var X,Y,W,H,Day,Top,Left: Integer;
+Begin
+ Top:=Layout.ToolBarRect.Y2+1; Left:=SCREEN_WIDTH-CalendarPaneWidth;
+ If (MX<Left) Or (MY<Top) Or (MY>=Layout.StatusBarRect.Y1) Then Exit;
+ RibbonKeyboardActive:=False; RibbonFocus:=-1; RibbonHover:=-1;
+ CalendarHasFocus:=True;
+ CalendarGeometry(X,Y,W,H);
+ If (MY>=Y+6*H+32) And (MY<=Y+6*H+58) Then Begin
+  If (MX>=Left+8) And (MX<=Left+64) Then EventNew(False)
+  Else If (MX>=Left+70) And (MX<=Left+140) Then EventNew(True)
+  Else If MX>=Left+146 Then EventAgenda;
   Exit;
  End;
-
- { Preferences generales }
- Read(F, B);
- UserPrefs.General.Language := TInterfaceLanguage(B);
- Read(F, B);
- Len := B;
- UserPrefs.General.DefaultFolder := '';
- For I := 1 To Len Do Begin
-  Read(F, B);
-  UserPrefs.General.DefaultFolder := UserPrefs.General.DefaultFolder + Chr(B);
+ If (MX>=SCREEN_WIDTH-26) And (MX<=SCREEN_WIDTH-6) And (MY>=Top+5) And (MY<=Top+25) Then Begin
+  CalendarShow(False); Exit;
  End;
- Read(F, B); UserPrefs.General.StartMinimized := (B = 1);
- Read(F, B); UserPrefs.General.CheckMailOnStart := (B = 1);
- Read(F, B); UserPrefs.General.EmptyTrashOnExit := (B = 1);
- Read(F, B); UserPrefs.General.ShowSplash := (B = 1);
- Read(F, B); UserPrefs.General.MinimizeToTray := (B = 1);
- Read(F, B); UserPrefs.General.ConfirmExit := (B = 1);
-
- { Preferences de lecture }
- Read(F, B);
- Len := B;
- UserPrefs.Reading.FontName := '';
- For I := 1 To Len Do Begin
-  Read(F, B);
-  UserPrefs.Reading.FontName := UserPrefs.Reading.FontName + Chr(B);
+ If (MY>=Top+36) And (MY<=Top+60) Then Begin
+  If (MX>=Left+8) And (MX<=Left+36) Then CalendarMoveMonth(-1)
+  Else If (MX>=Left+44) And (MX<=SCREEN_WIDTH-44) Then CalendarToday
+  Else If (MX>=SCREEN_WIDTH-36) And (MX<=SCREEN_WIDTH-8) Then CalendarMoveMonth(1);
+ End Else Begin
+  CalendarGeometry(X,Y,W,H);
+  If (MX<X) Or (MX>=X+7*W) Or (MY<Y) Or (MY>=Y+6*H) Then Begin DrawInterface; Exit; End;
+  Day:=(MY-Y) Div H*7+(MX-X) Div W-CalendarFirstDay(CalendarYear,CalendarMonth)+1;
+  If (Day<1) Or (Day>CalendarDays(CalendarYear,CalendarMonth)) Then Begin DrawInterface; Exit; End;
+  CalendarDay:=Day;
  End;
- Read(F, B); UserPrefs.Reading.FontSize := B;
- Read(F, B); UserPrefs.Reading.DefaultEncoding := TDefaultEncoding(B);
- Read(F, B); UserPrefs.Reading.MarkAsReadDelay := B;
- Read(F, B); UserPrefs.Reading.ShowPreviewPane := (B = 1);
- Read(F, B); UserPrefs.Reading.PreviewOnRight := (B = 1);
- Read(F, B); UserPrefs.Reading.AutoExpandGroups := (B = 1);
- Read(F, B); UserPrefs.Reading.ShowHeaders := (B = 1);
- Read(F, B); UserPrefs.Reading.UseAlternateRowColor := (B = 1);
-
- { Preferences de redaction }
- Read(F, B); UserPrefs.Composing.DefaultFormat := TComposeFormat(B);
- Read(F, B);
- Len := B;
- UserPrefs.Composing.FontName := '';
- For I := 1 To Len Do Begin
-  Read(F, B);
-  UserPrefs.Composing.FontName := UserPrefs.Composing.FontName + Chr(B);
- End;
- Read(F, B); UserPrefs.Composing.FontSize := B;
- Read(F, B); UserPrefs.Composing.SpellCheckEnabled := (B = 1);
- Read(F, B); UserPrefs.Composing.SpellCheckOnSend := (B = 1);
- Read(F, B); UserPrefs.Composing.AutoSaveDrafts := (B = 1);
- Read(F, B); UserPrefs.Composing.AutoSaveInterval := B;
- Read(F, B); UserPrefs.Composing.WrapTextAt := B;
- Read(F, B); UserPrefs.Composing.IncludeOriginal := (B = 1);
- Read(F, B);
- Len := B;
- UserPrefs.Composing.QuotePrefix := '';
- For I := 1 To Len Do Begin
-  Read(F, B);
-  UserPrefs.Composing.QuotePrefix := UserPrefs.Composing.QuotePrefix + Chr(B);
- End;
- Read(F, B); UserPrefs.Composing.DefaultSignature := B;
-
- { Preferences de connexion }
- Read(F, B); UserPrefs.Connection.CheckInterval := B;
- Read(F, B); UserPrefs.Connection.ConnectionTimeout := B;
- Read(F, B); UserPrefs.Connection.MaxRetries := B;
- Read(F, B); UserPrefs.Connection.RetryDelay := B;
- Read(F, B); UserPrefs.Connection.OfflineMode := (B = 1);
- Read(F, B); UserPrefs.Connection.AutoReconnect := (B = 1);
- Read(F, B); UserPrefs.Connection.SavePassword := (B = 1);
- Read(F, B); UserPrefs.Connection.UseSSL := (B = 1);
- Read(F, B); UserPrefs.Connection.VerifyCertificates := (B = 1);
-
- { Preferences de securite }
- Read(F, B); UserPrefs.Security.WarnOnExternal := (B = 1);
- Read(F, B); UserPrefs.Security.BlockExternalImages := (B = 1);
- Read(F, B); UserPrefs.Security.WarnOnAttachments := (B = 1);
- Read(F, B);
- Len := B;
- UserPrefs.Security.BlockedExtensions := '';
- For I := 1 To Len Do Begin
-  Read(F, B);
-  UserPrefs.Security.BlockedExtensions := UserPrefs.Security.BlockedExtensions + Chr(B);
- End;
- Read(F, B); UserPrefs.Security.EnableVirusCheck := (B = 1);
- Read(F, B); UserPrefs.Security.WarnOnUnencrypted := (B = 1);
- Read(F, B); UserPrefs.Security.EnablePhishingFilter := (B = 1);
- Read(F, B); UserPrefs.Security.TrustSenderImages := (B = 1);
-
- Close(F);
- {$I+}
-
- UserPrefs.Modified := False;
- PrefsNeedsSave := False;
- Prefs_Load := True;
+ DrawInterface;
 End;
 
-{ Dessine un checkbox }
-Procedure Prefs_DrawCheckbox(X, Y: Integer; Checked: Boolean; Caption: String);
-Var
- BoxSize: Integer;
+Procedure CalendarMoveDay(Delta: Integer);
 Begin
- BoxSize := 12;
-
- { Boite du checkbox }
- SetFillStyle(SolidFill, White);
- Bar(X, Y, X + BoxSize, Y + BoxSize);
- SetColor(DarkGray);
- Rectangle(X, Y, X + BoxSize, Y + BoxSize);
-
- { Coche }
- If Checked Then Begin
-  SetColor(Black);
-  Line(X + 2, Y + 6, X + 5, Y + 10);
-  Line(X + 5, Y + 10, X + 10, Y + 2);
- End;
-
- { Texte }
- SetColor(Black);
- OutTextXY(X + BoxSize + 8, Y + 2, Caption);
-End;
-
-{ Dessine un champ de texte }
-Procedure Prefs_DrawTextfield(X, Y, Width: Integer; Value: String; Active: Boolean);
-Begin
- If Active Then
-  SetFillStyle(SolidFill, Yellow)
- Else
-  SetFillStyle(SolidFill, White);
- Bar(X, Y, X + Width, Y + 18);
- SetColor(DarkGray);
- Rectangle(X, Y, X + Width, Y + 18);
- SetColor(Black);
- OutTextXY(X + 4, Y + 4, Copy(Value, 1, (Width - 8) Div 8));
-End;
-
-{ Dessine un combobox }
-Procedure Prefs_DrawCombobox(X, Y, Width: Integer; Value: String);
-Begin
- SetFillStyle(SolidFill, White);
- Bar(X, Y, X + Width, Y + 18);
- SetColor(DarkGray);
- Rectangle(X, Y, X + Width, Y + 18);
-
- { Fleche }
- SetFillStyle(SolidFill, LightGray);
- Bar(X + Width - 18, Y + 1, X + Width - 1, Y + 17);
- SetColor(DarkGray);
- Line(X + Width - 14, Y + 6, X + Width - 9, Y + 12);
- Line(X + Width - 9, Y + 12, X + Width - 4, Y + 6);
-
- { Texte }
- SetColor(Black);
- OutTextXY(X + 4, Y + 4, Copy(Value, 1, (Width - 26) Div 8));
-End;
-
-{ Dessine un slider/spin }
-Procedure Prefs_DrawSpinner(X, Y, Width, Value, Min, Max: Integer);
-Var
- ValStr: String;
-Begin
- SetFillStyle(SolidFill, White);
- Bar(X, Y, X + Width - 36, Y + 18);
- SetColor(DarkGray);
- Rectangle(X, Y, X + Width - 36, Y + 18);
-
- Str(Value, ValStr);
- SetColor(Black);
- OutTextXY(X + 4, Y + 4, ValStr);
-
- { Boutons + et - }
- SetFillStyle(SolidFill, LightGray);
- Bar(X + Width - 34, Y, X + Width - 18, Y + 18);
- Bar(X + Width - 16, Y, X + Width, Y + 18);
- SetColor(DarkGray);
- Rectangle(X + Width - 34, Y, X + Width - 18, Y + 18);
- Rectangle(X + Width - 16, Y, X + Width, Y + 18);
- SetColor(Black);
- OutTextXY(X + Width - 30, Y + 4, '-');
- OutTextXY(X + Width - 12, Y + 4, '+');
-End;
-
-{ Dessine l'onglet General }
-Procedure Prefs_DrawGeneralTab(X, Y, W, H: Integer);
-Var
- CY: Integer;
-Begin
- CY := Y + 10;
-
- SetColor(Black);
- OutTextXY(X, CY, 'Langue de l''interface:');
- CY := CY + 18;
- Prefs_DrawCombobox(X, CY, 180, PREFS_LANG_NAMES[Ord(UserPrefs.General.Language)]);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Dossier par defaut:');
- CY := CY + 18;
- Prefs_DrawTextfield(X, CY, W - 20, UserPrefs.General.DefaultFolder, PrefsEditingField = 0);
- CY := CY + 30;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.General.StartMinimized, 'Demarrer minimise');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.General.CheckMailOnStart, 'Verifier le courrier au demarrage');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.General.EmptyTrashOnExit, 'Vider la corbeille en quittant');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.General.ShowSplash, 'Afficher l''ecran d''accueil');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.General.MinimizeToTray, 'Minimiser dans la barre des taches');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.General.ConfirmExit, 'Confirmer avant de quitter');
-End;
-
-{ Dessine l'onglet Lecture }
-Procedure Prefs_DrawReadingTab(X, Y, W, H: Integer);
-Var
- CY: Integer;
-Begin
- CY := Y + 10;
-
- SetColor(Black);
- OutTextXY(X, CY, 'Police d''affichage:');
- CY := CY + 18;
- Prefs_DrawTextfield(X, CY, 150, UserPrefs.Reading.FontName, PrefsEditingField = 1);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Taille de police:');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Reading.FontSize, 8, 24);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Encodage par defaut:');
- CY := CY + 18;
- Prefs_DrawCombobox(X, CY, 150, PREFS_ENCODING_NAMES[Ord(UserPrefs.Reading.DefaultEncoding)]);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Marquer comme lu apres (sec):');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Reading.MarkAsReadDelay, 0, 30);
- CY := CY + 30;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.ShowPreviewPane, 'Afficher le volet de previsualisation');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.PreviewOnRight, 'Volet a droite (sinon en bas)');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.AutoExpandGroups, 'Developper automatiquement les groupes');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Reading.UseAlternateRowColor, 'Utiliser des couleurs alternees');
-End;
-
-{ Dessine l'onglet Redaction }
-Procedure Prefs_DrawComposingTab(X, Y, W, H: Integer);
-Var
- CY: Integer;
-Begin
- CY := Y + 10;
-
- SetColor(Black);
- OutTextXY(X, CY, 'Format par defaut:');
- CY := CY + 18;
- Prefs_DrawCombobox(X, CY, 150, PREFS_FORMAT_NAMES[Ord(UserPrefs.Composing.DefaultFormat)]);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Police de redaction:');
- CY := CY + 18;
- Prefs_DrawTextfield(X, CY, 150, UserPrefs.Composing.FontName, PrefsEditingField = 2);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Retour a la ligne (colonnes):');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Composing.WrapTextAt, 40, 132);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Prefixe de citation:');
- CY := CY + 18;
- Prefs_DrawTextfield(X, CY, 80, UserPrefs.Composing.QuotePrefix, PrefsEditingField = 3);
- CY := CY + 30;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.SpellCheckEnabled, 'Activer le correcteur orthographique');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.SpellCheckOnSend, 'Verifier avant l''envoi');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.AutoSaveDrafts, 'Sauvegarde automatique des brouillons');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Composing.IncludeOriginal, 'Inclure le message original');
-End;
-
-{ Dessine l'onglet Connexion }
-Procedure Prefs_DrawConnectionTab(X, Y, W, H: Integer);
-Var
- CY: Integer;
-Begin
- CY := Y + 10;
-
- SetColor(Black);
- OutTextXY(X, CY, 'Verifier le courrier toutes les (min):');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.CheckInterval, 1, 60);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Delai de connexion (sec):');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.ConnectionTimeout, 10, 120);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Nombre de tentatives:');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.MaxRetries, 1, 10);
- CY := CY + 30;
-
- OutTextXY(X, CY, 'Delai entre tentatives (sec):');
- CY := CY + 18;
- Prefs_DrawSpinner(X, CY, 100, UserPrefs.Connection.RetryDelay, 1, 30);
- CY := CY + 30;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.OfflineMode, 'Mode hors ligne');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.AutoReconnect, 'Reconnexion automatique');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.SavePassword, 'Sauvegarder le mot de passe');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.UseSSL, 'Utiliser SSL/TLS');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Connection.VerifyCertificates, 'Verifier les certificats');
-End;
-
-{ Dessine l'onglet Securite }
-Procedure Prefs_DrawSecurityTab(X, Y, W, H: Integer);
-Var
- CY: Integer;
-Begin
- CY := Y + 10;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.WarnOnExternal, 'Avertir pour les liens externes');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.BlockExternalImages, 'Bloquer les images externes');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.WarnOnAttachments, 'Avertir pour les pieces jointes');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.EnableVirusCheck, 'Activer la verification antivirus');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.WarnOnUnencrypted, 'Avertir si non chiffre');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.EnablePhishingFilter, 'Activer le filtre anti-hameconnage');
- CY := CY + 22;
-
- Prefs_DrawCheckbox(X, CY, UserPrefs.Security.TrustSenderImages, 'Faire confiance aux images des contacts');
- CY := CY + 32;
-
- SetColor(Black);
- OutTextXY(X, CY, 'Extensions bloquees:');
- CY := CY + 18;
- Prefs_DrawTextfield(X, CY, W - 20, UserPrefs.Security.BlockedExtensions, PrefsEditingField = 4);
-End;
-
-{ Dessine la fenetre de preferences }
-Procedure Prefs_DrawWindow;
-Var
- X1, Y1, X2, Y2: Integer;
- TabX, TabY, TabI: Integer;
- ContentX, ContentY, ContentW, ContentH: Integer;
- BtnX, BtnY, BtnW, BtnH: Integer;
-Begin
- If Not PrefsVisible Then Exit;
-
- X1 := PrefsWindowX;
- Y1 := PrefsWindowY;
- X2 := X1 + PREFS_WINDOW_WIDTH;
- Y2 := Y1 + PREFS_WINDOW_HEIGHT;
-
- { Fond de la fenetre }
- SetFillStyle(SolidFill, LightGray);
- Bar(X1, Y1, X2, Y2);
-
- { Barre de titre }
- SetFillStyle(SolidFill, Blue);
- Bar(X1, Y1, X2, Y1 + 25);
- SetColor(White);
- OutTextXY(X1 + 10, Y1 + 7, 'Preferences - Options');
-
- { Bouton fermer }
- SetFillStyle(SolidFill, Red);
- Bar(X2 - 25, Y1 + 3, X2 - 3, Y1 + 22);
- SetColor(White);
- OutTextXY(X2 - 18, Y1 + 7, 'X');
-
- { Bordure }
- SetColor(DarkGray);
- Rectangle(X1, Y1, X2, Y2);
-
- { Liste des onglets }
- TabX := X1 + 5;
- TabY := Y1 + 30;
- For TabI := 0 To PREFS_TAB_COUNT - 1 Do Begin
-  If TabI = Ord(PrefsCurrentTab) Then Begin
-   SetFillStyle(SolidFill, White);
-   Bar(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
-  End
-  Else If TabI = PrefsHoveredTab Then Begin
-   SetFillStyle(SolidFill, Cyan);
-   Bar(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
-  End
+ While Delta>0 Do Begin
+  If CalendarDay<CalendarDays(CalendarYear,CalendarMonth) Then Inc(CalendarDay)
   Else Begin
-   SetFillStyle(SolidFill, LightGray);
-   Bar(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
+   If (CalendarYear=9999) And (CalendarMonth=12) Then Exit;
+   CalendarDay:=1; CalendarMoveMonth(1);
   End;
-  SetColor(DarkGray);
-  Rectangle(TabX, TabY, TabX + PREFS_TAB_WIDTH, TabY + PREFS_TAB_HEIGHT);
-  SetColor(Black);
-  OutTextXY(TabX + 10, TabY + 10, PREFS_TAB_NAMES[TabI]);
-  TabY := TabY + PREFS_TAB_HEIGHT + 2;
+  Dec(Delta);
  End;
-
- { Zone de contenu }
- ContentX := X1 + PREFS_TAB_WIDTH + 15;
- ContentY := Y1 + 35;
- ContentW := PREFS_WINDOW_WIDTH - PREFS_TAB_WIDTH - 25;
- ContentH := PREFS_WINDOW_HEIGHT - 90;
-
- SetFillStyle(SolidFill, White);
- Bar(ContentX, ContentY, ContentX + ContentW, ContentY + ContentH);
- SetColor(DarkGray);
- Rectangle(ContentX, ContentY, ContentX + ContentW, ContentY + ContentH);
-
- { Contenu de l'onglet }
- Case PrefsCurrentTab Of
-  ptGeneral: Prefs_DrawGeneralTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
-  ptReading: Prefs_DrawReadingTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
-  ptComposing: Prefs_DrawComposingTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
-  ptConnection: Prefs_DrawConnectionTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
-  ptSecurity: Prefs_DrawSecurityTab(ContentX + 10, ContentY, ContentW - 20, ContentH);
+ While Delta<0 Do Begin
+  If CalendarDay>1 Then Dec(CalendarDay)
+  Else Begin
+   If (CalendarYear=1) And (CalendarMonth=1) Then Exit;
+   CalendarMoveMonth(-1); CalendarDay:=CalendarDays(CalendarYear,CalendarMonth);
+  End;
+  Inc(Delta);
  End;
+End;
 
- { Boutons OK, Annuler, Appliquer }
- BtnW := 80;
- BtnH := 25;
- BtnY := Y2 - 35;
+Procedure CalendarKey(Key: Char; Extended: Boolean);
+Begin
+ If Extended Then Case Key Of
+  #75: CalendarMoveDay(-1); #77: CalendarMoveDay(1);
+  #72: CalendarMoveDay(-7); #80: CalendarMoveDay(7);
+  #73: CalendarMoveMonth(-1); #81: CalendarMoveMonth(1);
+  #71: CalendarToday;
+ End Else Case Key Of
+  #27: Begin FocusMail; Exit; End;
+  #13: Begin EventAgenda; Exit; End;
+  'n','N': Begin EventNew(False); Exit; End;
+  'm','M': Begin EventNew(True); Exit; End;
+ End;
+ DrawInterface;
+End;
 
- { Bouton OK }
- BtnX := X2 - 270;
- SetFillStyle(SolidFill, Green);
- Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
- SetColor(DarkGray);
- Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
- SetColor(White);
- OutTextXY(BtnX + 30, BtnY + 7, 'OK');
+{ Agenda local persistant. Les invitations sont envoyees seulement sur demande. }
+Function EventNumber(N,Width: LongInt): String;
+Var S: String;
+Begin Str(N,S); While Length(S)<Width Do S:='0'+S; EventNumber:=S; End;
 
- { Bouton Annuler }
- BtnX := X2 - 180;
- SetFillStyle(SolidFill, LightGray);
- Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
- SetColor(DarkGray);
- Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+Function EventNewUID: String;
+{$IFDEF WINDOWS}
+Const Digits: String[16]='0123456789abcdef';
+Var Value: TEventGUID; Bytes: Array[0..15] Of Byte; I: Integer; Text: String;
+{$ENDIF}
+Begin
+ EventNewUID:='outlook-'+EventNumber(GetTickCount,0)+'-'+EventNumber(EventNextID,0)+'@local';
+ {$IFDEF WINDOWS}
+ If EventCreateGUID(Value)<>0 Then Exit;
+ Move(Value,Bytes,16); Text:='';
+ For I:=0 To 15 Do Text:=Text+Digits[Bytes[I] Shr 4+1]+Digits[(Bytes[I] And 15)+1];
+ EventNewUID:=Text+'@outlook.local';
+ {$ENDIF}
+End;
+
+Function EventDate(Y,M,D: Integer): String;
+Begin EventDate:=EventNumber(Y,4)+'-'+EventNumber(M,2)+'-'+EventNumber(D,2); End;
+
+Function EventParseDate(S: String; Var Y,M,D: Integer): Boolean;
+Var C,I: Integer;
+Begin
+ EventParseDate:=False;
+ If (Length(S)<>10) Then Exit;
+ If (S[5]<>'-') Or (S[8]<>'-') Then Exit;
+ For I:=1 To 10 Do If Not (I In [5,8]) And Not (S[I] In ['0'..'9']) Then Exit;
+ Val(Copy(S,1,4),Y,C); Val(Copy(S,6,2),M,C); Val(Copy(S,9,2),D,C);
+ If (Y<1) Or (Y>9999) Or (M<1) Or (M>12) Then Exit;
+ EventParseDate:=(D>=1) And (D<=CalendarDays(Y,M));
+End;
+
+Function EventMoment(Date,Time: String): TEventMoment;
+Var Y,M,D,H,Mi,C,I: Integer; Days: LongInt;
+Begin
+ EventMoment:=-1;
+ If Not EventParseDate(Date,Y,M,D) Or (Length(Time)<>5) Then Exit;
+ If (Time[3]<>':') Or Not (Time[1] In ['0'..'9']) Or Not (Time[2] In ['0'..'9']) Or
+    Not (Time[4] In ['0'..'9']) Or Not (Time[5] In ['0'..'9']) Then Exit;
+ Val(Copy(Time,1,2),H,C); Val(Copy(Time,4,2),Mi,C);
+ If (H>23) Or (Mi>59) Then Exit;
+ Days:=LongInt(Y-1)*365+(Y-1) Div 4-(Y-1) Div 100+(Y-1) Div 400+D-1;
+ For I:=1 To M-1 Do Inc(Days,CalendarDays(Y,I));
+ EventMoment:=(TEventMoment(Days)*1440)+H*60+Mi;
+End;
+
+Function EventOnDay(Const E: TCalendarEvent; Y,M,D: Integer): Boolean;
+Var Start: TEventMoment;
+Begin
+ Start:=EventMoment(EventDate(Y,M,D),'00:00');
+ EventOnDay:=(EventMoment(E.StartDate,E.StartTime)<Start+1440) And
+             (EventMoment(E.EndDate,E.EndTime)>Start);
+End;
+
+Function EventAddresses(List: String; Var Normalized: String): Boolean;
+Var Token: String; P,I,AtPos,N: Integer;
+Begin
+ EventAddresses:=False; Normalized:=''; N:=0;
+ While List<>'' Do Begin
+  P:=1; While (P<=Length(List)) And Not (List[P] In [',',';']) Do Inc(P);
+  Token:=MailTrim(Copy(List,1,P-1)); Delete(List,1,P);
+  If Token='' Then Continue;
+  If (Length(Token)>60) Or (Length(Token)<3) Then Exit;
+  AtPos:=0;
+  For I:=1 To Length(Token) Do Begin
+   If (Token[I]<#33) Or (Token[I]>#126) Or (Token[I] In ['<','>','"',Chr(92),':']) Then Exit;
+   If Token[I]='@' Then Begin If AtPos<>0 Then Exit; AtPos:=I; End;
+  End;
+  If (AtPos<2) Or (AtPos=Length(Token)) Then Exit;
+  Inc(N); If N>20 Then Exit;
+  If Normalized<>'' Then Normalized:=Normalized+';';
+  If Length(Normalized)+Length(Token)>255 Then Exit;
+  Normalized:=Normalized+Token;
+ End;
+ EventAddresses:=N>0;
+End;
+
+Function EventValid(Const E: TCalendarEvent): Boolean;
+Var Addresses: String;
+Begin
+ EventValid:=False;
+ If MailTrim(E.Title)='' Then Begin EventError:='Saisir un objet.'; Exit; End;
+ If (EventMoment(E.StartDate,E.StartTime)<0) Or (EventMoment(E.EndDate,E.EndTime)<0) Then Begin
+  EventError:='Dates AAAA-MM-JJ et heures HH:MM valides requises.'; Exit;
+ End;
+ If EventMoment(E.EndDate,E.EndTime)<=EventMoment(E.StartDate,E.StartTime) Then Begin
+  EventError:='La fin doit etre apres le debut.'; Exit;
+ End;
+ If Not MailSafe(E.Title) Or Not MailSafe(E.Location) Or Not MailSafe(E.Notes) Or
+    Not MailSafe(E.UID) Or Not MailSafe(E.Organizer) Or Not MailSafe(E.Participants) Then Begin
+  EventError:='Caractere interdit dans la fiche.'; Exit;
+ End;
+ If E.IsMeeting And Not EventAddresses(E.Participants,Addresses) Then Begin
+  EventError:='Participants : adresses courriel separees par ;'; Exit;
+ End;
+ EventValid:=True;
+End;
+
+Function EventPath: String;
+Var P: String; I: Integer;
+Begin
+ P:=AccountFileName; I:=Length(P);
+ While (I>0) And Not (P[I] In ['.',Chr(92),'/']) Do Dec(I);
+ If (I>0) And (P[I]='.') Then Delete(P,I,255);
+ EventPath:=P+'.CAL';
+End;
+
+Function EventSave: Boolean;
+Var Data: TMailText; SavedError: String; I: Integer;
+ Procedure Add(S: String);
+ Begin FileSaveData:=FileSaveData+S+#13#10; End;
+Begin
+ Data:=FileSaveData; SavedError:=FileOpenError; FileSaveData:='OUTLOOK-AGENDA-1'+#13#10;
+ Add(EventNumber(EventCount,0)); Add(EventNumber(EventNextID,0));
+ For I:=0 To EventCount-1 Do With CalendarEvents[I] Do Begin
+  Add(EventNumber(ID,0)); Add(EventNumber(Ord(IsMeeting),0)); Add(Title); Add(Location);
+  Add(StartDate); Add(StartTime); Add(EndDate); Add(EndTime); Add(Participants); Add(Notes);
+  Add(UID); Add(EventNumber(Sequence,0)); Add(Organizer); Add(EventNumber(Ord(InvitationSent),0));
+ End;
+ EventSave:=WriteMessageFile(EventPath,True);
+ If FileOpenError<>'' Then EventError:='Impossible de sauvegarder l agenda.' Else EventError:='';
+ FileSaveData:=Data; FileOpenError:=SavedError;
+End;
+
+Procedure EventInit;
+Const Limits: Array[0..13] Of Byte=(10,1,80,80,10,5,10,5,255,255,80,10,80,1);
+Var F: Text; I,J,K,Err,C,N,OldMode: Integer; Line: String; Next,NValue: LongInt; Valid: Boolean;
+ Function ReadNumber(Low,High: LongInt): LongInt;
+ Var S: String; Code: Integer; V: LongInt;
+ Begin
+  V:=0;
+  If Err=0 Then Begin
+   {$I-}
+   If Eof(F) Then Err:=100 Else Begin ReadLn(F,S); Err:=IOResult; End;
+   {$I+}
+   If Err=0 Then Begin Val(S,V,Code); If (Code<>0) Or (V<Low) Or (V>High) Then Err:=100; End;
+  End;
+  ReadNumber:=V;
+ End;
+Begin
+ EventCount:=0; EventNextID:=1; EventError:=''; EventEditIndex:=-1;
+ {$I-}
+ Assign(F,EventPath); OldMode:=FileMode; FileMode:=0; Reset(F); FileMode:=OldMode; Err:=IOResult;
+ If Err=2 Then Exit;
+ If Err<>0 Then Begin EventError:='Impossible de lire l agenda.'; Exit; End;
+ ReadLn(F,Line); Err:=IOResult; If Line<>'OUTLOOK-AGENDA-1' Then Err:=100;
+ N:=ReadNumber(0,128); Next:=ReadNumber(1,2147483646);
+ For I:=0 To N-1 Do Begin
+  If Err<>0 Then Break;
+  FillChar(EventBackup[I],SizeOf(TCalendarEvent),0);
+  For J:=0 To 13 Do Begin
+   If Err<>0 Then Break;
+   If Eof(F) Then Begin Err:=100; Break; End;
+   ReadLn(F,Line); Err:=IOResult; If Length(Line)>Limits[J] Then Err:=100;
+   If Err<>0 Then Break;
+   NValue:=0;
+   If J In [0,1,11,13] Then Begin
+    Val(Line,NValue,C); If (C<>0) Or (NValue<0) Then Err:=100;
+    If (J In [1,13]) And (NValue>1) Then Err:=100;
+   End;
+   With EventBackup[I] Do Case J Of
+    0: ID:=NValue; 1: IsMeeting:=NValue=1; 2: Title:=Line; 3: Location:=Line;
+    4: StartDate:=Line; 5: StartTime:=Line; 6: EndDate:=Line; 7: EndTime:=Line;
+    8: Participants:=Line; 9: Notes:=Line; 10: UID:=Line; 11: Sequence:=NValue;
+    12: Organizer:=Line; 13: InvitationSent:=NValue=1;
+   End;
+  End;
+  If Err=0 Then Begin
+   Valid:=EventValid(EventBackup[I]);
+   If Not Valid Or (EventBackup[I].ID<1) Or (EventBackup[I].ID>=Next) Or
+      (EventBackup[I].UID='') Then Err:=100;
+   For K:=0 To I-1 Do
+    If (EventBackup[K].ID=EventBackup[I].ID) Or (EventBackup[K].UID=EventBackup[I].UID) Then Err:=100;
+  End;
+ End;
+ If (Err=0) And Not Eof(F) Then Err:=100;
+ Close(F); C:=IOResult; If Err=0 Then Err:=C;
+ {$I+}
+ If Err<>0 Then Begin EventError:='Agenda invalide ou incomplet : aucun evenement charge.'; Exit; End;
+ EventCount:=N; EventNextID:=Next;
+ For I:=0 To N-1 Do CalendarEvents[I]:=EventBackup[I];
+ EventError:='';
+End;
+
+Procedure EventBuildList;
+Var I,J,T: Integer;
+Begin
+ EventListCount:=0;
+ For I:=0 To EventCount-1 Do
+  If EventOnDay(CalendarEvents[I],CalendarYear,CalendarMonth,CalendarDay) Then Begin
+   EventList[EventListCount]:=I; Inc(EventListCount);
+  End;
+ For I:=0 To EventListCount-2 Do For J:=I+1 To EventListCount-1 Do
+  If EventMoment(CalendarEvents[EventList[J]].StartDate,CalendarEvents[EventList[J]].StartTime)<
+     EventMoment(CalendarEvents[EventList[I]].StartDate,CalendarEvents[EventList[I]].StartTime) Then Begin
+   T:=EventList[I]; EventList[I]:=EventList[J]; EventList[J]:=T;
+  End;
+ If EventListSelection>=EventListCount Then EventListSelection:=EventListCount-1;
+ If EventListSelection<0 Then If EventListCount>0 Then EventListSelection:=0;
+End;
+
+Function EventCanOpen: Boolean;
+Begin
+ EventCanOpen:=Not (ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or
+  ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible);
+End;
+
+Procedure EventAgenda;
+Begin
+ If Not EventCanOpen Or EventDialogVisible Then Exit;
+ If Not CalendarVisible Then CalendarShow(True);
+ EventListSelection:=0; EventListScroll:=0; EventBuildList;
+ EventDialogVisible:=True; EventEditing:=False; EventDeletePending:=False; EventFocus:=0;
+ DrawInterface;
+End;
+
+Procedure EventNew(Meeting: Boolean);
+Var H,M,S,HS: Word;
+Begin
+ If Not EventCanOpen Or (EventDialogVisible And EventEditing) Then Exit;
+ If EventCount>=128 Then Begin EventError:='Agenda plein (128 evenements).';
+  MailStatus:=EventError; DrawInterface; Exit; End;
+ EventReturnToList:=EventDialogVisible;
+ If Not CalendarVisible Then CalendarShow(True);
+ FillChar(EventDraft,SizeOf(EventDraft),0); EventDraft.IsMeeting:=Meeting;
+ EventDraft.StartDate:=EventDate(CalendarYear,CalendarMonth,CalendarDay);
+ EventDraft.EndDate:=EventDraft.StartDate;
+ GetTime(H,M,S,HS); If H>22 Then H:=22;
+ EventDraft.StartTime:=EventNumber(H,2)+':00'; EventDraft.EndTime:=EventNumber(H+1,2)+':00';
+ EventEditIndex:=-1; EventDialogVisible:=True; EventEditing:=True;
+ EventDeletePending:=False; EventFocus:=0; EventCursor:=0; EventError:=''; DrawInterface;
+End;
+
+Procedure EventEditSelected;
+Begin
+ If (EventListSelection<0) Or (EventListSelection>=EventListCount) Then Exit;
+ EventEditIndex:=EventList[EventListSelection]; EventDraft:=CalendarEvents[EventEditIndex];
+ EventReturnToList:=True; EventEditing:=True; EventFocus:=0;
+ EventCursor:=Length(EventDraft.Title); EventError:=''; DrawInterface;
+End;
+
+Procedure EventCloseEditor;
+Begin
+ EventDeletePending:=False; EventError:='';
+ If EventReturnToList Then Begin EventEditing:=False; EventFocus:=0; EventBuildList; End
+ Else EventDialogVisible:=False;
+ DrawInterface;
+End;
+
+Function EventCommit: Boolean;
+Var I,Y,M,D,OldCount: Integer; OldNext: LongInt; Old: TCalendarEvent; Normalized: String;
+Begin
+ EventCommit:=False; EventError:=''; If Not EventValid(EventDraft) Then Exit;
+ If EventDraft.IsMeeting Then Begin
+  EventAddresses(EventDraft.Participants,Normalized); EventDraft.Participants:=Normalized;
+ End;
+ If EventDraft.IsMeeting Then Begin
+  If EventDraft.Organizer<>'' Then Begin
+   If Not EventAddresses(EventDraft.Organizer,Normalized) Then Begin EventError:='Organisateur invalide.'; Exit; End;
+  End;
+ End;
+ OldCount:=EventCount; OldNext:=EventNextID;
+ If EventEditIndex<0 Then Begin
+  If EventCount>=128 Then Begin EventError:='Agenda plein.'; Exit; End;
+  If EventNextID>=2147483646 Then Begin EventError:='Limite des identifiants atteinte.'; Exit; End;
+  I:=EventCount; EventDraft.ID:=EventNextID; Inc(EventNextID); Inc(EventCount);
+  EventDraft.UID:=EventNewUID;
+ End Else Begin
+  I:=EventEditIndex; Old:=CalendarEvents[I]; EventDraft.ID:=Old.ID; EventDraft.UID:=Old.UID;
+  If Old.Sequence>=2147483646 Then Begin EventError:='Limite de versions atteinte.'; Exit; End;
+  EventDraft.Sequence:=Old.Sequence+1;
+ End;
+ CalendarEvents[I]:=EventDraft;
+ If Not EventSave Then Begin
+  EventCount:=OldCount; EventNextID:=OldNext;
+  If EventEditIndex>=0 Then CalendarEvents[I]:=Old;
+  Exit;
+ End;
+ EventEditIndex:=I;
+ If EventParseDate(EventDraft.StartDate,Y,M,D) Then Begin CalendarYear:=Y; CalendarMonth:=M; CalendarDay:=D; End;
+ EventBuildList; EventCommit:=True;
+End;
+
+Procedure EventDelete;
+Var I,N: Integer;
+Begin
+ If (EventEditIndex<0) Or (EventEditIndex>=EventCount) Then Exit;
+ N:=EventCount;
+ For I:=0 To N-1 Do EventBackup[I]:=CalendarEvents[I];
+ For I:=EventEditIndex To N-2 Do CalendarEvents[I]:=CalendarEvents[I+1];
+ Dec(EventCount);
+ If Not EventSave Then Begin
+  EventCount:=N; For I:=0 To N-1 Do CalendarEvents[I]:=EventBackup[I]; Exit;
+ End;
+ EventEditIndex:=-1; EventCloseEditor;
+End;
+
+{ Conversion et encodage des invitations iCalendar, sans nouvelle unite. }
+Function EventUTF8(S: TMailText): TMailText;
+{$IFDEF WINDOWS}
+Var Wide: Array[0..1023] Of WideChar; N,K: LongInt;
+{$ENDIF}
+Begin
+ EventUTF8:=S;
+ {$IFDEF WINDOWS}
+ If S='' Then Exit;
+ N:=EventToWide(0,0,@S[1],Length(S),@Wide,1024);
+ If N=0 Then Exit;
+ K:=EventToUTF8(65001,0,@Wide,N,nil,0,nil,nil);
+ If K<=0 Then Exit;
+ SetLength(EventUTF8,K); EventToUTF8(65001,0,@Wide,N,@EventUTF8[1],K,nil,nil);
+ {$ENDIF}
+End;
+
+Function EventBase64(Const Data: TMailText): TMailText;
+Const Alphabet: String[64]='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+Var I,N,Col: LongInt; A,B,C: Byte; Chunk: String;
+Begin
+ EventBase64:=''; I:=1; Col:=0; N:=Length(Data);
+ While I<=N Do Begin
+  A:=Ord(Data[I]); B:=0; C:=0;
+  If I+1<=N Then B:=Ord(Data[I+1]); If I+2<=N Then C:=Ord(Data[I+2]);
+  Chunk:=Alphabet[A Shr 2+1]+Alphabet[((A And 3) Shl 4 Or (B Shr 4))+1];
+  If I+1<=N Then Chunk:=Chunk+Alphabet[((B And 15) Shl 2 Or (C Shr 6))+1] Else Chunk:=Chunk+'=';
+  If I+2<=N Then Chunk:=Chunk+Alphabet[(C And 63)+1] Else Chunk:=Chunk+'=';
+  EventBase64:=EventBase64+Chunk; Inc(I,3); Inc(Col,4);
+  If Col=76 Then Begin EventBase64:=EventBase64+#13#10; Col:=0; End;
+ End;
+ If Col<>0 Then EventBase64:=EventBase64+#13#10;
+End;
+
+Function EventEscape(Const S: TMailText): TMailText;
+Var I: LongInt;
+Begin
+ EventEscape:='';
+ For I:=1 To Length(S) Do Case S[I] Of
+  Chr(92),';',',': EventEscape:=EventEscape+Chr(92)+S[I];
+  #13: ; #10: EventEscape:=EventEscape+Chr(92)+'n';
+ Else EventEscape:=EventEscape+S[I];
+ End;
+End;
+
+Function EventUTC(Date,Time: String): String;
+{$IFDEF WINDOWS}
+Var Local,UTC: TEventSystemTime; Y,M,D,C: Integer;
+{$ENDIF}
+Begin
+ EventUTC:='';
+ {$IFDEF WINDOWS}
+ If EventMoment(Date,Time)<0 Then Exit;
+ EventParseDate(Date,Y,M,D); FillChar(Local,SizeOf(Local),0);
+ Local.Year:=Y; Local.Month:=M; Local.Day:=D;
+ Val(Copy(Time,1,2),Local.Hour,C); Val(Copy(Time,4,2),Local.Minute,C);
+ If Not EventLocalToUTC(nil,@Local,@UTC) Then Exit;
+ EventUTC:=EventNumber(UTC.Year,4)+EventNumber(UTC.Month,2)+EventNumber(UTC.Day,2)+'T'+
+  EventNumber(UTC.Hour,2)+EventNumber(UTC.Minute,2)+'00Z';
+ {$ENDIF}
+End;
+
+Function EventInvitation(Const E: TCalendarEvent): TMailText;
+Const Days: Array[0..6] Of String[3]=('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
+ Months: Array[1..12] Of String[3]=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec');
+Var Data,Line,Participants,Address: TMailText; P,N: LongInt; Stamp: TEventSystemTime;
+ Procedure Add(S: TMailText);
+ Var Cut: LongInt;
+ Begin
+  While Length(S)>75 Do Begin
+   Cut:=75;
+   While (Cut>1) And ((Ord(S[Cut+1]) And $C0)=$80) Do Dec(Cut);
+   Data:=Data+Copy(S,1,Cut)+#13#10; Delete(S,1,Cut); S:=' '+S;
+  End;
+  Data:=Data+S+#13#10;
+ End;
+Begin
+ Data:=''; EventInvitation:='';
+ If (EventUTC(E.StartDate,E.StartTime)='') Or (EventUTC(E.EndDate,E.EndTime)='') Then Begin
+  EventError:='Conversion UTC impossible pour ces dates.'; Exit;
+ End;
+ FillChar(Stamp,SizeOf(Stamp),0);
+ {$IFDEF WINDOWS} EventGetSystemTime(Stamp); {$ENDIF}
+ Add('BEGIN:VCALENDAR'); Add('VERSION:2.0'); Add('PRODID:-//OFFICE-0//Outlook Clone//FR');
+ Add('CALSCALE:GREGORIAN'); Add('METHOD:REQUEST'); Add('BEGIN:VEVENT'); Add('UID:'+E.UID);
+ Add('DTSTAMP:'+EventNumber(Stamp.Year,4)+EventNumber(Stamp.Month,2)+EventNumber(Stamp.Day,2)+'T'+
+  EventNumber(Stamp.Hour,2)+EventNumber(Stamp.Minute,2)+EventNumber(Stamp.Second,2)+'Z');
+ Add('SEQUENCE:'+EventNumber(E.Sequence,0)); Add('DTSTART:'+EventUTC(E.StartDate,E.StartTime));
+ Add('DTEND:'+EventUTC(E.EndDate,E.EndTime)); Add('SUMMARY:'+EventEscape(EventUTF8(E.Title)));
+ Add('LOCATION:'+EventEscape(EventUTF8(E.Location))); Add('DESCRIPTION:'+EventEscape(EventUTF8(E.Notes)));
+ Add('ORGANIZER:mailto:'+E.Organizer); Participants:=E.Participants;
+ While Participants<>'' Do Begin
+  P:=1; While (P<=Length(Participants)) And Not (Participants[P] In [',',';']) Do Inc(P);
+  Address:=MailTrim(Copy(Participants,1,P-1)); Delete(Participants,1,P);
+  If Address<>'' Then Add('ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:'+Address);
+ End;
+ Add('STATUS:CONFIRMED'); Add('END:VEVENT'); Add('END:VCALENDAR');
+ { Les mots encodes d en-tete ne depassent pas 75 caracteres. }
+ Participants:='';
+ For P:=1 To Length(E.Participants) Do
+  If E.Participants[P]=';' Then Participants:=Participants+', ' Else Participants:=Participants+E.Participants[P];
+ EventInvitation:='From: '+E.Organizer+#13#10+'To: '+Participants+#13#10+
+  'Date: '+Days[Stamp.WeekDay]+', '+EventNumber(Stamp.Day,2)+' '+Months[Stamp.Month]+' '+
+  EventNumber(Stamp.Year,4)+' '+EventNumber(Stamp.Hour,2)+':'+EventNumber(Stamp.Minute,2)+':'+
+  EventNumber(Stamp.Second,2)+' +0000'+#13#10+'Message-ID: <'+EventNewUID+'>'+#13#10+'Subject: ';
+ Line:=EventUTF8('Invitation : '+E.Title); N:=1;
+ While N<=Length(Line) Do Begin
+  P:=30; If Length(Line)-N+1<P Then P:=Length(Line)-N+1;
+  While (P>1) And (N+P<=Length(Line)) And ((Ord(Line[N+P]) And $C0)=$80) Do Dec(P);
+  Address:=EventBase64(Copy(Line,N,P)); While Pos(#13#10,Address)>0 Do Delete(Address,Pos(#13#10,Address),2);
+  If N>1 Then EventInvitation:=EventInvitation+#13#10+' ';
+  EventInvitation:=EventInvitation+'=?UTF-8?B?'+Address+'?='; Inc(N,P);
+ End;
+ EventInvitation:=EventInvitation+#13#10+'MIME-Version: 1.0'+#13#10+
+  'Content-Type: text/calendar; charset=UTF-8; method=REQUEST'+#13#10+
+  'Content-Disposition: attachment; filename="invitation.ics"'+#13#10+
+  'Content-Transfer-Encoding: base64'+#13#10+#13#10+EventBase64(Data);
+End;
+
+Procedure EventSendInvitationWork;
+Var A,I: Integer; OK: Boolean; Body: TMailText; Addresses: String;
+Begin
+ EventError:='';
+ If Not EventDraft.IsMeeting Then Begin EventError:='L invitation est reservee aux reunions.'; Exit; End;
+ If Not EventValid(EventDraft) Then Exit;
+ If UserPrefs.Connection.OfflineMode Then Begin EventError:='Mode hors ligne : invitation non envoyee.'; Exit; End;
+ A:=-1;
+ If EventDraft.InvitationSent Then Begin
+  For I:=0 To EmailAccountCount-1 Do
+   If MailUpper(EmailAccounts[I].EmailAddress)=MailUpper(EventDraft.Organizer) Then A:=I;
+ End Else Begin
+  If (SelectedFolder>=0) And (SelectedFolder<FolderCount) Then A:=MailFolderAccount[SelectedFolder];
+  If A<0 Then For I:=0 To EmailAccountCount-1 Do If EmailAccounts[I].IsDefault Then A:=I;
+ End;
+ If (A<0) Or (A>=EmailAccountCount) Then Begin EventError:='Compte organisateur non configure.'; Exit; End;
+ If Not EventAddresses(EmailAccounts[A].EmailAddress,Addresses) Then Begin
+  EventError:='Adresse du compte organisateur invalide.'; Exit;
+ End;
+ EventDraft.Organizer:=EmailAccounts[A].EmailAddress;
+ If Not EventCommit Then Exit;
+ Body:=EventInvitation(EventDraft); If Body='' Then Exit;
+ BusyBegin('Envoi de l invitation',EmailAccounts[A].OutgoingHost);
+ OK:=OpenOutgoingAccount(EmailAccounts[A]);
+ If OK Then BusyStage('Envoi de l invitation et confirmation SMTP...');
+ If OK Then OK:=SMTP_MailFrom(EventDraft.Organizer)=SMTP_OK;
+ If OK Then OK:=MailRecipients(EventDraft.Participants);
+ If OK Then OK:=SMTP_Data(Body)=SMTP_OK;
+ MailClose(SMTPWire);
+ If Not OK Then Begin
+  EventError:='Invitation non envoyee : '+Copy(MailError,1,60);
+  If MailError='' Then EventError:='Invitation refusee : '+Copy(SMTPClient.LastError,1,60);
+  Exit;
+ End;
+ EventDraft.InvitationSent:=True; CalendarEvents[EventEditIndex].InvitationSent:=True;
+ If Not EventSave Then Begin EventError:='Invitation envoyee; sauvegarde du statut impossible.'; Exit; End;
+ EventError:='Invitation acceptee par le serveur SMTP.';
+End;
+
+Procedure EventSendInvitation;
+Begin
+ If BusyVisible Then Exit;
+ EventSendInvitationWork;
+ BusyEnd;
+End;
+
+Function EventField(Index: Integer): String;
+Begin
+ Case Index Of
+  0: EventField:=EventDraft.Title; 1: EventField:=EventDraft.Location;
+  2: EventField:=EventDraft.StartDate; 3: EventField:=EventDraft.StartTime;
+  4: EventField:=EventDraft.EndDate; 5: EventField:=EventDraft.EndTime;
+  6: EventField:=EventDraft.Participants; 7: EventField:=EventDraft.Notes;
+ Else EventField:='';
+ End;
+End;
+
+Procedure EventPutField(Index: Integer; Text: String);
+Begin
+ Case Index Of
+  0: EventDraft.Title:=Text; 1: EventDraft.Location:=Text;
+  2: EventDraft.StartDate:=Text; 3: EventDraft.StartTime:=Text;
+  4: EventDraft.EndDate:=Text; 5: EventDraft.EndTime:=Text;
+  6: EventDraft.Participants:=Text; 7: EventDraft.Notes:=Text;
+ End;
+End;
+
+Procedure EventDraw;
+Const Labels: Array[0..8] Of String[15]=('Objet','Lieu','Date debut','Heure debut','Date fin','Heure fin',
+ 'Participants','Notes','Reunion');
+Var X,Y,I,Index: Integer; Text,Title: String;
+Begin
+ If Not EventDialogVisible Then Exit;
+ X:=(SCREEN_WIDTH-550) Div 2; Y:=(SCREEN_HEIGHT-420) Div 2;
+ If EventEditing Then Begin
+  Title:='Rendez-vous'; If EventDraft.IsMeeting Then Title:='Reunion';
+  DrawDialogBox(X,Y,550,420,Title);
+  For I:=0 To 8 Do Begin
+   SetColor(Black); OutTextXY(X+14,Y+42+I*32,Labels[I]+' :');
+   FillRect(X+146,Y+34+I*32,X+532,Y+60+I*32,White);
+   Text:=EventField(I);
+   If I=8 Then Begin Text:='Non'; If EventDraft.IsMeeting Then Text:='Oui'; End;
+   If (EventFocus=I) And (I<8) Then Begin
+    Insert('|',Text,EventCursor+1);
+    If EventCursor>42 Then Delete(Text,1,EventCursor-42);
+   End;
+   If EventFocus=I Then Text:='> '+Text;
+   OutTextXY(X+150,Y+42+I*32,Copy(Text,1,47));
+  End;
+  DrawDialogButton(X+12,Y+378,94,26,'Enregistrer',EventFocus=9,True);
+  DrawDialogButton(X+116,Y+378,110,26,'Inviter',EventFocus=10,EventDraft.IsMeeting);
+  DrawDialogButton(X+236,Y+378,94,26,'Supprimer',EventFocus=11,EventEditIndex>=0);
+  DrawDialogButton(X+440,Y+378,94,26,'Annuler',EventFocus=12,True);
+  SetColor(Black); OutTextXY(X+14,Y+350,'Heures locales. Dates AAAA-MM-JJ, heures HH:MM.');
+ End Else Begin
+  DrawDialogBox(X,Y,550,420,'Agenda du jour - '+EventDate(CalendarYear,CalendarMonth,CalendarDay));
+  DrawDialogButton(X+12,Y+30,104,26,'Nouveau RDV',EventFocus=1,EventCount<128);
+  DrawDialogButton(X+126,Y+30,128,26,'Nouvelle reunion',EventFocus=2,EventCount<128);
+  DrawDialogButton(X+264,Y+30,94,26,'Modifier',EventFocus=3,EventListCount>0);
+  If EventListSelection<EventListScroll Then EventListScroll:=EventListSelection;
+  If EventListSelection>=EventListScroll+12 Then EventListScroll:=EventListSelection-11;
+  If EventListScroll<0 Then EventListScroll:=0;
+  For I:=0 To 11 Do Begin
+   Index:=EventListScroll+I;
+   If Index>=EventListCount Then Break;
+   If Index=EventListSelection Then Begin
+    FillRect(X+12,Y+70+I*22,X+534,Y+90+I*22,Blue); SetColor(White);
+   End Else SetColor(Black);
+   With CalendarEvents[EventList[Index]] Do Begin
+    Text:=StartTime+'-'+EndTime+' '; If IsMeeting Then Text:=Text+'[R] ';
+    Text:=Text+Title;
+   End;
+   OutTextXY(X+16,Y+76+I*22,Copy(Text,1,62));
+  End;
+  If EventListCount=0 Then Begin SetColor(Black); OutTextXY(X+16,Y+86,'Aucun rendez-vous pour ce jour.'); End;
+  DrawDialogButton(X+12,Y+378,88,26,'Page -',EventFocus=4,EventListScroll>0);
+  DrawDialogButton(X+110,Y+378,88,26,'Page +',EventFocus=5,EventListScroll+12<EventListCount);
+  DrawDialogButton(X+440,Y+378,94,26,'Fermer',EventFocus=6,True);
+ End;
  SetColor(Black);
- OutTextXY(BtnX + 18, BtnY + 7, 'Annuler');
+ If EventEditing Then OutTextXY(X+14,Y+330,Copy(EventError,1,64))
+ Else OutTextXY(X+14,Y+350,Copy(EventError,1,64));
+ If EventDeletePending Then Begin
+  FillRect(X+8,Y+318,X+540,Y+412,LightGray); SetColor(Black);
+  OutTextXY(X+14,Y+328,'Supprimer du calendrier local ?');
+  If EventDraft.InvitationSent Then OutTextXY(X+14,Y+350,'Cette action n annule pas l invitation envoyee.');
+  DrawDialogButton(X+14,Y+378,94,26,'Oui (O)',False,True);
+  DrawDialogButton(X+122,Y+378,94,26,'Non (N)',True,True);
+ End;
+End;
 
- { Bouton Appliquer }
- BtnX := X2 - 90;
- If PrefsNeedsSave Then
-  SetFillStyle(SolidFill, Yellow)
- Else
-  SetFillStyle(SolidFill, LightGray);
- Bar(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
- SetColor(DarkGray);
- Rectangle(BtnX, BtnY, BtnX + BtnW, BtnY + BtnH);
+Procedure EventAction(Action: Integer);
+Begin
+ If EventEditing Then Case Action Of
+  8: EventDraft.IsMeeting:=Not EventDraft.IsMeeting;
+  9: If EventCommit Then EventCloseEditor;
+  10: EventSendInvitation;
+  11: If EventEditIndex>=0 Then EventDeletePending:=True;
+  12: EventCloseEditor;
+ End Else Case Action Of
+  1: EventNew(False); 2: EventNew(True); 3: EventEditSelected;
+  4: Begin Dec(EventListSelection,12); If EventListSelection<0 Then EventListSelection:=0; End;
+  5: Begin Inc(EventListSelection,12);
+   If EventListSelection>=EventListCount Then EventListSelection:=EventListCount-1; End;
+  6: EventDialogVisible:=False;
+ End;
+ DrawInterface;
+End;
+
+Procedure EventKey(Key: Char; Extended: Boolean);
+Const Limits: Array[0..7] Of Integer=(80,80,10,5,10,5,255,255);
+Var Text: String; OldFocus: Integer;
+Begin
+ If EventDeletePending Then Begin
+  If Not Extended Then Case UpCase(Key) Of
+   'O': Begin EventDeletePending:=False; EventDelete; End;
+   'N',#27,#13: EventDeletePending:=False;
+  End;
+ End Else If EventEditing Then Begin
+  OldFocus:=EventFocus; Text:=EventField(EventFocus);
+  If Extended Then Case Key Of
+   #15: EventFocus:=(EventFocus+12) Mod 13;
+   #75: If EventFocus<8 Then If EventCursor>0 Then Dec(EventCursor);
+   #77: If EventFocus<8 Then If EventCursor<Length(Text) Then Inc(EventCursor);
+   #71: EventCursor:=0; #79: EventCursor:=Length(Text);
+   #83: If EventFocus<8 Then Delete(Text,EventCursor+1,1);
+  End Else Case Key Of
+   #27: Begin EventCloseEditor; Exit; End;
+   #9: EventFocus:=(EventFocus+1) Mod 13;
+   #13: Begin If EventFocus<8 Then EventAction(9) Else EventAction(EventFocus); Exit; End;
+   #8: If (EventFocus<8) And (EventCursor>0) Then Begin Delete(Text,EventCursor,1); Dec(EventCursor); End;
+   #32..#255: If EventFocus<8 Then Begin
+    If Length(Text)<Limits[EventFocus] Then Begin Insert(Key,Text,EventCursor+1); Inc(EventCursor); End;
+   End Else If Key=' ' Then Begin EventAction(EventFocus); Exit; End;
+  End;
+  EventPutField(OldFocus,Text);
+  If EventFocus<>OldFocus Then EventCursor:=Length(EventField(EventFocus));
+ End Else Begin
+  If Extended Then Case Key Of
+   #72: If EventListSelection>0 Then Dec(EventListSelection);
+   #80: If EventListSelection<EventListCount-1 Then Inc(EventListSelection);
+   #73: EventAction(4); #81: EventAction(5);
+   #71: If EventListCount>0 Then EventListSelection:=0;
+   #79: EventListSelection:=EventListCount-1;
+   #82: EventNew(False);
+   #83: Begin EventEditSelected; If EventEditing Then EventDeletePending:=True; End;
+   #15: EventFocus:=(EventFocus+6) Mod 7;
+  End Else Case Key Of
+   #27: EventDialogVisible:=False;
+   #9: EventFocus:=(EventFocus+1) Mod 7;
+   #13,' ': If EventFocus=0 Then EventEditSelected Else EventAction(EventFocus);
+   'n','N': EventNew(False); 'm','M': EventNew(True);
+  End;
+ End;
+ DrawInterface;
+End;
+
+Procedure EventClick(MX,MY: Integer);
+Var X,Y,Row: Integer;
+Begin
+ X:=MX-(SCREEN_WIDTH-550) Div 2; Y:=MY-(SCREEN_HEIGHT-420) Div 2;
+ If (X<0) Or (X>550) Or (Y<0) Or (Y>420) Then Exit;
+ If EventDeletePending Then Begin
+  If (Y>=378) And (Y<=404) Then Begin
+   If (X>=14) And (X<=108) Then Begin EventDeletePending:=False; EventDelete; End
+   Else If (X>=122) And (X<=216) Then EventDeletePending:=False;
+  End;
+ End Else If EventEditing Then Begin
+  If (X>=146) And (X<=532) And (Y>=34) And (Y<316) Then Begin
+   Row:=(Y-34) Div 32;
+   If Y<=60+Row*32 Then Begin EventFocus:=Row; EventCursor:=Length(EventField(Row));
+    If Row=8 Then EventAction(8); End;
+  End Else If (Y>=378) And (Y<=404) Then Begin
+   If (X>=12) And (X<=106) Then EventAction(9)
+   Else If (X>=116) And (X<=226) Then EventAction(10)
+   Else If (X>=236) And (X<=330) Then EventAction(11)
+   Else If (X>=440) And (X<=534) Then EventAction(12);
+  End;
+ End Else Begin
+  If (Y>=30) And (Y<=56) Then Begin
+   If (X>=12) And (X<=116) Then EventAction(1)
+   Else If (X>=126) And (X<=254) Then EventAction(2)
+   Else If (X>=264) And (X<=358) Then EventAction(3);
+  End Else If (X>=12) And (X<=534) And (Y>=70) And (Y<334) Then Begin
+   Row:=EventListScroll+(Y-70) Div 22;
+   If Row<EventListCount Then Begin EventListSelection:=Row; EventFocus:=0; End;
+  End Else If (Y>=378) And (Y<=404) Then Begin
+   If (X>=12) And (X<=100) Then EventAction(4)
+   Else If (X>=110) And (X<=198) Then EventAction(5)
+   Else If (X>=440) And (X<=534) Then EventAction(6);
+  End;
+ End;
+ DrawInterface;
+End;
+
+{ Informations du programme dans une boite graphique modale. }
+Procedure DrawAboutDialog;
+Var X,Y: Integer;
+Begin
+ If Not AboutVisible Then Exit;
+ X:=(SCREEN_WIDTH-440) Div 2; Y:=(SCREEN_HEIGHT-260) Div 2;
+ DrawDialogBox(X,Y,440,260,'A propos...');
+ DrawDialogButton(X+416,Y+3,18,16,'X',False,True);
+ { Petite enveloppe dessinee avec les primitives graphiques. }
+ FillRect(X+20,Y+44,X+66,Y+78,White);
+ SetColor(Blue);
+ Rectangle(X+20,Y+44,X+66,Y+78);
+ Line(X+20,Y+44,X+43,Y+62); Line(X+66,Y+44,X+43,Y+62);
+ OutTextXY(X+84,Y+46,'Outlook Clone');
  SetColor(Black);
- OutTextXY(BtnX + 12, BtnY + 7, 'Appliquer');
+ OutTextXY(X+84,Y+66,'Version 1.00');
+ OutTextXY(X+20,Y+100,'Client de messagerie graphique en Pascal');
+ OutTextXY(X+20,Y+124,'Auteur : Sylvain Maltais');
+ OutTextXY(X+20,Y+144,'support@gladir.com');
+ OutTextXY(X+20,Y+166,'https://www.gladir.com/office-0');
+ OutTextXY(X+20,Y+186,'https://www.gladir.com/networkkitp');
+ DrawDialogButton(X+176,Y+220,88,26,'OK',True,True);
 End;
 
-{ Gere les clics dans la fenetre de preferences }
-Procedure Prefs_HandleClick(MX, MY: Integer);
-Var
- X1, Y1, X2, Y2: Integer;
- TabX, TabY, TabI, ClickedTab: Integer;
- ContentX, ContentY, ContentW, ContentH: Integer;
- BtnX, BtnY, BtnW, BtnH: Integer;
- RelY: Integer;
+Procedure ShowAboutDialog;
 Begin
- If Not PrefsVisible Then Exit;
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or
+    ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ AboutVisible:=True; ContextMenuVisible:=False; DrawInterface;
+End;
 
- X1 := PrefsWindowX;
- Y1 := PrefsWindowY;
- X2 := X1 + PREFS_WINDOW_WIDTH;
- Y2 := Y1 + PREFS_WINDOW_HEIGHT;
- BtnW := 80;
- BtnH := 25;
+Procedure CloseAboutDialog;
+Begin AboutVisible:=False; DrawInterface; End;
 
- { Clic hors de la fenetre }
- If (MX < X1) Or (MX > X2) Or (MY < Y1) Or (MY > Y2) Then Exit;
+Procedure HandleAboutClick(MX,MY: Integer);
+Var X,Y: Integer;
+Begin
+ X:=(SCREEN_WIDTH-440) Div 2; Y:=(SCREEN_HEIGHT-260) Div 2;
+ If ((MX>=X+176) And (MX<=X+264) And (MY>=Y+220) And (MY<=Y+246)) Or
+    ((MX>=X+416) And (MX<=X+434) And (MY>=Y+3) And (MY<=Y+19)) Then CloseAboutDialog;
+End;
 
- { Bouton fermer (X) }
- If (MX >= X2 - 25) And (MX <= X2 - 3) And (MY >= Y1 + 3) And (MY <= Y1 + 22) Then Begin
-  PrefsVisible := False;
-  Exit;
- End;
+Procedure HandleAboutKey(Key: Char);
+Begin If Key In [#13,#27,' '] Then CloseAboutDialog; End;
 
- { Clic sur un onglet }
- TabX := X1 + 5;
- TabY := Y1 + 30;
- ClickedTab := -1;
- For TabI := 0 To PREFS_TAB_COUNT - 1 Do Begin
-  If (MX >= TabX) And (MX <= TabX + PREFS_TAB_WIDTH) And
-     (MY >= TabY) And (MY <= TabY + PREFS_TAB_HEIGHT) Then Begin
-   ClickedTab := TabI;
-   Break;
-  End;
-  TabY := TabY + PREFS_TAB_HEIGHT + 2;
- End;
- If ClickedTab >= 0 Then Begin
-  PrefsCurrentTab := TPrefsTab(ClickedTab);
-  PrefsEditingField := -1;
-  Exit;
- End;
+{ Les options proposees sont reliees au comportement effectif du programme. }
+Function Prefs_Path: String;
+Var Path: String; I: Integer;
+Begin
+ Path:=AccountFileName; I:=Length(Path);
+ While (I>0) And Not (Path[I] In ['.',Chr(92),'/']) Do Dec(I);
+ If (I>0) And (Path[I]='.') Then Delete(Path,I,255);
+ Prefs_Path:=Path+'.OPT';
+End;
 
- { Zone de contenu }
- ContentX := X1 + PREFS_TAB_WIDTH + 15;
- ContentY := Y1 + 35;
- ContentW := PREFS_WINDOW_WIDTH - PREFS_TAB_WIDTH - 25;
- ContentH := PREFS_WINDOW_HEIGHT - 90;
+Function Prefs_Save: Boolean;
+Var SavedData: TMailText; SavedError: String; Number: String;
+ Procedure AddNumber(N: Integer);
+ Begin Str(N,Number); FileSaveData:=FileSaveData+Number+#13#10; End;
+Begin
+ SavedData:=FileSaveData; SavedError:=FileOpenError;
+ FileSaveData:='OUTLOOK-OPTIONS-1'+#13#10;
+ AddNumber(Ord(OptionsDraft.General.CheckMailOnStart));
+ AddNumber(Ord(OptionsDraft.Reading.ShowPreviewPane));
+ AddNumber(Ord(OptionsDraft.Reading.PreviewOnRight));
+ AddNumber(Ord(OptionsDraft.Reading.UseAlternateRowColor));
+ AddNumber(Ord(OptionsDraft.Composing.IncludeOriginal));
+ FileSaveData:=FileSaveData+OptionsDraft.Composing.QuotePrefix+#13#10;
+ AddNumber(Ord(OptionsDraft.Connection.OfflineMode));
+ AddNumber(OptionsDraft.Connection.ConnectionTimeout);
+ Prefs_Save:=WriteMessageFile(Prefs_Path,True);
+ OptionsError:='';
+ If FileOpenError<>'' Then OptionsError:='Impossible de sauvegarder les options.';
+ FileSaveData:=SavedData; FileOpenError:=SavedError;
+End;
 
- If (MX >= ContentX) And (MX <= ContentX + ContentW) And
-    (MY >= ContentY) And (MY <= ContentY + ContentH) Then Begin
-  RelY := MY - ContentY - 10;
-
-  { Gerer les clics sur les checkboxes selon l'onglet }
-  Case PrefsCurrentTab Of
-   ptGeneral: Begin
-    If (RelY >= 76) And (RelY < 98) Then Begin
-     UserPrefs.General.StartMinimized := Not UserPrefs.General.StartMinimized;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 98) And (RelY < 120) Then Begin
-     UserPrefs.General.CheckMailOnStart := Not UserPrefs.General.CheckMailOnStart;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 120) And (RelY < 142) Then Begin
-     UserPrefs.General.EmptyTrashOnExit := Not UserPrefs.General.EmptyTrashOnExit;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 142) And (RelY < 164) Then Begin
-     UserPrefs.General.ShowSplash := Not UserPrefs.General.ShowSplash;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 164) And (RelY < 186) Then Begin
-     UserPrefs.General.MinimizeToTray := Not UserPrefs.General.MinimizeToTray;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 186) And (RelY < 208) Then Begin
-     UserPrefs.General.ConfirmExit := Not UserPrefs.General.ConfirmExit;
-     PrefsNeedsSave := True;
-    End;
-   End;
-
-   ptReading: Begin
-    If (RelY >= 166) And (RelY < 188) Then Begin
-     UserPrefs.Reading.ShowPreviewPane := Not UserPrefs.Reading.ShowPreviewPane;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 188) And (RelY < 210) Then Begin
-     UserPrefs.Reading.PreviewOnRight := Not UserPrefs.Reading.PreviewOnRight;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 210) And (RelY < 232) Then Begin
-     UserPrefs.Reading.AutoExpandGroups := Not UserPrefs.Reading.AutoExpandGroups;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 232) And (RelY < 254) Then Begin
-     UserPrefs.Reading.UseAlternateRowColor := Not UserPrefs.Reading.UseAlternateRowColor;
-     PrefsNeedsSave := True;
-    End;
-   End;
-
-   ptComposing: Begin
-    If (RelY >= 136) And (RelY < 158) Then Begin
-     UserPrefs.Composing.SpellCheckEnabled := Not UserPrefs.Composing.SpellCheckEnabled;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 158) And (RelY < 180) Then Begin
-     UserPrefs.Composing.SpellCheckOnSend := Not UserPrefs.Composing.SpellCheckOnSend;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 180) And (RelY < 202) Then Begin
-     UserPrefs.Composing.AutoSaveDrafts := Not UserPrefs.Composing.AutoSaveDrafts;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 202) And (RelY < 224) Then Begin
-     UserPrefs.Composing.IncludeOriginal := Not UserPrefs.Composing.IncludeOriginal;
-     PrefsNeedsSave := True;
-    End;
-   End;
-
-   ptConnection: Begin
-    If (RelY >= 136) And (RelY < 158) Then Begin
-     UserPrefs.Connection.OfflineMode := Not UserPrefs.Connection.OfflineMode;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 158) And (RelY < 180) Then Begin
-     UserPrefs.Connection.AutoReconnect := Not UserPrefs.Connection.AutoReconnect;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 180) And (RelY < 202) Then Begin
-     UserPrefs.Connection.SavePassword := Not UserPrefs.Connection.SavePassword;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 202) And (RelY < 224) Then Begin
-     UserPrefs.Connection.UseSSL := Not UserPrefs.Connection.UseSSL;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 224) And (RelY < 246) Then Begin
-     UserPrefs.Connection.VerifyCertificates := Not UserPrefs.Connection.VerifyCertificates;
-     PrefsNeedsSave := True;
-    End;
-   End;
-
-   ptSecurity: Begin
-    If (RelY >= 0) And (RelY < 22) Then Begin
-     UserPrefs.Security.WarnOnExternal := Not UserPrefs.Security.WarnOnExternal;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 22) And (RelY < 44) Then Begin
-     UserPrefs.Security.BlockExternalImages := Not UserPrefs.Security.BlockExternalImages;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 44) And (RelY < 66) Then Begin
-     UserPrefs.Security.WarnOnAttachments := Not UserPrefs.Security.WarnOnAttachments;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 66) And (RelY < 88) Then Begin
-     UserPrefs.Security.EnableVirusCheck := Not UserPrefs.Security.EnableVirusCheck;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 88) And (RelY < 110) Then Begin
-     UserPrefs.Security.WarnOnUnencrypted := Not UserPrefs.Security.WarnOnUnencrypted;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 110) And (RelY < 132) Then Begin
-     UserPrefs.Security.EnablePhishingFilter := Not UserPrefs.Security.EnablePhishingFilter;
-     PrefsNeedsSave := True;
-    End
-    Else If (RelY >= 132) And (RelY < 154) Then Begin
-     UserPrefs.Security.TrustSenderImages := Not UserPrefs.Security.TrustSenderImages;
-     PrefsNeedsSave := True;
-    End;
+Function Prefs_Load: Boolean;
+Var F: Text; Draft: TUserPreferences; Line: String; Err,Code,N,I: Integer; OldMode: Byte;
+Begin
+ Prefs_Load:=False; OptionsError:=''; Draft:=UserPrefs;
+ {$I-}
+ Assign(F,Prefs_Path); OldMode:=FileMode; FileMode:=0; Reset(F); FileMode:=OldMode; Err:=IOResult;
+ If Err=2 Then Exit;
+ If Err<>0 Then Begin OptionsError:='Impossible de lire les options.'; Exit; End;
+ ReadLn(F,Line); Err:=IOResult;
+ If (Err=0) And (Line<>'OUTLOOK-OPTIONS-1') Then Err:=100;
+ For I:=0 To 7 Do Begin
+  If Err<>0 Then Break;
+  If Eof(F) Then Begin Err:=100; Break; End;
+  ReadLn(F,Line); Err:=IOResult;
+  If Err<>0 Then Break;
+  If I=5 Then Begin
+   If Length(Line)>5 Then Err:=100 Else Draft.Composing.QuotePrefix:=Line;
+  End Else Begin
+   Val(Line,N,Code);
+   If (Code<>0) Or (N<0) Then Err:=100;
+   If I=7 Then Begin If (N<10) Or (N>120) Then Err:=100; End
+   Else If N>1 Then Err:=100;
+   If Err=0 Then Case I Of
+    0: Draft.General.CheckMailOnStart:=N=1;
+    1: Draft.Reading.ShowPreviewPane:=N=1;
+    2: Draft.Reading.PreviewOnRight:=N=1;
+    3: Draft.Reading.UseAlternateRowColor:=N=1;
+    4: Draft.Composing.IncludeOriginal:=N=1;
+    6: Draft.Connection.OfflineMode:=N=1;
+    7: Draft.Connection.ConnectionTimeout:=N;
    End;
   End;
-  Exit;
  End;
-
- { Boutons en bas }
- BtnY := Y2 - 35;
-
- { Bouton OK }
- BtnX := X2 - 270;
- If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
-  Prefs_Save;
-  PrefsVisible := False;
-  Exit;
- End;
-
- { Bouton Annuler }
- BtnX := X2 - 180;
- If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
-  If PrefsNeedsSave Then Begin
-   { Recharger les preferences depuis le fichier }
-   Prefs_Load;
-  End;
-  PrefsVisible := False;
-  Exit;
- End;
-
- { Bouton Appliquer }
- BtnX := X2 - 90;
- If (MX >= BtnX) And (MX <= BtnX + BtnW) And (MY >= BtnY) And (MY <= BtnY + BtnH) Then Begin
-  Prefs_Save;
-  Exit;
- End;
+ If (Err=0) And Not Eof(F) Then Err:=100;
+ Close(F); Code:=IOResult; If Err=0 Then Err:=Code;
+ {$I+}
+ If Err<>0 Then Begin OptionsError:='Fichier options invalide ou incomplet.'; Exit; End;
+ UserPrefs:=Draft; Prefs_Load:=True;
 End;
 
-{ Affiche la fenetre de preferences }
-Procedure Prefs_Show;
-Begin
- PrefsVisible := True;
- PrefsCurrentTab := ptGeneral;
- PrefsEditingField := -1;
- PrefsNeedsSave := False;
-End;
-
-{ Masque la fenetre de preferences }
-Procedure Prefs_Hide;
-Begin
- PrefsVisible := False;
-End;
-
-{ Initialise le systeme de preferences }
-Procedure Prefs_Init;
-Begin
- { Initialiser avec les valeurs par defaut }
- Prefs_InitDefaults;
-
- { Tenter de charger depuis le fichier }
- Prefs_Load;
-End;
-
-{ Applique les preferences de lecture }
 Procedure Prefs_ApplyReadingSettings;
 Begin
- { Appliquer l'orientation du volet }
- If UserPrefs.Reading.PreviewOnRight Then
-  PreviewOrientation := poVertical
- Else
-  PreviewOrientation := poHorizontal;
+ If UserPrefs.Reading.PreviewOnRight Then PreviewOrientation:=poVertical
+ Else PreviewOrientation:=poHorizontal;
+ PreviewVisible:=UserPrefs.Reading.ShowPreviewPane;
+ If PreviewVisible And (Layout.PreviewPaneHeight=0) Then Layout.PreviewPaneHeight:=150;
+ CalculateLayout;
+End;
 
- { Appliquer la visibilite du volet }
- PreviewVisible := UserPrefs.Reading.ShowPreviewPane;
+Procedure Prefs_DrawWindow;
+Var X,Y,I: Integer; Text: String; Checked: Boolean;
+Begin
+ If Not PrefsVisible Then Exit;
+ X:=PrefsWindowX; Y:=PrefsWindowY; DrawDialogBox(X,Y,520,370,'Options');
+ For I:=0 To 7 Do Begin
+  Checked:=False; Text:='';
+  Case I Of
+   0: Begin Checked:=OptionsDraft.General.CheckMailOnStart; Text:='Relever le courrier au demarrage'; End;
+   1: Begin Checked:=OptionsDraft.Reading.ShowPreviewPane; Text:='Afficher le volet de lecture'; End;
+   2: Begin Checked:=OptionsDraft.Reading.PreviewOnRight; Text:='Placer le volet de lecture a droite'; End;
+   3: Begin Checked:=OptionsDraft.Reading.UseAlternateRowColor; Text:='Alterner les couleurs des messages'; End;
+   4: Begin Checked:=OptionsDraft.Composing.IncludeOriginal; Text:='Citer le message original dans les reponses'; End;
+   5: Text:='Prefixe de citation :';
+   6: Begin Checked:=OptionsDraft.Connection.OfflineMode; Text:='Mode hors ligne (aucune connexion)'; End;
+   7: Text:='Delai reseau (10 a 120 secondes) :';
+  End;
+  If I In [0,1,2,3,4,6] Then Begin
+   If Checked Then Text:='[x] '+Text Else Text:='[ ] '+Text;
+  End;
+  If OptionsFocus=I Then Text:='> '+Text Else Text:='  '+Text;
+  SetColor(Black); OutTextXY(X+16,Y+40+I*32,Text);
+  If I=5 Then Begin
+   FillRect(X+286,Y+34+I*32,X+494,Y+58+I*32,White);
+   Text:=OptionsDraft.Composing.QuotePrefix;
+   If OptionsFocus=5 Then Insert('|',Text,OptionsCursor+1);
+   OutTextXY(X+292,Y+40+I*32,Text);
+  End;
+  If I=7 Then Begin
+   Str(OptionsDraft.Connection.ConnectionTimeout,Text);
+   OutTextXY(X+350,Y+40+I*32,'< '+Text+' >');
+  End;
+ End;
+ SetColor(Black); OutTextXY(X+16,Y+296,OptionsError);
+ DrawDialogButton(X+224,Y+330,80,26,'OK',OptionsFocus=8,True);
+ DrawDialogButton(X+314,Y+330,90,26,'Annuler',OptionsFocus=9,True);
+ DrawDialogButton(X+414,Y+330,90,26,'Appliquer',OptionsFocus=10,True);
+End;
+
+Procedure Prefs_Hide;
+Begin PrefsVisible:=False; DrawInterface; End;
+
+Procedure Prefs_Commit(CloseAfter: Boolean);
+Begin
+ If Not Prefs_Save Then Begin DrawInterface; Exit; End;
+ UserPrefs:=OptionsDraft; UserPrefs.Modified:=False;
+ Prefs_ApplyReadingSettings;
+ If CloseAfter Then PrefsVisible:=False;
+ DrawInterface;
+End;
+
+Procedure Prefs_Change(Delta: Integer);
+Begin
+ OptionsError:='';
+ Case OptionsFocus Of
+  0: OptionsDraft.General.CheckMailOnStart:=Not OptionsDraft.General.CheckMailOnStart;
+  1: OptionsDraft.Reading.ShowPreviewPane:=Not OptionsDraft.Reading.ShowPreviewPane;
+  2: OptionsDraft.Reading.PreviewOnRight:=Not OptionsDraft.Reading.PreviewOnRight;
+  3: OptionsDraft.Reading.UseAlternateRowColor:=Not OptionsDraft.Reading.UseAlternateRowColor;
+  4: OptionsDraft.Composing.IncludeOriginal:=Not OptionsDraft.Composing.IncludeOriginal;
+  6: OptionsDraft.Connection.OfflineMode:=Not OptionsDraft.Connection.OfflineMode;
+  7: Begin
+   Inc(OptionsDraft.Connection.ConnectionTimeout,Delta);
+   If OptionsDraft.Connection.ConnectionTimeout<10 Then OptionsDraft.Connection.ConnectionTimeout:=10;
+   If OptionsDraft.Connection.ConnectionTimeout>120 Then OptionsDraft.Connection.ConnectionTimeout:=120;
+  End;
+  8: Prefs_Commit(True);
+  9: Prefs_Hide;
+  10: Prefs_Commit(False);
+ End;
+End;
+
+Procedure Prefs_Show;
+Begin
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or
+    ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ OptionsDraft:=UserPrefs;
+ OptionsDraft.Reading.ShowPreviewPane:=PreviewVisible;
+ OptionsDraft.Reading.PreviewOnRight:=PreviewOrientation=poVertical;
+ OptionsFocus:=0; OptionsCursor:=Length(OptionsDraft.Composing.QuotePrefix);
+ PrefsWindowX:=(SCREEN_WIDTH-520) Div 2; PrefsWindowY:=(SCREEN_HEIGHT-370) Div 2;
+ PrefsVisible:=True; ContextMenuVisible:=False; DrawInterface;
+End;
+
+Procedure Prefs_HandleKey(Key: Char; Extended: Boolean);
+Var Text: String;
+Begin
+ Text:=OptionsDraft.Composing.QuotePrefix;
+ If Extended Then Begin
+  Case Key Of
+   #15: OptionsFocus:=(OptionsFocus+10) Mod 11;
+   #72: OptionsFocus:=(OptionsFocus+10) Mod 11;
+   #80: OptionsFocus:=(OptionsFocus+1) Mod 11;
+   #75: If OptionsFocus=5 Then Begin If OptionsCursor>0 Then Dec(OptionsCursor); End
+        Else If OptionsFocus=7 Then Prefs_Change(-1);
+   #77: If OptionsFocus=5 Then Begin If OptionsCursor<Length(Text) Then Inc(OptionsCursor); End
+        Else If OptionsFocus=7 Then Prefs_Change(1);
+   #71: If OptionsFocus=5 Then OptionsCursor:=0;
+   #79: If OptionsFocus=5 Then OptionsCursor:=Length(Text);
+   #83: If OptionsFocus=5 Then Delete(Text,OptionsCursor+1,1);
+  End;
+ End Else Case Key Of
+  #27: Begin Prefs_Hide; Exit; End;
+  #9: OptionsFocus:=(OptionsFocus+1) Mod 11;
+  #13: Begin
+   If OptionsFocus=9 Then Prefs_Hide Else Prefs_Commit(OptionsFocus<>10);
+   Exit;
+  End;
+  #8: If (OptionsFocus=5) And (OptionsCursor>0) Then Begin
+   Delete(Text,OptionsCursor,1); Dec(OptionsCursor); End;
+  #32..#255: If OptionsFocus=5 Then Begin
+   If Length(Text)<5 Then Begin Insert(Key,Text,OptionsCursor+1); Inc(OptionsCursor); End;
+  End Else If Key=' ' Then Prefs_Change(1);
+ End;
+ OptionsDraft.Composing.QuotePrefix:=Text; DrawInterface;
+End;
+
+Procedure Prefs_HandleClick(MX,MY: Integer);
+Var X,Y,Row: Integer;
+Begin
+ X:=MX-PrefsWindowX; Y:=MY-PrefsWindowY;
+ If (X<0) Or (X>520) Or (Y<0) Or (Y>370) Then Exit;
+ If (X>=16) And (X<=500) And (Y>=34) And (Y<282) Then Begin
+  Row:=(Y-34) Div 32;
+  If Y<=58+Row*32 Then Begin
+   OptionsFocus:=Row;
+   If Row=5 Then OptionsCursor:=Length(OptionsDraft.Composing.QuotePrefix)
+   Else If (Row=7) And (X<380) Then Prefs_Change(-1) Else Prefs_Change(1);
+  End;
+ End Else If (Y>=330) And (Y<=356) Then Begin
+  If (X>=224) And (X<=304) Then Prefs_Commit(True)
+  Else If (X>=314) And (X<=404) Then Prefs_Hide
+  Else If (X>=414) And (X<=504) Then Prefs_Commit(False);
+ End;
+ DrawInterface;
+End;
+
+Procedure Prefs_Init;
+Begin
+ Prefs_InitDefaults; OptionsReady:=True; Prefs_Load; Prefs_ApplyReadingSettings;
 End;
 
 { ============================================================================
@@ -20450,7 +21680,7 @@ Begin
  Rewrite(F);
  If IOResult <> 0 Then Exit;
 
- WriteLn(F, '; Fichier de langue pour Outlook Express');
+ WriteLn(F, '; Fichier de langue pour Outlook');
  WriteLn(F, '; Langue: ' + LANG_NAMES[CurrentLanguage]);
  WriteLn(F, '; Code: ' + LANG_CODES[CurrentLanguage]);
  WriteLn(F, ';');
@@ -20555,12 +21785,894 @@ End;
   FIN DE L'IMPLEMENTATION DU SUPPORT MULTI-LANGUE (TODO 25)
   ============================================================================ }
 
-{ Initialise la liste des messages avec des donnees de demonstration }
-Procedure InitializeMessageList;
+{ En-tetes RFC 5322 avec lignes repliees. }
+Function MailHeader(Const Raw, Name: TMailText): TMailText;
+Var P, Q, StopAt: LongInt; Line, Key, Value: TMailText;
 Begin
- MessageCount := 8;
+ MailHeader:=''; Key:=''; Value:=''; P:=1;
+ StopAt:=Pos(#13#10#13#10,Raw); If StopAt=0 Then StopAt:=Length(Raw)+1;
+ While P<StopAt Do Begin
+  Q:=P; While (Q<StopAt) And (Raw[Q]<>#13) Do Inc(Q);
+  Line:=Copy(Raw,P,Q-P); P:=Q+2;
+  If (Line<>'') And (Line[1] In [' ',#9]) Then Value:=Value+' '+MailTrim(Line)
+  Else Begin
+   If MailUpper(Key)=MailUpper(Name) Then Begin MailHeader:=Value; Exit; End;
+   Q:=Pos(':',Line); Key:=Copy(Line,1,Q-1); Value:=MailTrim(Copy(Line,Q+1,Length(Line)));
+  End;
+ End;
+ If MailUpper(Key)=MailUpper(Name) Then MailHeader:=Value;
+End;
+
+Function MailDecodeData(Const Data, Encoding: TMailText): TMailText;
+Const Alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+Var I, V, Bits, Acc, Code: LongInt; Hex: String;
+Begin
+ MailDecodeData:='';
+ If Pos('BASE64',MailUpper(Encoding))>0 Then Begin
+  Acc:=0; Bits:=0;
+  For I:=1 To Length(Data) Do Begin
+   V:=Pos(Data[I],Alphabet)-1;
+   If V>=0 Then Begin
+    Acc:=((Acc Shl 6) Or V) And $FFFFFF; Inc(Bits,6);
+    If Bits>=8 Then Begin Dec(Bits,8); MailDecodeData:=MailDecodeData+Chr((Acc Shr Bits) And 255); End;
+   End;
+  End;
+ End Else If Pos('QUOTED-PRINTABLE',MailUpper(Encoding))>0 Then Begin
+  I:=1;
+  While I<=Length(Data) Do Begin
+   If (Data[I]='=') And (I+2<=Length(Data)) Then Begin
+    If Copy(Data,I+1,2)=#13#10 Then Inc(I,3)
+    Else Begin
+     Hex:='$'+Copy(Data,I+1,2); Val(Hex,V,Code);
+     If Code=0 Then Begin MailDecodeData:=MailDecodeData+Chr(V); Inc(I,3); End
+     Else Begin MailDecodeData:=MailDecodeData+Data[I]; Inc(I); End;
+    End;
+   End Else Begin MailDecodeData:=MailDecodeData+Data[I]; Inc(I); End;
+  End;
+ End Else MailDecodeData:=Data;
+End;
+
+{ Parcourir MIME pour afficher la partie texte, sans creer de faux contenu. }
+Function MailTextBody(Const Raw: TMailText; Depth: Integer): TMailText;
+Var P, Q, R: LongInt; ContentType, Boundary, Body, Part, Candidate, Fallback: TMailText;
+ Quoted, InTag: Boolean;
+Begin
+ MailTextBody:=''; If Depth>8 Then Exit;
+ P:=Pos(#13#10#13#10,Raw); If P=0 Then Exit;
+ Body:=Copy(Raw,P+4,Length(Raw)); ContentType:=MailHeader(Raw,'Content-Type');
+ If Pos('MULTIPART/',MailUpper(ContentType))=1 Then Begin
+  P:=Pos('BOUNDARY=',MailUpper(ContentType)); If P=0 Then Exit;
+  Boundary:=MailTrim(Copy(ContentType,P+9,Length(ContentType)));
+  Quoted:=(Boundary<>'') And (Boundary[1]='"');
+  If Quoted Then Begin Delete(Boundary,1,1); P:=Pos('"',Boundary); End
+  Else P:=Pos(';',Boundary);
+  If P>0 Then Boundary:=Copy(Boundary,1,P-1);
+  If Boundary='' Then Exit;
+  Boundary:='--'+Boundary; P:=Pos(Boundary+#13#10,Body); Fallback:='';
+  While P>0 Do Begin
+   Delete(Body,1,P+Length(Boundary)+1); Q:=Pos(#13#10+Boundary,Body);
+   If Q=0 Then Break;
+   Part:=Copy(Body,1,Q-1);
+   If Pos('ATTACHMENT',MailUpper(MailHeader(Part,'Content-Disposition')))=0 Then Begin
+    Candidate:=MailTextBody(Part,Depth+1);
+    If Pos('TEXT/PLAIN',MailUpper(MailHeader(Part,'Content-Type')))=1 Then Begin
+     MailTextBody:=Candidate; Exit;
+    End;
+    If Fallback='' Then Fallback:=Candidate;
+   End;
+   Delete(Body,1,Q+1);
+   If Copy(Body,Length(Boundary)+1,2)='--' Then Break;
+   P:=Pos(Boundary+#13#10,Body);
+  End;
+  MailTextBody:=Fallback; Exit;
+ End;
+ If (ContentType<>'') And (Pos('TEXT/',MailUpper(ContentType))<>1) Then Exit;
+ Body:=MailDecodeData(Body,MailHeader(Raw,'Content-Transfer-Encoding'));
+ If Pos('TEXT/HTML',MailUpper(ContentType))=1 Then Begin
+  Candidate:=''; InTag:=False;
+  For R:=1 To Length(Body) Do Begin
+   If Body[R]='<' Then Begin InTag:=True; Candidate:=Candidate+' '; End
+   Else If Body[R]='>' Then InTag:=False
+   Else If Not InTag Then Candidate:=Candidate+Body[R];
+  End;
+  Body:=Candidate;
+ End;
+ MailTextBody:=Body;
+End;
+
+Procedure MailParseMessage(Const Raw, ID: TMailText; Var Msg: TMessage);
+Var Value, Body, Line: TMailText; P, Q, I, N: LongInt;
+Begin
+ FillChar(Msg,SizeOf(Msg),0); Msg.MsgID:=Copy(ID,1,20); Msg.Priority:=mpNormal;
+ Value:=MailHeader(Raw,'From'); P:=Pos('<',Value); Q:=Pos('>',Value);
+ If (P>0) And (Q>P) Then Begin
+  Msg.FromName:=MIME_DecodeHeader(Copy(MailTrim(Copy(Value,1,P-1)),1,255));
+  Msg.FromEmail:=Copy(Value,P+1,Q-P-1);
+ End Else Begin Msg.FromEmail:=Copy(Value,1,60); Msg.FromName:=Msg.FromEmail; End;
+ If Msg.FromName='' Then Msg.FromName:=Msg.FromEmail;
+ Msg.ToEmail:=Copy(MailHeader(Raw,'To'),1,60);
+ Msg.CcEmail:=Copy(MailHeader(Raw,'Cc'),1,80);
+ Msg.Subject:=MIME_DecodeHeader(Copy(MailHeader(Raw,'Subject'),1,255));
+ Msg.DateFull:=Copy(MailHeader(Raw,'Date'),1,25); Msg.DateStr:=Copy(Msg.DateFull,1,10);
+ Msg.Size:=Length(Raw);
+ Msg.HasAttachment:=(Pos('ATTACHMENT',MailUpper(Raw))>0);
+ Body:=MailTextBody(Raw,0); P:=1; I:=0;
+ While (P<=Length(Body)) And (I<20) Do Begin
+  Q:=P; While (Q<=Length(Body)) And Not (Body[Q] In [#13,#10]) Do Inc(Q);
+  Line:=Copy(Body,P,Q-P);
+  Repeat
+   N:=Length(Line); If N>80 Then N:=80;
+   Msg.Body[I]:=Copy(Line,1,N); Inc(I); Delete(Line,1,N);
+  Until (Line='') Or (I=20);
+  P:=Q+1; If (Q<Length(Body)) And (Body[Q]=#13) And (Body[Q+1]=#10) Then Inc(P);
+ End;
+ Msg.BodyLineCount:=I;
+End;
+
+{ Accepter les fins de ligne LF des fichiers exportes sur d autres systemes. }
+Function NormalizeMessageLines(Const Raw: TMailText): TMailText;
+{$IFDEF FPC}
+Var I, Extra, Target: LongInt;
+{$ENDIF}
+Begin
+ {$IFDEF FPC}
+ Extra := 0;
+ For I := 1 To Length(Raw) Do
+  If Raw[I] = #10 Then
+   If (I = 1) Or (Raw[I-1] <> #13) Then Inc(Extra);
+ If Extra = 0 Then Begin NormalizeMessageLines := Raw; Exit; End;
+ SetLength(NormalizeMessageLines, Length(Raw) + Extra);
+ Target := 0;
+ For I := 1 To Length(Raw) Do Begin
+  If Raw[I] = #10 Then
+   If (I = 1) Or (Raw[I-1] <> #13) Then Begin
+    Inc(Target); NormalizeMessageLines[Target] := #13;
+   End;
+  Inc(Target); NormalizeMessageLines[Target] := Raw[I];
+ End;
+ {$ELSE}
+ NormalizeMessageLines := Raw;
+ {$ENDIF}
+End;
+
+{ Ne modifier la vue que lorsque le fichier a ete entierement lu et valide. }
+Function LoadMessageFile(FileName: TMailText): Boolean;
+Var
+ F: File;
+ Raw, OriginalRaw, Headers: TMailText;
+ OpenedMessage: TMessage;
+ Count, HeaderEnd: LongInt;
+ {$IFDEF FPC}
+ FileLength: Int64;
+ {$ELSE}
+ FileLength: LongInt;
+ {$ENDIF}
+ Err, I: Integer; OldFileMode: Byte;
+Begin
+ LoadMessageFile := False;
+ If (FileName = '') Or (Length(FileName) > 255) Then Begin
+  MailStatus := 'Erreur: chemin du courriel vide ou trop long'; Exit;
+ End;
+ {$I-}
+ Assign(F, FileName);
+ OldFileMode:=FileMode; FileMode:=0;
+ Reset(F, 1);
+ FileMode:=OldFileMode;
+ Err := IOResult;
+ If Err <> 0 Then Begin
+  MailStatus := 'Erreur: impossible d ouvrir le fichier de courriel'; Exit;
+ End;
+ FileLength := FileSize(F);
+ Err := IOResult;
+ If (Err = 0) And (FileLength > 0) And (FileLength <= 10485760) Then Begin
+  {$IFDEF FPC}
+  SetLength(Raw, FileLength);
+  {$ELSE}
+  If FileLength > 255 Then Err := 100
+  Else Raw[0] := Chr(FileLength);
+  {$ENDIF}
+  If Err = 0 Then Begin
+   BlockRead(F, Raw[1], FileLength, Count);
+   Err := IOResult;
+   If Count <> FileLength Then Err := 100;
+  End;
+ End Else Err := 100;
+ Close(F);
+ If IOResult <> 0 Then Err := 100;
+ {$I+}
+ If Err <> 0 Then Begin
+  MailStatus := 'Erreur: lecture impossible, fichier vide ou plus de 10 Mo'; Exit;
+ End;
+ OriginalRaw := Raw;
+ Raw := NormalizeMessageLines(Raw);
+ If Copy(Raw, 1, 3) = #$EF#$BB#$BF Then Delete(Raw, 1, 3);
+ HeaderEnd := Pos(#13#10#13#10, Raw);
+ Headers := Copy(Raw, 1, HeaderEnd);
+ If (HeaderEnd = 0) Or (Pos(#0, Headers) > 0) Or
+    ((MailHeader(Raw, 'From') = '') And (MailHeader(Raw, 'Subject') = '') And
+     (MailHeader(Raw, 'To') = '') And (MailHeader(Raw, 'MIME-Version') <> '1.0')) Then Begin
+  MailStatus := 'Erreur: fichier invalide; un courriel au format EML est requis'; Exit;
+ End;
+ MailParseMessage(Raw, MailHeader(Raw, 'Message-ID'), OpenedMessage);
+ OpenedMessage.IsRead := True;
+ OpenedMessage.IsSelected := True;
+ For I := 0 To FolderCount - 1 Do Folders[I].Selected := False;
+ SelectedFolder := -1;
+ MailLoadedFolder := -1;
+ MessageCount := 1;
+ Messages[0] := OpenedMessage;
+ For I := 0 To MAX_MESSAGES-1 Do MessageSources[I] := '';
+ MessageSources[0] := OriginalRaw;
  SelectedMessage := 0;
  LastSelectedMessage := 0;
+ MessageScrollOffset := 0;
+ PreviewScrollX := 0;
+ PreviewScrollY := 0;
+ If Not OptionsReady Then PreviewVisible:=True;
+ If Layout.PreviewPaneHeight = 0 Then Layout.PreviewPaneHeight := 150;
+ MailStatus := 'Fichier ouvert : ' + Copy(FileName, 1, 62);
+ LoadMessageFile := True;
+End;
+
+{ Navigation de fichiers avec les routines DOS deja presentes dans Uses.
+  Aucune boite de dialogue native ni unite supplementaire n est utilisee. }
+Function OpenFileJoin(DirectoryName, Name: TMailText): TMailText;
+Var Separator: Char;
+Begin
+ Separator := '\';
+ {$IFDEF UNIX}
+ Separator := '/';
+ {$ENDIF}
+ If (DirectoryName <> '') And
+    Not (DirectoryName[Length(DirectoryName)] In ['\','/']) Then
+  DirectoryName := DirectoryName + Separator;
+ OpenFileJoin := DirectoryName + Name;
+End;
+
+Function OpenFileFullPath(Name: TMailText): TMailText;
+Begin
+ Name := MailTrim(Name);
+ If (Length(Name) >= 2) And (Name[1] = '"') And (Name[Length(Name)] = '"') Then
+  Name := Copy(Name, 2, Length(Name)-2);
+ If Name = '' Then Begin OpenFileFullPath := ''; Exit; End;
+ If Not (Name[1] In ['\','/']) And (Copy(Name,2,1) <> ':') Then
+  Name := OpenFileJoin(FileOpenDirectory, Name);
+ If Length(Name) > 255 Then OpenFileFullPath := ''
+ Else OpenFileFullPath := FExpand(Name);
+End;
+
+Function OpenFileIsDirectory(Path: TMailText): Boolean;
+Var F: File; Attributes: Word;
+Begin
+ OpenFileIsDirectory := False;
+ If (Path = '') Or (Length(Path) > 255) Then Exit;
+ Assign(F, Path);
+ GetFAttr(F, Attributes);
+ If DosError = 0 Then OpenFileIsDirectory := (Attributes And $10) <> 0;
+End;
+
+Procedure ReadOpenFileDirectory;
+Var
+ Entry: SearchRec;
+ I, J: Integer;
+ FirstError: Integer;
+ Item, Swap: TOpenFileEntry;
+ Pattern: TMailText;
+Begin
+ FileOpenCount := 1;
+ FileOpenEntries[0].Name := '..';
+ FileOpenEntries[0].IsDirectory := True;
+ FileOpenSelection := 0;
+ FileOpenScroll := 0;
+ FileOpenTruncated := False;
+ Pattern := OpenFileJoin(FileOpenDirectory, '*.*');
+ If Length(Pattern) > 255 Then Begin
+  FileOpenError := 'Erreur: chemin du repertoire trop long'; Exit;
+ End;
+ FindFirst(Pattern, AnyFile, Entry);
+ FirstError := DosError;
+ While DosError = 0 Do Begin
+  If (Entry.Name <> '.') And (Entry.Name <> '..') Then Begin
+   Item.Name := Entry.Name;
+   Item.IsDirectory := (Entry.Attr And $10) <> 0;
+   If Item.IsDirectory Or FileOpenShowAll Or
+      (MailUpper(Copy(Item.Name, Length(Item.Name)-3, 4)) = '.EML') Then Begin
+    If FileOpenCount < MAX_OPEN_DIALOG_FILES Then Begin
+     FileOpenEntries[FileOpenCount] := Item;
+     Inc(FileOpenCount);
+    End Else FileOpenTruncated := True;
+   End;
+  End;
+  FindNext(Entry);
+ End;
+ {$IFDEF FPC}
+ If FirstError = 0 Then FindClose(Entry);
+ {$ENDIF}
+ If (FirstError <> 0) And (FirstError <> 18) And (FirstError <> 2) Then
+  FileOpenError := 'Erreur: impossible de lire ce repertoire';
+ { Conserver .. en premier, puis les dossiers, puis les fichiers. }
+ For I := 1 To FileOpenCount-2 Do
+  For J := I+1 To FileOpenCount-1 Do
+   If (FileOpenEntries[J].IsDirectory And Not FileOpenEntries[I].IsDirectory) Or
+      ((FileOpenEntries[J].IsDirectory = FileOpenEntries[I].IsDirectory) And
+       (MailUpper(FileOpenEntries[J].Name) < MailUpper(FileOpenEntries[I].Name))) Then Begin
+    Swap := FileOpenEntries[I];
+    FileOpenEntries[I] := FileOpenEntries[J];
+    FileOpenEntries[J] := Swap;
+   End;
+End;
+
+Procedure OpenFileSelect(Index: Integer);
+Begin
+ If Index < 0 Then Index := 0;
+ If Index >= FileOpenCount Then Index := FileOpenCount-1;
+ FileOpenSelection := Index;
+ If Index < FileOpenScroll Then FileOpenScroll := Index;
+ If Index >= FileOpenScroll + OPEN_DIALOG_ROWS Then
+  FileOpenScroll := Index - OPEN_DIALOG_ROWS + 1;
+ If (Index >= 0) And
+    (Not FileDialogSaveMode Or Not FileOpenEntries[Index].IsDirectory) Then Begin
+  FileOpenName := FileOpenEntries[Index].Name;
+  FileOpenCursor := Length(FileOpenName);
+ End;
+End;
+
+Procedure OpenFileChangeDirectory(Path: TMailText);
+Begin
+ If Not OpenFileIsDirectory(Path) Then Begin
+  FileOpenError := 'Erreur: repertoire introuvable ou inaccessible'; Exit;
+ End;
+ FileOpenDirectory := Path;
+ If Not FileDialogSaveMode Then Begin
+  FileOpenName := ''; FileOpenCursor := 0;
+ End;
+ FileOpenError := '';
+ ReadOpenFileDirectory;
+ FileOpenFocus := 1;
+End;
+
+{ Ecrire le courriel complet, pas seulement les vingt lignes de previsualisation. }
+Function MessageFileExists(Path: TMailText): Boolean;
+Var F: File; Attributes: Word;
+Begin
+ Assign(F,Path); GetFAttr(F,Attributes);
+ MessageFileExists:=DosError=0;
+End;
+
+Function MessageSaveSibling(Path, Extension: TMailText): TMailText;
+Var I, LastSeparator, Attempt: Integer; Number: String; Candidate: TMailText;
+Begin
+ MessageSaveSibling:=''; LastSeparator:=0;
+ For I:=1 To Length(Path) Do If Path[I] In ['\','/',':'] Then LastSeparator:=I;
+ For Attempt:=0 To 9999 Do Begin
+  Str(Attempt,Number);
+  While Length(Number)<4 Do Number:='0'+Number;
+  Candidate:=Copy(Path,1,LastSeparator)+'~OE'+Number+Extension;
+  If Length(Candidate)>255 Then Exit;
+  If Not MessageFileExists(Candidate) Then Begin MessageSaveSibling:=Candidate; Exit; End;
+ End;
+End;
+
+Procedure DeleteMessageSaveTemporary(Path: TMailText);
+Var F: File; Err: Integer;
+Begin
+ {$I-}
+ Assign(F,Path); Erase(F); Err:=IOResult;
+ {$I+}
+End;
+
+Function WriteMessageFile(Path: TMailText; AllowReplace: Boolean): Boolean;
+Var F: File; Temporary, Backup: TMailText; Written: LongInt;
+ Err, RestoreError: Integer; Attributes: Word; HadOriginal, Created: Boolean;
+Begin
+ WriteMessageFile:=False; FileOpenError:='';
+ If (FileSaveData='') Or (Path='') Or (Length(Path)>255) Then Begin
+  FileOpenError:='Erreur: nom de fichier ou contenu du courriel invalide'; Exit;
+ End;
+ HadOriginal:=MessageFileExists(Path);
+ If HadOriginal Then Begin
+  If Not AllowReplace Then Begin FileOpenError:='Ce fichier existe deja'; Exit; End;
+  Assign(F,Path); GetFAttr(F,Attributes);
+  If (DosError<>0) Or ((Attributes And $11)<>0) Then Begin
+   FileOpenError:='Erreur: fichier en lecture seule ou inaccessible'; Exit;
+  End;
+ End;
+ Created:=False;
+ Temporary:=MessageSaveSibling(Path,'.TMP');
+ If Temporary='' Then Begin FileOpenError:='Erreur: impossible de creer un fichier temporaire'; Exit; End;
+ {$I-}
+ Assign(F,Temporary); Rewrite(F,1); Err:=IOResult;
+ If Err=0 Then Begin
+  Created:=True;
+  BlockWrite(F,FileSaveData[1],Length(FileSaveData),Written);
+  Err:=IOResult;
+  If Written<>Length(FileSaveData) Then Err:=101;
+  Close(F);
+  If IOResult<>0 Then Err:=101;
+ End;
+ {$I+}
+ If Err<>0 Then Begin
+  If Created Then DeleteMessageSaveTemporary(Temporary);
+  FileOpenError:='Erreur: impossible d ecrire le courriel sur disque'; Exit;
+ End;
+ Backup:='';
+ If HadOriginal Then Begin
+  Backup:=MessageSaveSibling(Path,'.BAK');
+  If Backup='' Then Err:=101
+  Else Begin
+   {$I-}
+   Assign(F,Path); Rename(F,Backup); Err:=IOResult;
+   {$I+}
+  End;
+  If Err<>0 Then Begin
+   DeleteMessageSaveTemporary(Temporary);
+   FileOpenError:='Erreur: le fichier existant ne peut pas etre remplace'; Exit;
+  End;
+ End;
+ {$I-}
+ Assign(F,Temporary); Rename(F,Path); Err:=IOResult;
+ {$I+}
+ If Err<>0 Then Begin
+  RestoreError:=0;
+  If Backup<>'' Then Begin
+   {$I-}
+   Assign(F,Backup); Rename(F,Path); RestoreError:=IOResult;
+   {$I+}
+  End;
+  If RestoreError=0 Then Begin
+   DeleteMessageSaveTemporary(Temporary);
+   FileOpenError:='Erreur: enregistrement impossible, fichier precedent conserve';
+  End Else FileOpenError:='Erreur: ancienne copie conservee dans '+Copy(Backup,1,34);
+  Exit;
+ End;
+ If Backup<>'' Then DeleteMessageSaveTemporary(Backup);
+ WriteMessageFile:=True;
+End;
+
+Procedure FinishMessageSave(Path: TMailText; AllowReplace: Boolean);
+Begin
+ If WriteMessageFile(Path,AllowReplace) Then Begin
+  If FileSaveFromComposer Then Composer.Modified:=False;
+  MailStatus:='Courriel enregistre : '+Copy(Path,1,58);
+  FileOpenVisible:=False;
+  FileSaveData:='';
+  DrawInterface;
+ End Else DrawOpenFileDialog;
+End;
+
+Procedure AnswerMessageOverwrite(ReplaceFile: Boolean);
+Var Path: TMailText;
+Begin
+ Path:=FileSaveOverwritePath;
+ FileSaveOverwritePending:=False;
+ If ReplaceFile Then FinishMessageSave(Path,True) Else DrawOpenFileDialog;
+End;
+
+Procedure DrawMessageOverwrite;
+Var X,Y: Integer; Text: String;
+Begin
+ X:=(SCREEN_WIDTH-420) Div 2; Y:=(SCREEN_HEIGHT-140) Div 2;
+ DrawDialogBox(X,Y,420,140,'Remplacer le fichier existant ?');
+ SetColor(COLOR_MENU_TEXT);
+ Text:=FileSaveOverwritePath;
+ While (Text<>'') And (TextWidth(Text)>390) Do Delete(Text,1,1);
+ OutTextXY(X+15,Y+38,Text);
+ OutTextXY(X+15,Y+60,'Le contenu actuel sera remplace.');
+ DrawDialogButton(X+225,Y+100,80,22,'Oui',FileSaveOverwriteYes,True);
+ DrawDialogButton(X+320,Y+100,80,22,'Non',Not FileSaveOverwriteYes,True);
+End;
+
+Procedure CancelOpenFileDialog;
+Begin
+ FileSaveOverwritePending:=False;
+ FileSaveData:='';
+ FileOpenVisible := False;
+ DrawInterface;
+End;
+
+Procedure ConfirmOpenFileDialog;
+Var Path: TMailText; PreviousStatus: String[80]; I, Separator: Integer;
+Begin
+ If FileOpenFocus = 1 Then
+  Path := OpenFileFullPath(FileOpenEntries[FileOpenSelection].Name)
+ Else Path := OpenFileFullPath(FileOpenName);
+ If Path = '' Then Begin
+  FileOpenError := 'Indiquez un nom de fichier ou un chemin de 255 caracteres au plus';
+  DrawOpenFileDialog; Exit;
+ End;
+ If OpenFileIsDirectory(Path) Then OpenFileChangeDirectory(Path)
+ Else If FileDialogSaveMode Then Begin
+  Separator:=0;
+  For I:=1 To Length(Path) Do If Path[I] In ['\','/',':'] Then Separator:=I;
+  If Pos('.',Copy(Path,Separator+1,Length(Path)))=0 Then Path:=Path+'.eml';
+  If Length(Path)>255 Then Begin
+   FileOpenError:='Erreur: nom de fichier trop long'; DrawOpenFileDialog; Exit;
+  End;
+  If MessageFileExists(Path) Then Begin
+   FileSaveOverwritePath:=Path;
+   FileSaveOverwritePending:=True;
+   FileSaveOverwriteYes:=False;
+   DrawOpenFileDialog;
+  End Else FinishMessageSave(Path,False);
+  Exit;
+ End Else Begin
+  PreviousStatus := MailStatus;
+  If LoadMessageFile(Path) Then Begin
+   FileOpenVisible := False;
+   DrawInterface;
+   Exit;
+  End;
+  FileOpenError := MailStatus;
+  MailStatus := PreviousStatus;
+ End;
+ DrawOpenFileDialog;
+End;
+
+Procedure ToggleOpenFileFilter;
+Begin
+ FileOpenShowAll := Not FileOpenShowAll;
+ FileOpenError := '';
+ ReadOpenFileDirectory;
+ DrawOpenFileDialog;
+End;
+
+Procedure DrawOpenFileDialog;
+Var X, Y, I, Index, FirstChar: Integer; Text, CursorText: String;
+Begin
+ If Not FileOpenVisible Then Exit;
+ X := (SCREEN_WIDTH - OPEN_DIALOG_WIDTH) Div 2;
+ Y := (SCREEN_HEIGHT - OPEN_DIALOG_HEIGHT) Div 2;
+ HideMouse;
+ If FileDialogSaveMode Then Text:='Enregistrer sous' Else Text:='Ouvrir un courriel';
+ DrawDialogBox(X, Y, OPEN_DIALOG_WIDTH, OPEN_DIALOG_HEIGHT, Text);
+ SetColor(COLOR_MENU_TEXT);
+ Text := FileOpenDirectory;
+ While (Text <> '') And (TextWidth(Text) > OPEN_DIALOG_WIDTH-120) Do Delete(Text,1,1);
+ OutTextXY(X+15, Y+35, Text);
+ DrawDialogButton(X+OPEN_DIALOG_WIDTH-90,Y+28,75,22,'Parent',False,True);
+ SetFillStyle(SolidFill, COLOR_LIST_BG);
+ Bar(X+15,Y+60,X+OPEN_DIALOG_WIDTH-15,Y+260);
+ Draw3DRect(X+15,Y+60,X+OPEN_DIALOG_WIDTH-15,Y+260,False);
+ For I := 0 To OPEN_DIALOG_ROWS-1 Do Begin
+  Index := FileOpenScroll + I;
+  If Index < FileOpenCount Then Begin
+   If Index = FileOpenSelection Then Begin
+    FillRect(X+17,Y+63+I*14,X+OPEN_DIALOG_WIDTH-38,Y+76+I*14,COLOR_MENU_HIGHLIGHT);
+    SetColor(COLOR_MENU_HIGHLIGHT_TEXT);
+   End Else SetColor(COLOR_MENU_TEXT);
+   Text := FileOpenEntries[Index].Name;
+   If FileOpenEntries[Index].IsDirectory Then Text := '['+Text+']';
+   While (Text <> '') And (TextWidth(Text) > OPEN_DIALOG_WIDTH-65) Do
+    Delete(Text,Length(Text),1);
+   OutTextXY(X+20,Y+66+I*14,Text);
+  End;
+ End;
+ DrawDialogButton(X+OPEN_DIALOG_WIDTH-35,Y+62,18,18,'^',False,True);
+ DrawDialogButton(X+OPEN_DIALOG_WIDTH-35,Y+240,18,18,'v',False,True);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(X+15,Y+271,'Nom du fichier :');
+ If FileOpenFocus = 0 Then SetFillStyle(SolidFill,COLOR_LIST_BG)
+ Else SetFillStyle(SolidFill,COLOR_WINDOW_BG);
+ Bar(X+15,Y+286,X+OPEN_DIALOG_WIDTH-15,Y+306);
+ Draw3DRect(X+15,Y+286,X+OPEN_DIALOG_WIDTH-15,Y+306,False);
+ FirstChar := 1;
+ CursorText := Copy(FileOpenName,1,FileOpenCursor);
+ While (CursorText <> '') And (TextWidth(CursorText) > OPEN_DIALOG_WIDTH-45) Do Begin
+  Delete(CursorText,1,1); Inc(FirstChar);
+ End;
+ Text := Copy(FileOpenName,FirstChar,255);
+ While (Text <> '') And (TextWidth(Text) > OPEN_DIALOG_WIDTH-45) Do
+  Delete(Text,Length(Text),1);
+ SetColor(COLOR_MENU_TEXT);
+ OutTextXY(X+19,Y+291,Text);
+ If FileOpenFocus = 0 Then
+  Line(X+19+TextWidth(CursorText),Y+289,X+19+TextWidth(CursorText),Y+303);
+ Text := FileOpenError;
+ If (Text = '') And FileOpenTruncated Then Text := 'Liste limitee: saisir le chemin pour un autre fichier.';
+ While (Text <> '') And (TextWidth(Text) > OPEN_DIALOG_WIDTH-30) Do
+  Delete(Text,Length(Text),1);
+ SetColor(LightRed);
+ OutTextXY(X+15,Y+316,Text);
+ If FileOpenShowAll Then Text := '*.eml' Else Text := 'Tous fichiers';
+ DrawDialogButton(X+15,Y+344,110,22,Text,FileOpenFocus=4,True);
+ If FileDialogSaveMode Then Text:='Enregistrer' Else Text:='Ouvrir';
+ DrawDialogButton(X+OPEN_DIALOG_WIDTH-205,Y+344,100,22,Text,FileOpenFocus=2,True);
+ DrawDialogButton(X+OPEN_DIALOG_WIDTH-90,Y+344,75,22,'Annuler',FileOpenFocus=3,True);
+ If FileSaveOverwritePending Then DrawMessageOverwrite;
+ ShowMouse;
+End;
+
+Procedure HandleOpenFileKey(Key: Char; Extended: Boolean);
+Begin
+ If Not FileOpenVisible Then Exit;
+ If FileSaveOverwritePending Then Begin
+  If Not Extended Then Begin
+   Case Ord(Key) of
+    9: FileSaveOverwriteYes:=Not FileSaveOverwriteYes;
+    27: Begin AnswerMessageOverwrite(False); Exit; End;
+    13: Begin AnswerMessageOverwrite(FileSaveOverwriteYes); Exit; End;
+    79,111,89,121: Begin AnswerMessageOverwrite(True); Exit; End;
+    78,110: Begin AnswerMessageOverwrite(False); Exit; End;
+   End;
+  End;
+  DrawOpenFileDialog; Exit;
+ End;
+ If FileOpenFocus=0 Then FileOpenError:='';
+ If Extended Then Begin
+  If FileOpenFocus = 1 Then Begin
+   Case Ord(Key) of
+    72: OpenFileSelect(FileOpenSelection-1);
+    80: OpenFileSelect(FileOpenSelection+1);
+    73: OpenFileSelect(FileOpenSelection-OPEN_DIALOG_ROWS);
+    81: OpenFileSelect(FileOpenSelection+OPEN_DIALOG_ROWS);
+    71: OpenFileSelect(0);
+    79: OpenFileSelect(FileOpenCount-1);
+   End;
+  End Else If FileOpenFocus = 0 Then Begin
+   Case Ord(Key) of
+    75: If FileOpenCursor>0 Then Dec(FileOpenCursor);
+    77: If FileOpenCursor<Length(FileOpenName) Then Inc(FileOpenCursor);
+    71: FileOpenCursor:=0;
+    79: FileOpenCursor:=Length(FileOpenName);
+    83: Delete(FileOpenName,FileOpenCursor+1,1);
+   End;
+  End;
+ End Else Begin
+  Case Ord(Key) of
+   27: Begin CancelOpenFileDialog; Exit; End;
+   9: FileOpenFocus := (FileOpenFocus+1) Mod 5;
+   13: Begin
+    If FileOpenFocus=3 Then CancelOpenFileDialog
+    Else If FileOpenFocus=4 Then ToggleOpenFileFilter
+    Else ConfirmOpenFileDialog;
+    Exit;
+   End;
+   8: If FileOpenFocus=0 Then Begin
+       If FileOpenCursor>0 Then Begin
+        Delete(FileOpenName,FileOpenCursor,1); Dec(FileOpenCursor);
+       End;
+      End Else If FileOpenFocus=1 Then
+       OpenFileChangeDirectory(OpenFileFullPath('..'));
+   Else If (FileOpenFocus=0) And (Key>=#32) And (Key<>#127) And
+           (Length(FileOpenName)<255) Then Begin
+    Insert(Key,FileOpenName,FileOpenCursor+1); Inc(FileOpenCursor);
+   End;
+  End;
+ End;
+ DrawOpenFileDialog;
+End;
+
+Procedure HandleOpenFileClick(MX, MY: Integer);
+Var X, Y, Index: Integer; DoubleClick: Boolean;
+Begin
+ If Not FileOpenVisible Then Exit;
+ If FileSaveOverwritePending Then Begin
+  X:=(SCREEN_WIDTH-420) Div 2; Y:=(SCREEN_HEIGHT-140) Div 2;
+  If (MY>=Y+100) And (MY<=Y+122) Then Begin
+   If (MX>=X+225) And (MX<=X+305) Then AnswerMessageOverwrite(True)
+   Else If (MX>=X+320) And (MX<=X+400) Then AnswerMessageOverwrite(False);
+  End;
+  Exit;
+ End;
+ X := (SCREEN_WIDTH-OPEN_DIALOG_WIDTH) Div 2;
+ Y := (SCREEN_HEIGHT-OPEN_DIALOG_HEIGHT) Div 2;
+ If (MX<X) Or (MX>X+OPEN_DIALOG_WIDTH) Or (MY<Y) Or (MY>Y+OPEN_DIALOG_HEIGHT) Then Exit;
+ If (MY>=Y+344) And (MY<=Y+366) Then Begin
+  If (MX>=X+OPEN_DIALOG_WIDTH-90) And (MX<=X+OPEN_DIALOG_WIDTH-15) Then Begin
+   CancelOpenFileDialog; Exit;
+  End;
+  If (MX>=X+OPEN_DIALOG_WIDTH-205) And (MX<=X+OPEN_DIALOG_WIDTH-105) Then Begin
+   FileOpenFocus:=0; ConfirmOpenFileDialog; Exit;
+  End;
+  If (MX>=X+15) And (MX<=X+125) Then Begin
+   FileOpenFocus:=4; ToggleOpenFileFilter; Exit;
+  End;
+ End;
+ If (MX>=X+OPEN_DIALOG_WIDTH-90) And (MY>=Y+28) And (MY<=Y+50) Then Begin
+  OpenFileChangeDirectory(OpenFileFullPath('..')); DrawOpenFileDialog; Exit;
+ End;
+ If (MX>=X+15) And (MX<=X+OPEN_DIALOG_WIDTH-15) And (MY>=Y+286) And (MY<=Y+306) Then Begin
+  FileOpenFocus:=0; FileOpenCursor:=Length(FileOpenName); DrawOpenFileDialog; Exit;
+ End;
+ If (MX>=X+15) And (MX<=X+OPEN_DIALOG_WIDTH-15) And (MY>=Y+63) And (MY<Y+259) Then Begin
+  FileOpenFocus:=1;
+  If MX>=X+OPEN_DIALOG_WIDTH-36 Then Begin
+   If MY<Y+90 Then OpenFileSelect(FileOpenSelection-1)
+   Else If MY>=Y+240 Then OpenFileSelect(FileOpenSelection+1);
+  End Else Begin
+   Index:=FileOpenScroll+(MY-Y-63) Div 14;
+   If Index<FileOpenCount Then Begin
+    DoubleClick:=IsDoubleClick(MX,MY,MOUSE_LEFT);
+    OpenFileSelect(Index);
+    If DoubleClick Then Begin ConfirmOpenFileDialog; Exit; End;
+   End;
+  End;
+ End;
+ DrawOpenFileDialog;
+End;
+
+Function BeginMessageFileDialog(SaveMode: Boolean): Boolean;
+Var Err: Integer;
+Begin
+ BeginMessageFileDialog:=False;
+ If AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or ColumnsDialogVisible Or
+    RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Or
+    (ComposerVisible And Not SaveMode) Then Exit;
+ If FileOpenDirectory='' Then Begin
+  {$I-}
+  GetDir(0,FileOpenDirectory);
+  Err:=IOResult;
+  {$I+}
+  If Err<>0 Then FileOpenDirectory:='.';
+ End;
+ FileDialogSaveMode:=SaveMode; FileSaveOverwritePending:=False;
+ FileOpenName:=''; FileOpenCursor:=0; FileOpenFocus:=0; FileOpenError:='';
+ FileOpenVisible:=True;
+ TooltipVisible:=False; ContextMenuVisible:=False;
+ ActiveMenu:=-1; ActiveMenuItem:=-1; MenuBarActive:=False; DragState:=dsNone;
+ LastClickTime:=0;
+ ReadOpenFileDirectory;
+ BeginMessageFileDialog:=True;
+End;
+
+Procedure OpenMessageFile;
+Begin
+ If BeginMessageFileDialog(False) Then DrawOpenFileDialog;
+End;
+
+Function ComposerMessageSource: TMailText;
+Var A,I: Integer; Data: TMailText;
+Begin
+ SaveComposerFields;
+ A:=Composer.AccountIndex;
+ If (A<0) And (SelectedFolder>=0) And (SelectedFolder<FolderCount) Then A:=MailFolderAccount[SelectedFolder];
+ If A<0 Then For I:=0 To EmailAccountCount-1 Do If EmailAccounts[I].IsDefault Then A:=I;
+ Data:='';
+ If (A>=0) And (A<EmailAccountCount) Then
+  Data:='From: '+EmailAccounts[A].EmailAddress+#13#10;
+ Data:=Data+'To: '+Composer.ToField+#13#10;
+ If Composer.CcField<>'' Then Data:=Data+'Cc: '+Composer.CcField+#13#10;
+ If Composer.BccField<>'' Then Data:=Data+'Bcc: '+Composer.BccField+#13#10;
+ Data:=Data+'Subject: '+Composer.SubjectField+#13#10+
+  'MIME-Version: 1.0'#13#10'Content-Type: text/plain; charset=windows-1252'#13#10+
+  'Content-Transfer-Encoding: 8bit'#13#10#13#10;
+ For I:=0 To Composer.LineCount-1 Do Data:=Data+Composer.Lines[I].Text+#13#10;
+ ComposerMessageSource:=Data;
+End;
+
+Procedure SaveMessageAs;
+Var Subject: String; I: Integer; Data: TMailText;
+Begin
+ If AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or ColumnsDialogVisible Or
+    RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ If ComposerVisible Then Begin
+  If Composer.AttachmentCount>0 Then Begin
+   MailStatus:='Enregistrement des pieces jointes du brouillon non implemente';
+   DrawStatusBar; Exit;
+  End;
+  Data:=ComposerMessageSource;
+  Subject:=Composer.SubjectField;
+ End Else Begin
+  If (SelectedMessage<0) Or (SelectedMessage>=MessageCount) Then Begin
+   MailStatus:='Selectionnez un courriel avant Enregistrer sous'; DrawStatusBar; Exit;
+  End;
+  Data:=MessageSources[SelectedMessage];
+  Subject:=Messages[SelectedMessage].Subject;
+  If Data='' Then Begin
+   MailStatus:='Erreur: source complete du courriel indisponible'; DrawStatusBar; Exit;
+  End;
+ End;
+ If Not BeginMessageFileDialog(True) Then Exit;
+ FileSaveFromComposer:=ComposerVisible; FileSaveData:=Data;
+ For I:=1 To Length(Subject) Do
+  If (Subject[I]<#32) Or (Subject[I] In ['\','/',':','*','?','"','<','>','|']) Then Subject[I]:='_';
+ Subject:=MailTrim(Subject);
+ If Subject='' Then FileOpenName:='message.eml'
+ Else FileOpenName:='Message - '+Subject+'.eml';
+ FileOpenCursor:=Length(FileOpenName);
+ DrawOpenFileDialog;
+End;
+
+Procedure ReceiveMailWork;
+Var AccountIndex, I, Total, First, Count, Code, Unread,ToFetch: LongInt;
+ R: TIMAPResponse; P: TPOP3Response; Number, ID, StatText: TMailText;
+ Success: Boolean;
+Begin
+ If (SelectedFolder<0) Or (SelectedFolder>=FolderCount) Then Begin
+  MailStatus:='Configurez un compte dans Outils / Comptes'; Exit;
+ End;
+ AccountIndex:=MailFolderAccount[SelectedFolder];
+ If (AccountIndex<0) Or (AccountIndex>=EmailAccountCount) Then Exit;
+ If Folders[SelectedFolder].FolderType<>ftInbox Then Begin
+  MailStatus:='Selectionnez la boite de reception du compte'; Exit;
+ End;
+ If Not EmailAccounts[AccountIndex].IsActive Then Begin MailStatus:='Compte desactive'; Exit; End;
+ MailStatus:='Connexion a '+EmailAccounts[AccountIndex].IncomingHost;
+ BusyBegin('Reception du courrier',EmailAccounts[AccountIndex].IncomingHost);
+ If Not OpenIncomingAccount(EmailAccounts[AccountIndex]) Then Begin MailStatus:=MailError; Exit; End;
+ For I:=0 To MAX_MESSAGES-1 Do PendingMessageSources[I]:='';
+ BusyStage('Lecture de la boite de reception...');
+ Success:=True; Total:=0; Count:=0; Unread:=0;
+ If EmailAccounts[AccountIndex].IncomingType=istIMAP Then Begin
+  IMAPClient.CurrentMailbox.Exists:=0;
+  If IMAP_Select('INBOX')<>IMAP_OK Then Begin MailError:=IMAPClient.LastError; Success:=False; End;
+  Total:=IMAPClient.CurrentMailbox.Exists;
+ End Else Begin
+  P:=POP3_SendCommand('STAT'); StatText:=P.Text;
+  I:=Pos(' ',StatText); If I>0 Then StatText:=Copy(StatText,1,I-1);
+  Val(StatText,Total,Code);
+  If (P.ResponseType<>prOK) Or (Code<>0) Or (Total<0) Then Begin
+   MailError:='STAT refuse: '+P.Text; Success:=False;
+  End;
+ End;
+ First:=Total-MAX_MESSAGES+1; If First<1 Then First:=1;
+ ToFetch:=Total; If ToFetch>MAX_MESSAGES Then ToFetch:=MAX_MESSAGES;
+ BusyUpdate('Reception des messages...',0,ToFetch);
+ For I:=Total DownTo First Do Begin
+  If Not Success Then Break;
+  Str(I,Number);
+  If EmailAccounts[AccountIndex].IncomingType=istIMAP Then Begin
+   R:=IMAP_SendCommand('FETCH '+Number+' (UID FLAGS BODY.PEEK[])');
+   Success:=R.ResponseType=irOK;
+   If Not Success Then MailError:='Lecture IMAP refusee: '+R.Text;
+   Str(MailFetchUID,ID);
+  End Else Begin
+   P:=POP3_SendCommand('RETR '+Number); Success:=P.ResponseType=prOK;
+   If Not Success Then MailError:='Lecture POP3 refusee: '+P.Text;
+   ID:=Number;
+  End;
+  If Success Then Begin
+   MailParseMessage(MailRaw,ID,MailNewMessages[Count]);
+   PendingMessageSources[Count]:=MailRaw;
+   If EmailAccounts[AccountIndex].IncomingType=istIMAP Then Begin
+    MailNewMessages[Count].IsRead:=Pos('\Seen',MailFetchFlags)>0;
+    MailNewMessages[Count].IsFlagged:=Pos('\Flagged',MailFetchFlags)>0;
+   End;
+   If Not MailNewMessages[Count].IsRead Then Inc(Unread);
+   Inc(Count); BusyUpdate('Reception des messages...',Count,ToFetch);
+  End;
+ End;
+ MailClose(IMAPWire); MailClose(POP3Wire);
+ IMAPClient.Connected:=False; IMAPClient.State:=isDisconnected;
+ POP3Client.Connected:=False; POP3Client.State:=psDisconnected;
+ If Not Success Then Begin
+  For I:=0 To MAX_MESSAGES-1 Do PendingMessageSources[I]:='';
+  MailStatus:=MailError; Exit;
+ End;
+ BusyUpdate('Application des regles et preparation des messages...',0,0);
+ Move(MailNewMessages,Messages,SizeOf(Messages)); MessageCount:=Count;
+ For I:=0 To MAX_MESSAGES-1 Do Begin
+  MessageSources[I]:=PendingMessageSources[I];
+  PendingMessageSources[I]:='';
+ End;
+ Rules_ApplyToAllMessages;
+ Unread:=0;
+ For I:=0 To MessageCount-1 Do If Not Messages[I].IsRead Then Inc(Unread);
+ SelectedMessage:=-1; LastSelectedMessage:=-1; MessageScrollOffset:=0; PreviewScrollY:=0;
+ If Count>0 Then Begin SelectedMessage:=0; Messages[0].IsSelected:=True; End;
+ MailLoadedFolder:=SelectedFolder;
+ Folders[SelectedFolder].TotalCount:=Total; Folders[SelectedFolder].UnreadCount:=Unread;
+ Str(Count,Number); Str(Total,ID);
+ MailStatus:=Number+' messages charges sur '+ID+' | '+EmailAccounts[AccountIndex].AccountName;
+End;
+
+Procedure ReceiveMail;
+Begin
+ If BusyVisible Then Exit;
+ ReceiveMailWork;
+ BusyEnd;
+End;
+
+{ Demarre avec une boite vide; seul le serveur fournit les messages. }
+Procedure InitializeMessageList;
+Var I: Integer;
+Begin
+ For I:=0 To MAX_MESSAGES-1 Do Begin
+  MessageSources[I]:=''; PendingMessageSources[I]:='';
+ End;
+ MessageCount := 0;
+ SelectedMessage := -1;
+ LastSelectedMessage := -1;
  MessageScrollOffset := 0;
  SortColumn := 5;  { Tri par date par defaut }
  SortOrder := soDescending;
@@ -20581,260 +22693,11 @@ Begin
 
  { Initialiser le client IMAP }
  IMAP_InitClient;
- { Configurer un serveur IMAP de demonstration }
- IMAP_Configure('imap.example.com', IMAPS_PORT, 'user@example.com', 'password', True);
-
- { Message 1 - Non lu, priorite haute }
- Messages[0].MsgID := 'MSG001';
- Messages[0].FromName := 'Jean Dupont';
- Messages[0].FromEmail := 'jean.dupont@example.com';
- Messages[0].ToName := 'Moi';
- Messages[0].ToEmail := 'moi@example.com';
- Messages[0].CcEmail := '';
- Messages[0].Subject := 'URGENT: Reunion demain matin';
- Messages[0].DateStr := '01/04/26';
- Messages[0].DateFull := '01 avril 2026, 09:30';
- Messages[0].DateSort := 1743465600;
- Messages[0].Size := 2450;
- Messages[0].Priority := mpHigh;
- Messages[0].HasAttachment := True;
- Messages[0].IsRead := False;
- Messages[0].IsFlagged := True;
- Messages[0].IsSelected := True;
- Messages[0].BodyLineCount := 7;
- Messages[0].Body[0] := 'Bonjour,';
- Messages[0].Body[1] := '';
- Messages[0].Body[2] := 'Je vous rappelle notre reunion de demain a 10h.';
- Messages[0].Body[3] := 'Merci de confirmer votre presence.';
- Messages[0].Body[4] := '';
- Messages[0].Body[5] := 'Cordialement,';
- Messages[0].Body[6] := 'Jean Dupont';
- { Pieces jointes pour Message 1 (TODO 13) }
- Messages[0].AttachmentCount := 1;
- Messages[0].Attachments[0].FileName := 'ordre_du_jour.pdf';
- Messages[0].Attachments[0].FilePath := '';
- Messages[0].Attachments[0].FileSize := 125000;
- Messages[0].Attachments[0].FileType := atPDF;
- Messages[0].Attachments[0].IsEmbedded := False;
- Messages[0].Attachments[0].ContentID := '';
- Messages[0].Attachments[0].IsDangerous := False;
-
- { Message 2 - Lu }
- Messages[1].MsgID := 'MSG002';
- Messages[1].FromName := 'Marie Martin';
- Messages[1].FromEmail := 'marie.martin@example.com';
- Messages[1].ToName := 'Equipe Projet';
- Messages[1].ToEmail := 'equipe@example.com';
- Messages[1].CcEmail := 'manager@example.com';
- Messages[1].Subject := 'Re: Projet Alpha - Avancement';
- Messages[1].DateStr := '31/03/26';
- Messages[1].DateFull := '31 mars 2026, 14:15';
- Messages[1].DateSort := 1743379200;
- Messages[1].Size := 15230;
- Messages[1].Priority := mpNormal;
- Messages[1].HasAttachment := True;
- Messages[1].IsRead := True;
- Messages[1].IsFlagged := False;
- Messages[1].IsSelected := False;
- Messages[1].BodyLineCount := 10;
- Messages[1].Body[0] := 'Bonjour a tous,';
- Messages[1].Body[1] := '';
- Messages[1].Body[2] := 'Voici le rapport d''avancement du projet Alpha:';
- Messages[1].Body[3] := '- Phase 1: terminee a 100%';
- Messages[1].Body[4] := '- Phase 2: en cours, 65% complete';
- Messages[1].Body[5] := '- Phase 3: planifiee pour le mois prochain';
- Messages[1].Body[6] := '';
- Messages[1].Body[7] := 'Voir le document joint pour les details.';
- Messages[1].Body[8] := '';
- Messages[1].Body[9] := 'Marie';
- { Pieces jointes pour Message 2 (TODO 13) }
- Messages[1].AttachmentCount := 2;
- Messages[1].Attachments[0].FileName := 'rapport_alpha.docx';
- Messages[1].Attachments[0].FilePath := '';
- Messages[1].Attachments[0].FileSize := 85400;
- Messages[1].Attachments[0].FileType := atDocument;
- Messages[1].Attachments[0].IsEmbedded := False;
- Messages[1].Attachments[0].ContentID := '';
- Messages[1].Attachments[0].IsDangerous := False;
- Messages[1].Attachments[1].FileName := 'planning.xlsx';
- Messages[1].Attachments[1].FilePath := '';
- Messages[1].Attachments[1].FileSize := 42300;
- Messages[1].Attachments[1].FileType := atSpreadsheet;
- Messages[1].Attachments[1].IsEmbedded := False;
- Messages[1].Attachments[1].ContentID := '';
- Messages[1].Attachments[1].IsDangerous := False;
-
- { Message 3 - Lu }
- Messages[2].MsgID := 'MSG003';
- Messages[2].FromName := 'Support Technique';
- Messages[2].FromEmail := 'support@techcorp.com';
- Messages[2].ToName := 'Client';
- Messages[2].ToEmail := 'moi@example.com';
- Messages[2].CcEmail := '';
- Messages[2].Subject := 'Votre demande #1234 a ete traitee';
- Messages[2].DateStr := '30/03/26';
- Messages[2].DateFull := '30 mars 2026, 11:42';
- Messages[2].DateSort := 1743292800;
- Messages[2].Size := 5670;
- Messages[2].Priority := mpNormal;
- Messages[2].HasAttachment := False;
- Messages[2].IsRead := True;
- Messages[2].IsFlagged := False;
- Messages[2].IsSelected := False;
- Messages[2].AttachmentCount := 0;
- Messages[2].BodyLineCount := 8;
- Messages[2].Body[0] := 'Cher client,';
- Messages[2].Body[1] := '';
- Messages[2].Body[2] := 'Votre demande de support #1234 a ete traitee.';
- Messages[2].Body[3] := 'Le probleme a ete resolu par notre equipe technique.';
- Messages[2].Body[4] := '';
- Messages[2].Body[5] := 'Si vous avez d''autres questions, n''hesitez pas.';
- Messages[2].Body[6] := '';
- Messages[2].Body[7] := 'L''equipe Support TechCorp';
-
- { Message 4 - Non lu, priorite basse }
- Messages[3].MsgID := 'MSG004';
- Messages[3].FromName := 'Newsletter Info';
- Messages[3].FromEmail := 'news@infolettre.com';
- Messages[3].ToName := 'Abonne';
- Messages[3].ToEmail := 'moi@example.com';
- Messages[3].CcEmail := '';
- Messages[3].Subject := 'Les nouveautes de la semaine';
- Messages[3].DateStr := '29/03/26';
- Messages[3].DateFull := '29 mars 2026, 08:00';
- Messages[3].DateSort := 1743206400;
- Messages[3].Size := 45000;
- Messages[3].Priority := mpLow;
- Messages[3].HasAttachment := False;
- Messages[3].IsRead := False;
- Messages[3].IsFlagged := False;
- Messages[3].IsSelected := False;
- Messages[3].BodyLineCount := 12;
- Messages[3].Body[0] := 'Bonjour cher abonne,';
- Messages[3].Body[1] := '';
- Messages[3].Body[2] := 'Decouvrez les nouveautes de cette semaine:';
- Messages[3].Body[3] := '';
- Messages[3].Body[4] := '1. Nouvelle fonctionnalite de recherche avancee';
- Messages[3].Body[5] := '2. Amelioration des performances';
- Messages[3].Body[6] := '3. Correction de bugs mineurs';
- Messages[3].Body[7] := '4. Nouvelle interface utilisateur';
- Messages[3].Body[8] := '';
- Messages[3].Body[9] := 'Pour plus d''informations, visitez notre site.';
- Messages[3].Body[10] := '';
- Messages[3].Body[11] := 'L''equipe Newsletter';
-
- { Message 5 - Lu }
- Messages[4].MsgID := 'MSG005';
- Messages[4].FromName := 'Admin Systeme';
- Messages[4].FromEmail := 'admin@company.local';
- Messages[4].ToName := 'Tous les employes';
- Messages[4].ToEmail := 'all@company.local';
- Messages[4].CcEmail := 'direction@company.local';
- Messages[4].Subject := 'Maintenance planifiee ce weekend';
- Messages[4].DateStr := '28/03/26';
- Messages[4].DateFull := '28 mars 2026, 16:30';
- Messages[4].DateSort := 1743120000;
- Messages[4].Size := 1234;
- Messages[4].Priority := mpNormal;
- Messages[4].HasAttachment := False;
- Messages[4].IsRead := True;
- Messages[4].IsFlagged := True;
- Messages[4].IsSelected := False;
- Messages[4].BodyLineCount := 9;
- Messages[4].Body[0] := 'Chers collegues,';
- Messages[4].Body[1] := '';
- Messages[4].Body[2] := 'Une maintenance est planifiee ce weekend:';
- Messages[4].Body[3] := '- Debut: Samedi 30 mars, 22h00';
- Messages[4].Body[4] := '- Fin prevue: Dimanche 31 mars, 06h00';
- Messages[4].Body[5] := '';
- Messages[4].Body[6] := 'Les services seront temporairement indisponibles.';
- Messages[4].Body[7] := '';
- Messages[4].Body[8] := 'L''equipe IT';
-
- { Message 6 - Non lu }
- Messages[5].MsgID := 'MSG006';
- Messages[5].FromName := 'Pierre Durand';
- Messages[5].FromEmail := 'p.durand@mail.fr';
- Messages[5].ToName := 'Moi';
- Messages[5].ToEmail := 'moi@example.com';
- Messages[5].CcEmail := 'secretariat@mail.fr';
- Messages[5].Subject := 'Documents a signer';
- Messages[5].DateStr := '27/03/26';
- Messages[5].DateFull := '27 mars 2026, 10:15';
- Messages[5].DateSort := 1743033600;
- Messages[5].Size := 125000;
- Messages[5].Priority := mpHigh;
- Messages[5].HasAttachment := True;
- Messages[5].IsRead := False;
- Messages[5].IsFlagged := False;
- Messages[5].IsSelected := False;
- Messages[5].BodyLineCount := 8;
- Messages[5].Body[0] := 'Bonjour,';
- Messages[5].Body[1] := '';
- Messages[5].Body[2] := 'Veuillez trouver ci-joint les documents a signer.';
- Messages[5].Body[3] := 'Merci de les retourner signes avant vendredi.';
- Messages[5].Body[4] := '';
- Messages[5].Body[5] := 'En cas de questions, n''hesitez pas a me contacter.';
- Messages[5].Body[6] := '';
- Messages[5].Body[7] := 'Pierre Durand';
-
- { Message 7 - Lu }
- Messages[6].MsgID := 'MSG007';
- Messages[6].FromName := 'Sophie Leblanc';
- Messages[6].FromEmail := 'sophie.l@webmail.com';
- Messages[6].ToName := 'Amis';
- Messages[6].ToEmail := 'moi@example.com';
- Messages[6].CcEmail := 'autres.amis@webmail.com';
- Messages[6].Subject := 'Invitation anniversaire';
- Messages[6].DateStr := '25/03/26';
- Messages[6].DateFull := '25 mars 2026, 18:45';
- Messages[6].DateSort := 1742860800;
- Messages[6].Size := 8900;
- Messages[6].Priority := mpNormal;
- Messages[6].HasAttachment := True;
- Messages[6].IsRead := True;
- Messages[6].IsFlagged := False;
- Messages[6].IsSelected := False;
- Messages[6].BodyLineCount := 11;
- Messages[6].Body[0] := 'Salut!';
- Messages[6].Body[1] := '';
- Messages[6].Body[2] := 'Je vous invite a mon anniversaire!';
- Messages[6].Body[3] := '';
- Messages[6].Body[4] := 'Date: Samedi 5 avril 2026';
- Messages[6].Body[5] := 'Heure: 19h00';
- Messages[6].Body[6] := 'Lieu: Chez moi';
- Messages[6].Body[7] := '';
- Messages[6].Body[8] := 'Voir le plan en piece jointe.';
- Messages[6].Body[9] := '';
- Messages[6].Body[10] := 'A bientot! Sophie';
-
- { Message 8 - Lu }
- Messages[7].MsgID := 'MSG008';
- Messages[7].FromName := 'Service Client';
- Messages[7].FromEmail := 'service@boutique.fr';
- Messages[7].ToName := 'Client';
- Messages[7].ToEmail := 'moi@example.com';
- Messages[7].CcEmail := '';
- Messages[7].Subject := 'Votre commande a ete expediee';
- Messages[7].DateStr := '24/03/26';
- Messages[7].DateFull := '24 mars 2026, 14:00';
- Messages[7].DateSort := 1742774400;
- Messages[7].Size := 3200;
- Messages[7].Priority := mpNormal;
- Messages[7].HasAttachment := False;
- Messages[7].IsRead := True;
- Messages[7].IsFlagged := False;
- Messages[7].IsSelected := False;
- Messages[7].BodyLineCount := 9;
- Messages[7].Body[0] := 'Cher client,';
- Messages[7].Body[1] := '';
- Messages[7].Body[2] := 'Votre commande #98765 a ete expediee.';
- Messages[7].Body[3] := '';
- Messages[7].Body[4] := 'Numero de suivi: FR123456789';
- Messages[7].Body[5] := 'Livraison estimee: 2-3 jours ouvrables';
- Messages[7].Body[6] := '';
- Messages[7].Body[7] := 'Merci pour votre achat!';
- Messages[7].Body[8] := 'L''equipe Boutique';
+ POP3_InitClient;
+ SMTP_InitClient;
+ FillChar(Messages,SizeOf(Messages),0);
+ MailLoadedFolder:=-1;
+ MailStatus:='Pret - cliquez sur Envoyer/Recevoir';
 
  { Initialiser les colonnes }
  InitializeMessageColumns;
@@ -20856,6 +22719,72 @@ Begin
   Line(X + 4, Y + 6, X + 8, Y);
   Line(X, Y, X + 8, Y);
  End;
+End;
+
+{ Cle chronologique RFC 5322, independante du format de la date affichee. }
+Function MessageDateKey(Index: Integer):
+ {$IFDEF FPC} Int64 {$ELSE} Real {$ENDIF};
+Const Months: String[36]='JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC';
+Var Text, Token: TMailText; Parts: Array[0..5] Of String;
+ I,N,P,Code,D,M,Y,H,Mi,Sec,Zone,ZHour,ZMin,MaxDay: Integer;
+ Days: LongInt;
+ Function Number(S: String): Integer;
+ Var V,E: Integer;
+ Begin Val(S,V,E); If E<>0 Then V:=-1; Number:=V; End;
+ Function Leap(Year: Integer): Boolean;
+ Begin Leap:=(Year Mod 4=0) And ((Year Mod 100<>0) Or (Year Mod 400=0)); End;
+Begin
+ MessageDateKey:=Messages[Index].DateSort;
+ Text:=MailUpper(MailHeader(MessageSources[Index],'Date'));
+ If Text='' Then Text:=MailUpper(Messages[Index].DateFull);
+ P:=Pos(',',Text); If P>0 Then Delete(Text,1,P);
+ N:=0;
+ While (Text<>'') And (N<6) Do Begin
+  Text:=MailTrim(Text); If Text='' Then Break;
+  P:=1; While (P<=Length(Text)) And Not (Text[P] In [' ',#9]) Do Inc(P);
+  Parts[N]:=Copy(Text,1,P-1); Inc(N); Delete(Text,1,P);
+ End;
+ If N<5 Then Exit;
+ D:=Number(Parts[0]); P:=Pos(Parts[1],Months);
+ If (Length(Parts[1])<>3) Or (P=0) Or ((P-1) Mod 3<>0) Then Exit;
+ M:=(P-1) Div 3+1; Y:=Number(Parts[2]);
+ If (Y>=0) And (Y<50) Then Inc(Y,2000)
+ Else If (Y>=50) And (Y<100) Then Inc(Y,1900);
+ If (Y<1601) Or (Y>9999) Then Exit;
+ MaxDay:=31;
+ If M In [4,6,9,11] Then MaxDay:=30;
+ If M=2 Then Begin MaxDay:=28; If Leap(Y) Then Inc(MaxDay); End;
+ If (D<1) Or (D>MaxDay) Then Exit;
+ Token:=Parts[3]; P:=Pos(':',Token); If P=0 Then Exit;
+ H:=Number(Copy(Token,1,P-1)); Delete(Token,1,P); P:=Pos(':',Token);
+ Sec:=0;
+ If P>0 Then Begin Sec:=Number(Copy(Token,P+1,255)); Token:=Copy(Token,1,P-1); End;
+ Mi:=Number(Token);
+ If (H<0) Or (H>23) Or (Mi<0) Or (Mi>59) Or (Sec<0) Or (Sec>60) Then Exit;
+ Zone:=0; Token:=Parts[4];
+ If (Length(Token)=5) And (Token[1] In ['+','-']) Then Begin
+  ZHour:=Number(Copy(Token,2,2)); ZMin:=Number(Copy(Token,4,2));
+  If (ZHour<0) Or (ZHour>23) Or (ZMin<0) Or (ZMin>59) Then Exit;
+  Zone:=ZHour*60+ZMin; If Token[1]='-' Then Zone:=-Zone;
+ End Else If (Token<>'UT') And (Token<>'UTC') And (Token<>'GMT') And (Token<>'Z') Then Begin
+  { Zones historiques autorisees dans les en-tetes RFC 5322. }
+  Code:=Pos('|'+Token+'|','|EST|EDT|CST|CDT|MST|MDT|PST|PDT|');
+  If (Length(Token)<>3) Or (Code=0) Then Exit;
+  Case (Code-1) Div 4 Of
+   0: Zone:=-300; 1: Zone:=-240; 2: Zone:=-360; 3: Zone:=-300;
+   4: Zone:=-420; 5: Zone:=-360; 6: Zone:=-480; 7: Zone:=-420;
+  End;
+ End;
+ Days:=365*(Y-1)+(Y-1) Div 4-(Y-1) Div 100+(Y-1) Div 400;
+ For I:=1 To M-1 Do Begin
+  Inc(Days,31); If I In [4,6,9,11] Then Dec(Days);
+  If I=2 Then Begin Dec(Days,3); If Leap(Y) Then Inc(Days); End;
+ End;
+ {$IFDEF FPC}
+ MessageDateKey:=(Int64(Days)+D-1-719162)*86400+H*3600+Mi*60+Sec-LongInt(Zone)*60;
+ {$ELSE}
+ MessageDateKey:=(Days+0.0+D-1-719162)*86400+LongInt(H)*3600+Mi*60+Sec-LongInt(Zone)*60;
+ {$ENDIF}
 End;
 
 { Compare deux messages selon la colonne de tri }
@@ -20888,23 +22817,23 @@ Begin
   End;
 
   ctFrom: Begin
-   If Messages[Idx1].FromName < Messages[Idx2].FromName Then
+   If MailUpper(Messages[Idx1].FromName) < MailUpper(Messages[Idx2].FromName) Then
     Result := -1
-   Else If Messages[Idx1].FromName > Messages[Idx2].FromName Then
+   Else If MailUpper(Messages[Idx1].FromName) > MailUpper(Messages[Idx2].FromName) Then
     Result := 1;
   End;
 
   ctSubject: Begin
-   If Messages[Idx1].Subject < Messages[Idx2].Subject Then
+   If MailUpper(Messages[Idx1].Subject) < MailUpper(Messages[Idx2].Subject) Then
     Result := -1
-   Else If Messages[Idx1].Subject > Messages[Idx2].Subject Then
+   Else If MailUpper(Messages[Idx1].Subject) > MailUpper(Messages[Idx2].Subject) Then
     Result := 1;
   End;
 
   ctDate: Begin
-   If Messages[Idx1].DateSort < Messages[Idx2].DateSort Then
+   If MessageDateKey(Idx1) < MessageDateKey(Idx2) Then
     Result := -1
-   Else If Messages[Idx1].DateSort > Messages[Idx2].DateSort Then
+   Else If MessageDateKey(Idx1) > MessageDateKey(Idx2) Then
     Result := 1;
   End;
 
@@ -20928,20 +22857,271 @@ Procedure SortMessageList;
 Var
  I, J: Integer;
  Temp: TMessage;
+ TempSource: TMailText;
 Begin
  If (SortColumn < 0) Or (SortColumn >= ColumnCount) Then Exit;
  If SortOrder = soNone Then Exit;
 
- { Tri a bulles simple (suffisant pour une demo) }
+ { Tri stable : les messages de meme valeur conservent leur ordre. }
  For I := 0 To MessageCount - 2 Do Begin
   For J := 0 To MessageCount - I - 2 Do Begin
    If CompareMessages(J, J + 1) > 0 Then Begin
     Temp := Messages[J];
     Messages[J] := Messages[J + 1];
     Messages[J + 1] := Temp;
+    TempSource := MessageSources[J];
+    MessageSources[J] := MessageSources[J+1];
+    MessageSources[J+1] := TempSource;
+    If SelectedMessage=J Then SelectedMessage:=J+1
+    Else If SelectedMessage=J+1 Then SelectedMessage:=J;
+    If LastSelectedMessage=J Then LastSelectedMessage:=J+1
+    Else If LastSelectedMessage=J+1 Then LastSelectedMessage:=J;
    End;
   End;
  End;
+End;
+
+{ Boite modale de tri, entierement dessinee avec les routines graphiques. }
+Function SortCriterionName(Index: Integer): String;
+Begin
+ Case Index Of
+  0: SortCriterionName:='Priorite';
+  1: SortCriterionName:='Pieces jointes';
+  2: SortCriterionName:='Drapeau';
+  3: SortCriterionName:='Expediteur';
+  4: SortCriterionName:='Objet';
+  5: SortCriterionName:='Date';
+  6: SortCriterionName:='Taille';
+ Else SortCriterionName:='';
+ End;
+End;
+
+{ Configuration transactionnelle des colonnes : aucun effet avant OK. }
+Procedure DrawColumnsDialog;
+Var X,Y,I,C: Integer; Text: String;
+Begin
+ If Not ColumnsDialogVisible Then Exit;
+ X:=(SCREEN_WIDTH-380) Div 2; Y:=(SCREEN_HEIGHT-290) Div 2;
+ DrawDialogBox(X,Y,380,290,'Colonnes...');
+ SetColor(Black); OutTextXY(X+16,Y+34,'Colonnes a afficher :');
+ For I:=0 To ColumnCount-1 Do Begin
+  C:=White; If I=ColumnsDialogSelection Then C:=Blue;
+  FillRect(X+16,Y+54+I*22,X+236,Y+74+I*22,C);
+  If I=ColumnsDialogSelection Then SetColor(White) Else SetColor(Black);
+  Text:='[ ] '; If ColumnsDraft[I].Visible Then Text:='[x] ';
+  Text:=Text+SortCriterionName(Ord(ColumnsDraft[I].ColType));
+  If (ColumnsDialogFocus=0) And (I=ColumnsDialogSelection) Then Text:='> '+Text;
+  OutTextXY(X+20,Y+60+I*22,Text);
+ End;
+ DrawDialogButton(X+250,Y+56,112,24,'Monter',ColumnsDialogFocus=1,ColumnsDialogSelection>0);
+ DrawDialogButton(X+250,Y+90,112,24,'Descendre',ColumnsDialogFocus=2,
+                  ColumnsDialogSelection<ColumnCount-1);
+ DrawDialogButton(X+250,Y+132,112,24,'Par defaut',ColumnsDialogFocus=3,True);
+ SetColor(Black); OutTextXY(X+16,Y+216,ColumnsDialogError);
+ DrawDialogButton(X+180,Y+250,76,24,'OK',ColumnsDialogFocus=4,True);
+ DrawDialogButton(X+268,Y+250,94,24,'Annuler',ColumnsDialogFocus=5,True);
+End;
+
+Procedure ShowColumnsDialog;
+Var I: Integer;
+Begin
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or
+    SortDialogVisible Or ColumnsDialogVisible Or RulesVisible Or PrefsVisible Or AboutVisible Or
+    EventDialogVisible Then Exit;
+ For I:=0 To ColumnCount-1 Do ColumnsDraft[I]:=Columns[I];
+ ColumnsDialogSelection:=0; ColumnsDialogFocus:=0; ColumnsDialogError:='';
+ ColumnsDialogVisible:=True; ContextMenuVisible:=False; DrawInterface;
+End;
+
+Procedure CloseColumnsDialog(Apply: Boolean);
+Var I,N: Integer; SortedType: TColumnType; HasSort: Boolean;
+Begin
+ If Apply Then Begin
+  N:=0;
+  For I:=0 To ColumnCount-1 Do If ColumnsDraft[I].Visible Then Inc(N);
+  If N=0 Then Begin
+   ColumnsDialogError:='Afficher au moins une colonne.'; DrawInterface; Exit;
+  End;
+  HasSort:=(SortColumn>=0) And (SortColumn<ColumnCount);
+  If HasSort Then SortedType:=Columns[SortColumn].ColType Else SortedType:=ctDate;
+  For I:=0 To ColumnCount-1 Do Begin
+   Columns[I]:=ColumnsDraft[I];
+   If HasSort And (Columns[I].ColType=SortedType) Then SortColumn:=I;
+  End;
+ End;
+ ColumnsDialogVisible:=False; DrawInterface;
+End;
+
+Procedure MoveColumnsDraft(Delta: Integer);
+Var Target: Integer; Temp: TColumnHeader;
+Begin
+ Target:=ColumnsDialogSelection+Delta;
+ If (Target<0) Or (Target>=ColumnCount) Then Exit;
+ Temp:=ColumnsDraft[Target]; ColumnsDraft[Target]:=ColumnsDraft[ColumnsDialogSelection];
+ ColumnsDraft[ColumnsDialogSelection]:=Temp; ColumnsDialogSelection:=Target;
+End;
+
+Procedure ColumnsDialogAction(Action: Integer);
+Var Saved: Array[0..MAX_COLUMNS-1] Of TColumnHeader;
+ I,J: Integer;
+Begin
+ ColumnsDialogError:='';
+ Case Action Of
+  0: ColumnsDraft[ColumnsDialogSelection].Visible:=Not ColumnsDraft[ColumnsDialogSelection].Visible;
+  1: MoveColumnsDraft(-1);
+  2: MoveColumnsDraft(1);
+  3: Begin
+   { Retrouver l ordre initial sans modifier les colonnes actives. }
+   For I:=0 To ColumnCount-1 Do Saved[I]:=ColumnsDraft[I];
+   For I:=0 To ColumnCount-1 Do
+    For J:=0 To ColumnCount-1 Do If Ord(Saved[J].ColType)=I Then Begin
+     ColumnsDraft[I]:=Saved[J]; ColumnsDraft[I].Visible:=True;
+    End;
+   ColumnsDialogSelection:=0;
+  End;
+  4: Begin CloseColumnsDialog(True); Exit; End;
+  5: Begin CloseColumnsDialog(False); Exit; End;
+ End;
+ DrawInterface;
+End;
+
+Procedure HandleColumnsDialogClick(MX,MY: Integer);
+Var X,Y: Integer;
+Begin
+ X:=(SCREEN_WIDTH-380) Div 2; Y:=(SCREEN_HEIGHT-290) Div 2;
+ If (MX>=X+16) And (MX<=X+236) And (MY>=Y+54) And (MY<Y+54+ColumnCount*22) Then Begin
+  ColumnsDialogSelection:=(MY-Y-54) Div 22; ColumnsDialogFocus:=0;
+  If MX<X+65 Then Begin ColumnsDialogAction(0); Exit; End;
+ End Else If (MX>=X+250) And (MX<=X+362) And
+             ((MY<Y+200) Or (MX>=X+268)) Then Begin
+  If (MY>=Y+56) And (MY<=Y+80) Then ColumnsDialogFocus:=1
+  Else If (MY>=Y+90) And (MY<=Y+114) Then ColumnsDialogFocus:=2
+  Else If (MY>=Y+132) And (MY<=Y+156) Then ColumnsDialogFocus:=3
+  Else If (MX>=X+268) And (MY>=Y+250) And (MY<=Y+274) Then ColumnsDialogFocus:=5
+  Else Begin DrawInterface; Exit; End;
+  ColumnsDialogAction(ColumnsDialogFocus); Exit;
+ End Else If (MX>=X+180) And (MX<=X+256) And (MY>=Y+250) And (MY<=Y+274) Then Begin
+  ColumnsDialogAction(4); Exit;
+ End;
+ DrawInterface;
+End;
+
+Procedure HandleColumnsDialogKey(Key: Char; Extended: Boolean);
+Begin
+ If Extended Then Begin
+  Case Key Of
+   #72: If ColumnsDialogFocus=0 Then
+    ColumnsDialogSelection:=(ColumnsDialogSelection+ColumnCount-1) Mod ColumnCount;
+   #80: If ColumnsDialogFocus=0 Then
+    ColumnsDialogSelection:=(ColumnsDialogSelection+1) Mod ColumnCount;
+   #71: If ColumnsDialogFocus=0 Then ColumnsDialogSelection:=0;
+   #79: If ColumnsDialogFocus=0 Then ColumnsDialogSelection:=ColumnCount-1;
+   #15: ColumnsDialogFocus:=(ColumnsDialogFocus+5) Mod 6;
+  End;
+ End Else Case Key Of
+  #27: Begin CloseColumnsDialog(False); Exit; End;
+  #9: ColumnsDialogFocus:=(ColumnsDialogFocus+1) Mod 6;
+  #13: Begin
+   If ColumnsDialogFocus=0 Then CloseColumnsDialog(True)
+   Else ColumnsDialogAction(ColumnsDialogFocus);
+   Exit;
+  End;
+  ' ': Begin ColumnsDialogAction(ColumnsDialogFocus); Exit; End;
+ End;
+ DrawInterface;
+End;
+
+Procedure DrawSortDialog;
+Var X,Y,I,C: Integer; LabelText: String;
+Begin
+ If Not SortDialogVisible Then Exit;
+ X:=(SCREEN_WIDTH-340) Div 2; Y:=(SCREEN_HEIGHT-270) Div 2;
+ DrawDialogBox(X,Y,340,270,'Trier par...');
+ SetColor(Black); OutTextXY(X+16,Y+34,'Critere :');
+ For I:=0 To 6 Do Begin
+  C:=White; If I=SortDialogCriterion Then C:=Blue;
+  FillRect(X+16,Y+52+I*22,X+180,Y+72+I*22,C);
+  If I=SortDialogCriterion Then SetColor(White) Else SetColor(Black);
+  LabelText:=SortCriterionName(I);
+  If (SortDialogFocus=0) And (I=SortDialogCriterion) Then LabelText:='> '+LabelText;
+  OutTextXY(X+20,Y+58+I*22,LabelText);
+ End;
+ SetColor(Black); OutTextXY(X+196,Y+34,'Ordre :');
+ LabelText:='( ) Croissant'; If SortDialogOrder=soAscending Then LabelText:='(*) Croissant';
+ OutTextXY(X+196,Y+64,LabelText);
+ LabelText:='( ) Decroissant'; If SortDialogOrder=soDescending Then LabelText:='(*) Decroissant';
+ OutTextXY(X+196,Y+94,LabelText);
+ If SortDialogFocus=1 Then OutTextXY(X+188,Y+120,'^ Fleches / Espace');
+ DrawDialogButton(X+150,Y+232,76,24,'OK',SortDialogFocus=2,True);
+ DrawDialogButton(X+238,Y+232,86,24,'Annuler',SortDialogFocus=3,True);
+End;
+
+Procedure ShowSortDialog;
+Begin
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or ColumnsDialogVisible Or
+    RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ SortDialogCriterion:=Ord(ctDate);
+ If (SortColumn>=0) And (SortColumn<ColumnCount) Then
+  SortDialogCriterion:=Ord(Columns[SortColumn].ColType);
+ SortDialogOrder:=SortOrder;
+ If SortDialogOrder=soNone Then SortDialogOrder:=soAscending;
+ SortDialogFocus:=0; SortDialogVisible:=True;
+ ContextMenuVisible:=False; DrawInterface;
+End;
+
+Procedure CloseSortDialog(Apply: Boolean);
+Var I: Integer;
+Begin
+ If Apply Then Begin
+  For I:=0 To ColumnCount-1 Do
+   If Ord(Columns[I].ColType)=SortDialogCriterion Then Begin
+    SortColumn:=I; SortOrder:=SortDialogOrder; SortMessageList; Break;
+   End;
+ End;
+ SortDialogVisible:=False; DrawInterface;
+End;
+
+Procedure HandleSortDialogClick(MX,MY: Integer);
+Var X,Y: Integer;
+Begin
+ X:=(SCREEN_WIDTH-340) Div 2; Y:=(SCREEN_HEIGHT-270) Div 2;
+ If (MX>=X+16) And (MX<=X+180) And (MY>=Y+52) And (MY<Y+206) Then Begin
+  SortDialogCriterion:=(MY-Y-52) Div 22; SortDialogFocus:=0;
+ End Else If (MX>=X+188) And (MX<X+330) And (MY>=Y+52) And (MY<Y+112) Then Begin
+  SortDialogFocus:=1;
+  If MY<Y+82 Then SortDialogOrder:=soAscending Else SortDialogOrder:=soDescending;
+ End Else If (MY>=Y+232) And (MY<=Y+256) Then Begin
+  If (MX>=X+150) And (MX<=X+226) Then Begin CloseSortDialog(True); Exit; End;
+  If (MX>=X+238) And (MX<=X+324) Then Begin CloseSortDialog(False); Exit; End;
+ End;
+ DrawInterface;
+End;
+
+Procedure HandleSortDialogKey(Key: Char; Extended: Boolean);
+Begin
+ If Extended Then Begin
+  Case Key Of
+   #72,#75: If SortDialogFocus=0 Then
+     SortDialogCriterion:=(SortDialogCriterion+6) Mod 7
+    Else If SortDialogFocus=1 Then SortDialogOrder:=soAscending;
+   #80,#77: If SortDialogFocus=0 Then
+     SortDialogCriterion:=(SortDialogCriterion+1) Mod 7
+    Else If SortDialogFocus=1 Then SortDialogOrder:=soDescending;
+   #71: If SortDialogFocus=0 Then SortDialogCriterion:=0;
+   #79: If SortDialogFocus=0 Then SortDialogCriterion:=6;
+   #15: SortDialogFocus:=(SortDialogFocus+3) Mod 4;
+  End;
+ End Else Case Key Of
+  #27: Begin CloseSortDialog(False); Exit; End;
+  #13: Begin CloseSortDialog(SortDialogFocus<>3); Exit; End;
+  #9: SortDialogFocus:=(SortDialogFocus+1) Mod 4;
+  ' ': Case SortDialogFocus Of
+   1: If SortDialogOrder=soAscending Then SortDialogOrder:=soDescending
+      Else SortDialogOrder:=soAscending;
+   2,3: Begin CloseSortDialog(SortDialogFocus=2); Exit; End;
+  End;
+ End;
+ DrawInterface;
 End;
 
 { Dessine l'icone de priorite }
@@ -20990,7 +23170,7 @@ Begin
  X := Layout.MessageListRect.X1 + 2;
  For I := 0 To ColumnCount - 1 Do Begin
   Columns[I].X := X;
-  X := X + Columns[I].Width;
+  If Columns[I].Visible Then X := X + Columns[I].Width;
  End;
 End;
 
@@ -21001,7 +23181,8 @@ Var
 Begin
  GetColumnAtPoint := -1;
  For I := 0 To ColumnCount - 1 Do Begin
-  If (X >= Columns[I].X) And (X < Columns[I].X + Columns[I].Width) Then Begin
+  If Columns[I].Visible And (X >= Columns[I].X) And
+     (X < Columns[I].X + Columns[I].Width) Then Begin
    GetColumnAtPoint := I;
    Exit;
   End;
@@ -21395,6 +23576,7 @@ Var
  DisplayText: String;
  MaxY: Integer;
 Begin
+ SetViewPort(0,0,Layout.MessageListRect.X2,SCREEN_HEIGHT-1,True);
  { Calculer les positions des colonnes }
  CalculateColumnPositions;
 
@@ -21413,6 +23595,7 @@ Begin
 
  { Dessiner chaque en-tete de colonne }
  For I := 0 To ColumnCount - 1 Do Begin
+  If Not Columns[I].Visible Then Continue;
   { Separateur vertical }
   If I > 0 Then Begin
    SetColor(COLOR_BUTTON_DARK);
@@ -21447,6 +23630,7 @@ Begin
   End
   Else Begin
    BgColor := COLOR_LIST_BG;
+   If OptionsReady And UserPrefs.Reading.UseAlternateRowColor And (I Mod 2=1) Then BgColor:=LightGray;
    If Messages[I].IsRead Then
     TextColor := COLOR_LIST_TEXT
    Else
@@ -21454,13 +23638,14 @@ Begin
   End;
 
   { Dessiner le fond si selectionne }
-  If Messages[I].IsSelected Then Begin
+  Begin
    FillRect(Layout.MessageListRect.X1 + 1, Y,
             Layout.MessageListRect.X2 - 1, Y + MESSAGE_ROW_HEIGHT - 1, BgColor);
   End;
 
   { Dessiner chaque colonne }
   For J := 0 To ColumnCount - 1 Do Begin
+   If Not Columns[J].Visible Then Continue;
    Case Columns[J].ColType Of
     ctPriority: Begin
      DrawPriorityIcon(Columns[J].X, Y + 1, Messages[I].Priority);
@@ -21509,6 +23694,7 @@ Begin
   Y := Y + MESSAGE_ROW_HEIGHT;
  End;
 
+ SetViewPort(0,0,SCREEN_WIDTH-1,SCREEN_HEIGHT-1,True);
  { Dessiner le menu contextuel si visible }
  If ContextMenuVisible Then
   DrawContextMenu;
@@ -21562,6 +23748,7 @@ Var
 Begin
  { Si le volet est masque, ne rien dessiner }
  If Not PreviewVisible Then Exit;
+ SetViewPort(0,0,Layout.PreviewPaneRect.X2,SCREEN_HEIGHT-1,True);
 
  { Fond du volet }
  FillRect(Layout.PreviewPaneRect.X1, Layout.PreviewPaneRect.Y1,
@@ -21574,6 +23761,7 @@ Begin
   SetColor(COLOR_BUTTON_DARK);
   Y := (Layout.PreviewPaneRect.Y1 + Layout.PreviewPaneRect.Y2) Div 2;
   OutTextXY(Layout.PreviewPaneRect.X1 + 20, Y, 'Selectionnez un message pour le previsualiser');
+  SetViewPort(0,0,SCREEN_WIDTH-1,SCREEN_HEIGHT-1,True);
   Exit;
  End;
 
@@ -21667,6 +23855,7 @@ Begin
             Layout.VSplitterRect.X2, Layout.VSplitterRect.Y2, True);
 
  { Séparateur horizontal }
+ If Not PreviewVisible Then Exit;
  FillRect(Layout.HSplitterRect.X1, Layout.HSplitterRect.Y1,
           Layout.HSplitterRect.X2, Layout.HSplitterRect.Y2, COLOR_SPLITTER);
  Draw3DRect(Layout.HSplitterRect.X1, Layout.HSplitterRect.Y1,
@@ -21683,7 +23872,7 @@ Begin
 
  SetColor(COLOR_STATUS_TEXT);
  OutTextXY(Layout.StatusBarRect.X1 + 4, Layout.StatusBarRect.Y1 + 5,
-           '5 messages, 5 non lus | Connecte');
+           MailStatus);
 End;
 
 { ============================================================================
@@ -21709,8 +23898,19 @@ Begin
  DrawSplitters;
  DrawMessageList;
  DrawPreviewPane;
+ If CalendarVisible Then DrawCalendar;
  DrawStatusBar;
 
+ If ComposerVisible Then DrawComposerWindow;
+ If AccountDialogVisible Then DrawAccountManagerDialog;
+ If FileOpenVisible Then DrawOpenFileDialog;
+ If SortDialogVisible Then DrawSortDialog;
+ If ColumnsDialogVisible Then DrawColumnsDialog;
+ If RulesVisible Then Rules_DrawWindow;
+ If PrefsVisible Then Prefs_DrawWindow;
+ If AboutVisible Then DrawAboutDialog;
+ If EventDialogVisible Then EventDraw;
+ If BusyVisible Then DrawBusyDialog;
  ShowMouse;
 End;
 
@@ -21736,12 +23936,20 @@ Begin
    If NewWidth < MIN_FOLDER_WIDTH Then NewWidth := MIN_FOLDER_WIDTH;
    If NewWidth > SCREEN_WIDTH - MIN_MESSAGE_WIDTH - SPLITTER_SIZE Then
     NewWidth := SCREEN_WIDTH - MIN_MESSAGE_WIDTH - SPLITTER_SIZE;
+   If CalendarVisible And (NewWidth>SCREEN_WIDTH-CalendarPaneWidth-144) Then
+    NewWidth:=SCREEN_WIDTH-CalendarPaneWidth-144;
    If NewWidth <> Layout.FolderPaneWidth Then Begin
     Layout.FolderPaneWidth := NewWidth;
     DrawInterface;
    End;
   End;
   dsDragHSplitter: Begin
+   If PreviewOrientation=poVertical Then Begin
+    PreviewPaneWidth:=SCREEN_WIDTH-MouseX;
+    If CalendarVisible Then Dec(PreviewPaneWidth,CalendarPaneWidth+SPLITTER_SIZE);
+    If PreviewPaneWidth<120 Then PreviewPaneWidth:=120;
+    DrawInterface; Exit;
+   End;
    { Redimensionnement du volet de prévisualisation }
    NewHeight := Layout.StatusBarRect.Y1 - MouseY - SPLITTER_SIZE;
    If NewHeight < MIN_PREVIEW_HEIGHT Then NewHeight := MIN_PREVIEW_HEIGHT;
@@ -21763,6 +23971,10 @@ Var
  ClickedMenu: Integer;
  ClickedItem: Integer;
 Begin
+ If RibbonMode Then Begin
+  ClickedMenu:=RibbonTabAt(MouseX,MouseY);
+  If ClickedMenu>=0 Then Begin RibbonSelectTab(ClickedMenu,False); Exit; End;
+ End;
  { Si un menu est ouvert, vérifier le clic }
  If ActiveMenu >= 0 Then Begin
   { Clic sur un élément du menu déroulant? }
@@ -21947,14 +24159,23 @@ End;
 { Met à jour le survol des éléments de menu }
 Procedure UpdateMenuHover;
 Var
- NewItem: Integer;
+ NewMenu, NewItem: Integer;
 Begin
- If ActiveMenu >= 0 Then Begin
-  NewItem := GetMenuItemAtPoint(MouseX, MouseY);
-  If NewItem <> ActiveMenuItem Then Begin
-   ActiveMenuItem := NewItem;
-   DrawDropdownMenu(ActiveMenu);
-  End;
+ If ActiveMenu < 0 Then Exit;
+ NewMenu := GetMenuAtPoint(MouseX, MouseY);
+ If (NewMenu >= 0) And (NewMenu <> ActiveMenu) Then Begin
+  { Effacer le deroulant precedent avant de dessiner le nouveau. }
+  ActiveMenu := NewMenu;
+  ActiveMenuItem := -1;
+  MenuBarActive := True;
+  DrawInterface;
+  DrawDropdownMenu(ActiveMenu);
+  Exit;
+ End;
+ NewItem := GetMenuItemAtPoint(MouseX, MouseY);
+ If NewItem <> ActiveMenuItem Then Begin
+  ActiveMenuItem := NewItem;
+  DrawDropdownMenu(ActiveMenu);
  End;
 End;
 
@@ -21965,6 +24186,11 @@ Var
  I: Integer;
  NeedRedraw: Boolean;
 Begin
+ If RibbonMode Then Begin
+  NewHover:=RibbonButtonAt(MouseX,MouseY);
+  If NewHover<>RibbonHover Then Begin RibbonHover:=NewHover; DrawToolBar; End;
+  Exit;
+ End;
  NewHover := GetToolButtonAtPoint(MouseX, MouseY);
  NeedRedraw := False;
 
@@ -22012,6 +24238,12 @@ Procedure HandleToolbarClick;
 Var
  BtnIdx: Integer;
 Begin
+ If RibbonMode Then Begin
+  RibbonPressed:=RibbonButtonAt(MouseX,MouseY); RibbonKeyboardActive:=False; RibbonFocus:=-1;
+  If RibbonPressed>=0 Then
+   If Not Menus[RibbonTab].Items[RibbonButtons[RibbonPressed].MenuItem].Enabled Then RibbonPressed:=-1;
+  DrawToolBar; Exit;
+ End;
  BtnIdx := GetToolButtonAtPoint(MouseX, MouseY);
  If BtnIdx >= 0 Then Begin
   If ToolButtons[BtnIdx].Enabled Then Begin
@@ -22030,7 +24262,16 @@ End;
 
 { Gère le relâchement d'un bouton de barre d'outils }
 Procedure HandleToolbarRelease;
+Var Index,Command: Integer;
 Begin
+ If RibbonMode Then Begin
+  Index:=RibbonPressed; RibbonPressed:=-1;
+  If (Index>=0) And (Index<RibbonCount) And (RibbonButtonAt(MouseX,MouseY)=Index) Then Begin
+   Command:=RibbonButtons[Index].MenuItem;
+   If Menus[RibbonTab].Items[Command].Enabled Then ExecuteMenuCommand(Menus[RibbonTab].Items[Command].ItemID);
+  End;
+  DrawInterface; Exit;
+ End;
  If PressedToolButton >= 0 Then Begin
   { Vérifier si on est toujours sur le même bouton }
   If GetToolButtonAtPoint(MouseX, MouseY) = PressedToolButton Then Begin
@@ -22042,24 +24283,1907 @@ Begin
   ToolButtons[PressedToolButton].State := tbsNormal;
   PressedToolButton := -1;
   HideMouse;
-  DrawToolBar;
+  If ComposerVisible Then DrawComposerWindow Else DrawToolBar;
   ShowMouse;
  End;
 End;
 
+Function ApplicationHasKeyboardFocus: Boolean;
+{$IFDEF WINDOWS}
+Var Window: PtrUInt; ProcessID: LongWord;
+{$ENDIF}
+Begin
+ ApplicationHasKeyboardFocus := False;
+ {$IFDEF WINDOWS}
+ Window := OutlookGetForegroundWindow;
+ If Window = 0 Then Exit;
+ ProcessID := 0;
+ OutlookGetWindowProcess(Window, ProcessID);
+ ApplicationHasKeyboardFocus := ProcessID = OutlookGetCurrentProcessID;
+ {$ENDIF}
+End;
+
+Function MenuShortcutFromScan(Key: Char): Integer;
+Begin
+ Case Ord(Key) of
+  33: MenuShortcutFromScan := 0; { Alt+F }
+  18: MenuShortcutFromScan := 1; { Alt+E }
+  30: MenuShortcutFromScan := 2; { Alt+A }
+  24: MenuShortcutFromScan := 3; { Alt+O }
+  50: MenuShortcutFromScan := 4; { Alt+M }
+  53: MenuShortcutFromScan := 5; { Alt+? }
+  Else MenuShortcutFromScan := -1;
+ End;
+End;
+
+Procedure OpenMenuShortcut(MenuIndex: Integer);
+Var I: Integer;
+Begin
+ If (MenuIndex < 0) Or (MenuIndex >= MenuCount) Then Exit;
+ If ComposerVisible Or AccountDialogVisible Or FileOpenVisible Or SortDialogVisible Or ColumnsDialogVisible Or
+    RulesVisible Or PrefsVisible Or AboutVisible Or EventDialogVisible Then Exit;
+ TooltipVisible := False;
+ ContextMenuVisible := False;
+ MenuBarActive := True;
+ If RibbonMode Then Begin RibbonSelectTab(MenuIndex,True); Exit; End;
+ ActiveMenu := MenuIndex;
+ ActiveMenuItem := -1;
+ For I := 0 To Menus[MenuIndex].ItemCount - 1 Do
+  If Menus[MenuIndex].Items[I].Enabled And
+     Not Menus[MenuIndex].Items[I].Separator Then Begin
+   ActiveMenuItem := I;
+   Break;
+  End;
+ DrawInterface;
+ DrawDropdownMenu(MenuIndex);
+End;
+
+Function NativeMenuShortcut: Integer;
+{$IFDEF WINDOWS}
+Const Letters: Array[0..4] of Byte = ($46, $45, $41, $4F, $4D);
+Var I: Integer; QuestionKey: SmallInt; ShiftDown, ShiftNeeded: Boolean;
+{$ENDIF}
+Begin
+ NativeMenuShortcut := -1;
+ {$IFDEF WINDOWS}
+ If Not ApplicationHasKeyboardFocus Then Exit;
+ If (Word(OutlookGetAsyncKeyState($12)) And $8000) = 0 Then Exit;
+ { Ne pas interpreter AltGr (Ctrl+Alt) comme un raccourci de menu. }
+ If (Word(OutlookGetAsyncKeyState($11)) And $8000) <> 0 Then Exit;
+ For I := 0 To 4 Do
+  If (Word(OutlookGetAsyncKeyState(Letters[I])) And $8000) <> 0 Then Begin
+   NativeMenuShortcut := I;
+   Exit;
+  End;
+ { Le point d interrogation depend de la disposition du clavier. }
+ QuestionKey := OutlookVkKeyScan('?');
+ If QuestionKey = -1 Then Exit;
+ ShiftNeeded := (Word(QuestionKey) And $0100) <> 0;
+ ShiftDown := (Word(OutlookGetAsyncKeyState($10)) And $8000) <> 0;
+ If (ShiftDown = ShiftNeeded) And
+    ((Word(OutlookGetAsyncKeyState(Word(QuestionKey) And $FF)) And $8000) <> 0) Then
+  NativeMenuShortcut := 5;
+ {$ENDIF}
+End;
+
+{ Ctrl+1 donne le focus au courrier; Ctrl+2 affiche et active le calendrier. }
+Function NativeViewShortcut: Integer;
+Begin
+ NativeViewShortcut:=0;
+ {$IFDEF WINDOWS}
+ If Not ApplicationHasKeyboardFocus Then Exit;
+ If (Word(OutlookGetAsyncKeyState($11)) And $8000)=0 Then Exit;
+ If (Word(OutlookGetAsyncKeyState($12)) And $8000)<>0 Then Exit;
+ If (Word(OutlookGetAsyncKeyState($10)) And $8000)<>0 Then Exit;
+ If (Word(OutlookGetAsyncKeyState($31)) And $8000)<>0 Then NativeViewShortcut:=1
+ Else If (Word(OutlookGetAsyncKeyState($32)) And $8000)<>0 Then NativeViewShortcut:=2;
+ {$ENDIF}
+End;
+
+Procedure PollMenuShortcut;
+Var MenuIndex,ViewIndex: Integer;
+Begin
+ ViewIndex:=NativeViewShortcut;
+ If (ViewIndex<>0) And (ViewIndex<>LastViewShortcut) Then Begin
+  If ViewIndex=1 Then FocusMail Else CalendarShow(True);
+ End;
+ LastViewShortcut:=ViewIndex;
+ MenuIndex := NativeMenuShortcut;
+ If (MenuIndex >= 0) And (MenuIndex <> LastMenuShortcut) Then
+  OpenMenuShortcut(MenuIndex);
+ LastMenuShortcut := MenuIndex;
+End;
+
+{ PtcCrt ne transmet pas toujours Alt+F4 dans son tampon de touches. }
+Function ApplicationQuitRequested: Boolean;
+Begin
+ ApplicationQuitRequested := False;
+ {$IFDEF WINDOWS}
+ If Not ApplicationHasKeyboardFocus Then Exit;
+ If (Word(OutlookGetAsyncKeyState($12)) And $8000 = 0) Or
+    (Word(OutlookGetAsyncKeyState($73)) And $8000 = 0) Then Exit;
+ ApplicationQuitRequested := True; { VK_MENU + VK_F4 }
+ {$ENDIF}
+End;
+
 { Boucle principale de gestion des événements }
+
+{ Moteur VBScript integre, sans unite supplementaire. }
+
+Const
+ VBS_MaxArguments=128;
+ VBS_VersionText='5.812';
+ VBS_ValueEmpty=0;VBS_ValueString=1;VBS_ValueNumber=2;VBS_ValueDate=3;
+ VBS_ValueArray=4;VBS_ValueError=5;VBS_ValueNull=6;VBS_ValueObject=7;
+ VBS_FunctionList:Array[0..66]of String[24]=(
+  'ABS','ARRAY','ASC','ATN','CBOOL','CBYTE','CDATE','CDBL','CHR','CINT',
+  'CLNG','COS','CSNG','CSTR','CVERR','DATE','DATESERIAL','DATEVALUE','DAY',
+  'EXP','FIX','HEX','HOUR','INPUTBOX','INSTR','INT','ISARRAY','ISDATE',
+  'ISEMPTY','ISERROR','ISNULL','ISNUMERIC','ISOBJECT','LBOUND','LCASE',
+  'LEFT','LEN','LOG','LTRIM','MID','MINUTE','MONTH','MSGBOX','NOW','OCT',
+  'RIGHT','RND','RTRIM','SECOND','SGN','SIN','SQR','STR','STRCOMP','STRING',
+  'TAN','TIME','TIMESERIAL','TIMEVALUE','TRIM','UBOUND','UCASE','VAL','VARTYPE',
+  'WEEKDAY','WSCRIPT.ARGUMENTS','YEAR');
+
+Type
+ VBS_PScriptLine=^VBS_TScriptLine;
+ VBS_TScriptLine=Record
+  Number:LongInt;
+  Text:TMailText;
+  Previous,Next:VBS_PScriptLine;
+ End;
+ VBS_PVariable=^VBS_TVariable;
+ VBS_TVariable=Record
+  Name:String[63];
+  Value:TMailText;
+  ValueKind:Byte;
+  Next:VBS_PVariable;
+ End;
+ VBS_PCallBinding=^VBS_TCallBinding;
+ VBS_TCallBinding=Record
+  Name:String[63];
+  ActualName:String[63];
+  Existed:Boolean;
+  CopyBack:Boolean;
+  OldValue:TMailText;
+  OldKind:Byte;
+  Next:VBS_PCallBinding;
+ End;
+ VBS_TValue=Record
+  Text:TMailText;
+  Number:Real;
+  IsNumber:Boolean;
+  ValueKind:Byte;
+ End;
+
+Var
+ VBS_FirstScriptLine,VBS_LastScriptLine:VBS_PScriptLine;
+ VBS_LineCount,VBS_CurrentLine:LongInt;
+ VBS_Variables:VBS_PVariable;
+ VBS_ScriptArguments:Array[0..VBS_MaxArguments-1]of TMailText;
+ VBS_ScriptArgumentCount:Integer;
+ VBS_ScriptName:TMailText;
+ VBS_TimeLimit:LongInt;
+ VBS_StartHour,VBS_StartMinute,VBS_StartSecond,VBS_StartHundredth:Word;
+ VBS_ExprText:TMailText;
+ VBS_ExprPos:Integer;
+ VBS_Terminated,VBS_ExitDoRequested,VBS_ExitForRequested,VBS_ExitSubRequested,VBS_ExitFunctionRequested:Boolean;
+ VBS_OnErrorResumeNext:Boolean;
+ VBS_ExitCode:Integer;
+ VBS_ArrayCounter:LongInt;
+
+
+Var
+ CommandLineScript: TMailText;
+ VBSSteps,VBSDepth: LongInt;
+ VBSDiagnostic: TMailText;
+ VBSStarted,VBSExplicit: Boolean;
+
+Procedure VBSOutput(S:TMailText);
+Begin
+ VBSDiagnostic:=S; MailStatus:='VBScript: '+S;
+End;
+Function VBSHostStatement(S:TMailText):Boolean;Forward;
+Function VBSHostValue(Name:TMailText;Var V:VBS_TValue):Boolean;Forward;
+Procedure VBS_ScriptError(MessageText:TMailText;StopScript:Boolean);Forward;
+Function VBS_Upper(S:TMailText):TMailText;
+Var I:Integer;
+Begin For I:=1To Length(S)Do If S[I]in['a'..'z']Then S[I]:=Chr(Ord(S[I])-32);VBS_Upper:=S;End;
+
+Function VBS_FunctionIndex(Name:TMailText):Byte;
+Var FirstIndex,LastIndex,MiddleIndex:Integer;
+Begin
+ Name:=VBS_Upper(Name);VBS_FunctionIndex:=255;
+ FirstIndex:=Low(VBS_FunctionList);LastIndex:=High(VBS_FunctionList);
+ While FirstIndex<=LastIndex Do Begin
+  MiddleIndex:=(FirstIndex+LastIndex)div 2;
+  If Name=VBS_FunctionList[MiddleIndex]Then Begin VBS_FunctionIndex:=MiddleIndex;Exit;End;
+  If Name<VBS_FunctionList[MiddleIndex]Then LastIndex:=MiddleIndex-1
+  Else FirstIndex:=MiddleIndex+1;
+ End;
+End;
+
+Function VBS_Trim(S:TMailText):TMailText;
+Begin
+ While(Length(S)>0)and(S[1]in[' ',#9])Do Delete(S,1,1);
+ While(Length(S)>0)and(S[Length(S)]in[' ',#9,#13,#10])Do Delete(S,Length(S),1);
+ VBS_Trim:=S;
+End;
+
+Function VBS_StartsWith(S,Prefix:TMailText):Boolean;
+Begin VBS_StartsWith:=Copy(VBS_Upper(VBS_Trim(S)),1,Length(Prefix))=VBS_Upper(Prefix);End;
+
+Procedure VBS_AddScriptLine(S:TMailText);
+Var Line:VBS_PScriptLine;
+Begin
+ New(Line);Inc(VBS_LineCount);Line^.Number:=VBS_LineCount;Line^.Text:=S;
+ Line^.Previous:=VBS_LastScriptLine;Line^.Next:=Nil;
+ If VBS_LastScriptLine<>Nil Then VBS_LastScriptLine^.Next:=Line
+ Else VBS_FirstScriptLine:=Line;
+ VBS_LastScriptLine:=Line;
+End;
+
+Function VBS_ScriptLineText(LineNumber:LongInt):TMailText;
+Var Line:VBS_PScriptLine;
+Begin
+ If(LineNumber<1)or(LineNumber>VBS_LineCount)Then Begin VBS_ScriptLineText:='';Exit;End;
+ If LineNumber<=(VBS_LineCount div 2)Then Begin
+  Line:=VBS_FirstScriptLine;While(Line<>Nil)and(Line^.Number<LineNumber)Do Line:=Line^.Next;
+ End Else Begin
+  Line:=VBS_LastScriptLine;While(Line<>Nil)and(Line^.Number>LineNumber)Do Line:=Line^.Previous;
+ End;
+ If Line=Nil Then VBS_ScriptLineText:=''Else VBS_ScriptLineText:=Line^.Text;
+End;
+
+Procedure VBS_MakeText(S:TMailText;Var V:VBS_TValue);
+Var Code:Integer;N:Real;
+Begin
+ V.Text:=S;Val(S,N,Code);V.IsNumber:=Code=0;
+ If V.IsNumber Then Begin V.Number:=N;V.ValueKind:=VBS_ValueNumber;End
+ Else Begin V.Number:=0;If S=''Then V.ValueKind:=VBS_ValueEmpty Else V.ValueKind:=VBS_ValueString;End;
+End;
+
+Procedure VBS_MakeNumber(N:Real;Var V:VBS_TValue);
+Var S:TMailText;
+Begin
+ If Frac(N)=0Then Str(Trunc(N),S)Else Str(N:0:8,S);
+ V.Text:=VBS_Trim(S);V.Number:=N;V.IsNumber:=True;V.ValueKind:=VBS_ValueNumber;
+End;
+
+Procedure VBS_MakeSingleNumber(N:Real;Var V:VBS_TValue);
+Var Scale,ScaledValue:Real;
+Begin
+ If N=0Then Begin VBS_MakeNumber(0,V);Exit;End;
+ Scale:=1;ScaledValue:=Abs(N);
+ While ScaledValue>=10Do Begin ScaledValue:=ScaledValue/10;Scale:=Scale*10;End;
+ While ScaledValue<1Do Begin ScaledValue:=ScaledValue*10;Scale:=Scale/10;End;
+ ScaledValue:=Round(ScaledValue*1000000)/1000000;
+ If N<0Then ScaledValue:=-ScaledValue;
+ VBS_MakeNumber(ScaledValue*Scale,V);
+End;
+
+Function VBS_LeapYear(Year:Integer):Boolean;
+Begin VBS_LeapYear:=(Year mod 4=0)and((Year mod 100<>0)or(Year mod 400=0));End;
+
+Function VBS_MonthDays(Year,Month:Integer):Integer;
+Const Days:Array[1..12]of Byte=(31,28,31,30,31,30,31,31,30,31,30,31);
+Begin
+ If(Month=2)and VBS_LeapYear(Year)Then VBS_MonthDays:=29 Else VBS_MonthDays:=Days[Month];
+End;
+
+Procedure VBS_MakeDateValue(Year,Month,Day:Integer;Var V:VBS_TValue);
+Var SYear,SMonth,SDay:TMailText;
+Begin
+ If(Year>=0)and(Year<=29)Then Inc(Year,2000)
+ Else If(Year>=30)and(Year<=99)Then Inc(Year,1900);
+ While Month<1 Do Begin Dec(Year);Inc(Month,12);End;
+ While Month>12 Do Begin Inc(Year);Dec(Month,12);End;
+ While Day<1 Do Begin Dec(Month);If Month<1Then Begin Month:=12;Dec(Year);End;
+  Inc(Day,VBS_MonthDays(Year,Month));End;
+ While Day>VBS_MonthDays(Year,Month)Do Begin Dec(Day,VBS_MonthDays(Year,Month));Inc(Month);
+  If Month>12Then Begin Month:=1;Inc(Year);End;End;
+ Str(Year,SYear);Str(Month,SMonth);Str(Day,SDay);
+ If Length(SMonth)<2Then SMonth:='0'+SMonth;If Length(SDay)<2Then SDay:='0'+SDay;
+ VBS_MakeText(SDay+'/'+SMonth+'/'+VBS_Trim(SYear),V);V.ValueKind:=VBS_ValueDate;
+End;
+
+Procedure VBS_ParseDateValue(SourceText:TMailText;Var V:VBS_TValue);
+Var FirstPart,SecondPart,ThirdPart:TMailText;P,Code,Year,Month,Day:Integer;
+Begin
+ SourceText:=VBS_Trim(SourceText);P:=Pos(' ',SourceText);
+ If P>0Then SourceText:=Copy(SourceText,1,P-1);
+ FirstPart:='';SecondPart:='';ThirdPart:='';
+ P:=Pos('/',SourceText);If P=0Then P:=Pos('-',SourceText);
+ If P=0Then Begin VBS_MakeText('',V);Exit;End;
+ FirstPart:=Copy(SourceText,1,P-1);Delete(SourceText,1,P);
+ P:=Pos('/',SourceText);If P=0Then P:=Pos('-',SourceText);
+ If P=0Then Begin VBS_MakeText('',V);Exit;End;
+ SecondPart:=Copy(SourceText,1,P-1);ThirdPart:=Copy(SourceText,P+1,32767);
+ If Length(VBS_Trim(FirstPart))=4Then Begin
+  Val(FirstPart,Year,Code);If Code<>0Then Begin VBS_MakeText('',V);Exit;End;
+  Val(SecondPart,Month,Code);If Code<>0Then Begin VBS_MakeText('',V);Exit;End;
+  Val(ThirdPart,Day,Code);
+ End Else Begin
+  Val(FirstPart,Day,Code);If Code<>0Then Begin VBS_MakeText('',V);Exit;End;
+  Val(SecondPart,Month,Code);If Code<>0Then Begin VBS_MakeText('',V);Exit;End;
+  Val(ThirdPart,Year,Code);
+ End;
+ If Code<>0Then VBS_MakeText('',V)Else VBS_MakeDateValue(Year,Month,Day,V);
+End;
+
+Procedure VBS_DateDayValue(SourceText:TMailText;Var V:VBS_TValue);
+Var DateValue:VBS_TValue;Day,Code:Integer;
+Begin
+ VBS_ParseDateValue(SourceText,DateValue);
+ If DateValue.Text=''Then Begin VBS_MakeText('',V);Exit;End;
+ Val(Copy(DateValue.Text,1,2),Day,Code);
+ If Code=0Then VBS_MakeNumber(Day,V)Else VBS_MakeText('',V);
+End;
+
+Procedure VBS_DateHourValue(SourceText:TMailText;Var V:VBS_TValue);
+Var P,HourValue,Code:Integer;TimeText:TMailText;
+Begin
+ SourceText:=VBS_Trim(SourceText);P:=Pos(' ',SourceText);
+ If P>0Then TimeText:=VBS_Trim(Copy(SourceText,P+1,32767))Else TimeText:=SourceText;
+ P:=Pos(':',TimeText);If P=0Then Begin VBS_MakeNumber(0,V);Exit;End;
+ Val(Copy(TimeText,1,P-1),HourValue,Code);
+ If(Code=0)and(HourValue>=0)and(HourValue<=23)Then VBS_MakeNumber(HourValue,V)
+ Else VBS_MakeText('',V);
+End;
+
+Procedure VBS_DateMinuteValue(SourceText:TMailText;Var V:VBS_TValue);
+Var P,P2,MinuteValue,Code:Integer;TimeText:TMailText;
+Begin
+ SourceText:=VBS_Trim(SourceText);P:=Pos(' ',SourceText);
+ If P>0Then TimeText:=VBS_Trim(Copy(SourceText,P+1,32767))Else TimeText:=SourceText;
+ P:=Pos(':',TimeText);If P=0Then Begin VBS_MakeNumber(0,V);Exit;End;
+ Delete(TimeText,1,P);P2:=Pos(':',TimeText);
+ If P2>0Then TimeText:=Copy(TimeText,1,P2-1);
+ Val(VBS_Trim(TimeText),MinuteValue,Code);
+ If(Code=0)and(MinuteValue>=0)and(MinuteValue<=59)Then VBS_MakeNumber(MinuteValue,V)
+ Else VBS_MakeText('',V);
+End;
+
+Procedure VBS_DateSecondValue(SourceText:TMailText;Var V:VBS_TValue);
+Var P,SecondValue,Code:Integer;TimeText:TMailText;
+Begin
+ SourceText:=VBS_Trim(SourceText);P:=Pos(' ',SourceText);
+ If P>0Then TimeText:=VBS_Trim(Copy(SourceText,P+1,32767))Else TimeText:=SourceText;
+ P:=Pos(':',TimeText);If P=0Then Begin VBS_MakeNumber(0,V);Exit;End;
+ Delete(TimeText,1,P);P:=Pos(':',TimeText);
+ If P=0Then Begin VBS_MakeNumber(0,V);Exit;End;Delete(TimeText,1,P);
+ P:=1;While(P<=Length(TimeText))and(TimeText[P]in['0'..'9'])Do Inc(P);
+ Val(Copy(TimeText,1,P-1),SecondValue,Code);
+ If(Code=0)and(SecondValue>=0)and(SecondValue<=59)Then VBS_MakeNumber(SecondValue,V)
+ Else VBS_MakeText('',V);
+End;
+
+Procedure VBS_DateMonthValue(SourceText:TMailText;Var V:VBS_TValue);
+Var DateValue:VBS_TValue;MonthValue,Code:Integer;
+Begin
+ VBS_ParseDateValue(SourceText,DateValue);
+ If DateValue.Text=''Then Begin VBS_MakeText('',V);Exit;End;
+ Val(Copy(DateValue.Text,4,2),MonthValue,Code);
+ If Code=0Then VBS_MakeNumber(MonthValue,V)Else VBS_MakeText('',V);
+End;
+
+Procedure VBS_NowValue(Var V:VBS_TValue);
+Var Year,Month,Day,DayOfWeek,HourValue,MinuteValue,Second,Hundredth:Word;
+ DatePart,HourText,MinuteText,SecondText:TMailText;DateValue:VBS_TValue;
+Begin
+ GetDate(Year,Month,Day,DayOfWeek);GetTime(HourValue,MinuteValue,Second,Hundredth);
+ VBS_MakeDateValue(Year,Month,Day,DateValue);Str(HourValue,HourText);
+ Str(MinuteValue,MinuteText);Str(Second,SecondText);
+ If Length(HourText)<2Then HourText:='0'+HourText;
+ If Length(MinuteText)<2Then MinuteText:='0'+MinuteText;
+ If Length(SecondText)<2Then SecondText:='0'+SecondText;
+ DatePart:=DateValue.Text+' '+HourText+':'+MinuteText+':'+SecondText;
+ VBS_MakeText(DatePart,V);V.ValueKind:=VBS_ValueDate;
+End;
+
+Procedure VBS_HexValue(NumberValue:LongInt;Var V:VBS_TValue);
+Const Digits:Array[0..15] of Char='0123456789ABCDEF';
+Var ResultText:TMailText;Digit,Count:Integer;Negative:Boolean;
+Begin
+ ResultText:='';Negative:=NumberValue<0;Count:=0;
+ Repeat
+  Digit:=NumberValue and 15;ResultText:=Digits[Digit]+ResultText;
+  NumberValue:=NumberValue shr 4;Inc(Count);
+ Until((Not Negative)and(NumberValue=0))or(Negative and(Count=8));
+ VBS_MakeText(ResultText,V);
+End;
+
+Procedure VBS_OctValue(NumberValue:LongInt;Var V:VBS_TValue);
+Const Digits:Array[0..7]of Char='01234567';
+Var ResultText:TMailText;Digit,Count:Integer;Negative:Boolean;
+Begin
+ ResultText:='';Negative:=NumberValue<0;Count:=0;
+ Repeat
+  Digit:=NumberValue and 7;ResultText:=Digits[Digit]+ResultText;
+  NumberValue:=NumberValue shr 3;Inc(Count);
+ Until((Not Negative)and(NumberValue=0))or(Negative and(Count=11));
+ VBS_MakeText(ResultText,V);
+End;
+
+Procedure VBS_StrValue(NumberValue:Real;Var V:VBS_TValue);
+Var Number:VBS_TValue;
+Begin
+ VBS_MakeNumber(NumberValue,Number);
+ If NumberValue>=0Then VBS_MakeText(' '+Number.Text,V)Else VBS_MakeText(Number.Text,V);
+End;
+
+Procedure VBS_MakeTimeValue(HourValue,MinuteValue,SecondValue:LongInt;Var V:VBS_TValue);
+Var TotalSeconds:LongInt;HourText,MinuteText,SecondText:TMailText;
+Begin
+ TotalSeconds:=HourValue*3600+MinuteValue*60+SecondValue;
+ TotalSeconds:=TotalSeconds mod 86400;If TotalSeconds<0Then Inc(TotalSeconds,86400);
+ HourValue:=TotalSeconds div 3600;MinuteValue:=(TotalSeconds mod 3600)div 60;
+ SecondValue:=TotalSeconds mod 60;Str(HourValue,HourText);Str(MinuteValue,MinuteText);
+ Str(SecondValue,SecondText);If Length(HourText)<2Then HourText:='0'+HourText;
+ If Length(MinuteText)<2Then MinuteText:='0'+MinuteText;
+ If Length(SecondText)<2Then SecondText:='0'+SecondText;
+ VBS_MakeText(HourText+':'+MinuteText+':'+SecondText,V);V.ValueKind:=VBS_ValueDate;
+End;
+
+Procedure VBS_CurrentTimeValue(Var V:VBS_TValue);
+Var HourValue,MinuteValue,SecondValue,Hundredth:Word;
+Begin GetTime(HourValue,MinuteValue,SecondValue,Hundredth);
+ VBS_MakeTimeValue(HourValue,MinuteValue,SecondValue,V);End;
+
+Procedure VBS_ParseTimeValue(SourceText:TMailText;Var V:VBS_TValue);
+Var P,Code,HourValue,MinuteValue,SecondValue:Integer;UpperText,Part:TMailText;
+ IsPM,IsAM:Boolean;
+Begin
+ SourceText:=VBS_Trim(SourceText);P:=Pos(' ',SourceText);
+ If(P>0)and(Pos(':',Copy(SourceText,P+1,32767))>0)Then SourceText:=VBS_Trim(Copy(SourceText,P+1,32767));
+ UpperText:=VBS_Upper(SourceText);IsPM:=Pos('PM',UpperText)>0;IsAM:=Pos('AM',UpperText)>0;
+ P:=Pos(':',SourceText);If P=0Then Begin VBS_MakeText('',V);Exit;End;
+ Part:=Copy(SourceText,1,P-1);Val(VBS_Trim(Part),HourValue,Code);
+ If Code<>0Then Begin VBS_MakeText('',V);Exit;End;Delete(SourceText,1,P);
+ P:=Pos(':',SourceText);
+ If P>0Then Begin Part:=Copy(SourceText,1,P-1);Delete(SourceText,1,P);End
+ Else Begin Part:=SourceText;SourceText:='0';End;
+ Val(VBS_Trim(Part),MinuteValue,Code);If Code<>0Then Begin VBS_MakeText('',V);Exit;End;
+ P:=1;While(P<=Length(SourceText))and(SourceText[P]in['0'..'9'])Do Inc(P);
+ If P=1Then SecondValue:=0 Else Begin Val(Copy(SourceText,1,P-1),SecondValue,Code);
+  If Code<>0Then Begin VBS_MakeText('',V);Exit;End;End;
+ If IsPM and(HourValue<12)Then Inc(HourValue,12);
+ If IsAM and(HourValue=12)Then HourValue:=0;
+ If(HourValue<0)or(HourValue>23)or(MinuteValue<0)or(MinuteValue>59)or
+   (SecondValue<0)or(SecondValue>59)Then VBS_MakeText('',V)
+ Else VBS_MakeTimeValue(HourValue,MinuteValue,SecondValue,V);
+End;
+
+Procedure VBS_StrCompValue(A,B,C:VBS_TValue;ArgumentCount:Integer;Var V:VBS_TValue);
+Var LeftText,RightText:TMailText;
+Begin
+ If(A.ValueKind=VBS_ValueNull)or(B.ValueKind=VBS_ValueNull)Then Begin VBS_MakeText('',V);V.ValueKind:=VBS_ValueNull;
+  Exit;End;
+ LeftText:=A.Text;RightText:=B.Text;
+ If(ArgumentCount>=3)and(Trunc(C.Number)=1)Then Begin LeftText:=VBS_Upper(LeftText);RightText:=VBS_Upper(RightText);End;
+ If LeftText<RightText Then VBS_MakeNumber(-1,V)Else If LeftText>RightText Then VBS_MakeNumber(1,V)Else VBS_MakeNumber(0,V);
+End;
+
+Procedure VBS_StringValue(Count:Integer;CharacterValue:VBS_TValue;Var V:VBS_TValue);
+Var ResultText:TMailText;Character:Char;
+Begin
+ If Count<0Then Begin VBS_MakeText('',V);Exit;End;If Count>255Then Count:=255;
+ If CharacterValue.IsNumber Then Character:=Chr(Trunc(CharacterValue.Number)and 255)
+ Else If CharacterValue.Text=''Then Character:=#0Else Character:=CharacterValue.Text[1];
+ ResultText:='';While Length(ResultText)<Count Do ResultText:=ResultText+Character;
+ VBS_MakeText(ResultText,V);V.ValueKind:=VBS_ValueString;
+End;
+
+Procedure VBS_MsgBoxValue(MessageText:TMailText;StyleValue:Integer;TitleText:TMailText;Var V:VBS_TValue);
+Begin VBSOutput('MsgBox non interactif: '+TitleText+' '+MessageText);VBS_MakeNumber(1,V);End;
+Procedure VBS_InputBoxValue(PromptText,TitleText,DefaultText:TMailText;Var V:VBS_TValue);
+Begin VBS_ScriptError('InputBox non supporte dans cet hote.',True);VBS_MakeText('',V);End;
+
+Procedure VBS_InStrValue(A,B,C,D:VBS_TValue;ArgumentCount:Integer;Var V:VBS_TValue);
+Var StartPosition,FoundPosition:Integer;SourceText,SearchText:TMailText;
+Begin
+ If ArgumentCount<3Then Begin StartPosition:=1;SourceText:=A.Text;SearchText:=B.Text;End
+ Else Begin StartPosition:=Trunc(A.Number);SourceText:=B.Text;SearchText:=C.Text;End;
+ If StartPosition<1Then StartPosition:=1;
+ If(ArgumentCount>=4)and(Trunc(D.Number)=1)Then Begin
+  SourceText:=VBS_Upper(SourceText);SearchText:=VBS_Upper(SearchText);
+ End;
+ If SearchText=''Then FoundPosition:=StartPosition
+ Else FoundPosition:=Pos(SearchText,Copy(SourceText,StartPosition,32767));
+ If FoundPosition>0Then Inc(FoundPosition,StartPosition-1);
+ VBS_MakeNumber(FoundPosition,V);
+End;
+
+Procedure VBS_BooleanValue(State:Boolean;Var V:VBS_TValue);
+Begin
+ If State Then Begin VBS_MakeText('True',V);V.Number:=-1;End
+ Else Begin VBS_MakeText('False',V);V.Number:=0;End;
+End;
+
+Procedure VBS_IsDateValue(A:VBS_TValue;Var V:VBS_TValue);
+Var Converted:VBS_TValue;
+Begin
+ If A.ValueKind=VBS_ValueDate Then VBS_BooleanValue(True,V)
+ Else Begin VBS_ParseDateValue(A.Text,Converted);VBS_BooleanValue(Converted.Text<>'',V);End;
+End;
+
+Function VBS_Truth(V:VBS_TValue):Boolean;
+Begin VBS_Truth:=Not((V.Text='')or(V.Text='0')or(VBS_Upper(V.Text)='FALSE'));End;
+
+Function VBS_FindVariable(Name:TMailText):VBS_PVariable;
+Var P:VBS_PVariable;
+Begin
+ Name:=VBS_Upper(VBS_Trim(Name));P:=VBS_Variables;
+ While P<>Nil Do Begin If P^.Name=Name Then Begin VBS_FindVariable:=P;Exit;End;P:=P^.Next;End;
+ VBS_FindVariable:=Nil;
+End;
+
+Procedure VBS_SetVariable(Name,Value:TMailText);
+Var P:VBS_PVariable;V:VBS_TValue;
+Begin
+ Name:=VBS_Upper(VBS_Trim(Name));If Name=''Then Exit;P:=VBS_FindVariable(Name);
+ If P=Nil Then Begin New(P);P^.Name:=Name;P^.Next:=VBS_Variables;VBS_Variables:=P;End;
+ VBS_MakeText(Value,V);P^.Value:=Value;P^.ValueKind:=V.ValueKind;
+ If Copy(Value,1,8)='@VBARRAY'Then P^.ValueKind:=VBS_ValueArray;
+ If Copy(Value,1,6)='Error 'Then P^.ValueKind:=VBS_ValueError;
+End;
+
+Procedure VBS_SetVariableValue(Name:TMailText;V:VBS_TValue);
+Var P:VBS_PVariable;
+Begin
+ Name:=VBS_Upper(VBS_Trim(Name));If Name=''Then Exit;P:=VBS_FindVariable(Name);
+ If P=Nil Then Begin New(P);P^.Name:=Name;P^.Next:=VBS_Variables;VBS_Variables:=P;End;
+ P^.Value:=V.Text;P^.ValueKind:=V.ValueKind;
+End;
+
+Procedure VBS_GetVariable(Name:TMailText;Var V:VBS_TValue);
+Var P:VBS_PVariable;
+Begin
+ If VBSHostValue(Name,V) Then Exit;
+ P:=VBS_FindVariable(Name);If P=Nil Then Begin
+  VBS_MakeText('',V);
+  If VBSExplicit Then VBS_ScriptError('Variable non declaree: '+Name,True);
+ End Else Begin
+ VBS_MakeText(P^.Value,V);V.ValueKind:=P^.ValueKind;
+ End;
+End;
+
+Procedure VBS_RemoveVariable(Name:TMailText);
+Var P,Previous:VBS_PVariable;
+Begin
+ Name:=VBS_Upper(VBS_Trim(Name));P:=VBS_Variables;Previous:=Nil;
+ While P<>Nil Do Begin
+  If P^.Name=Name Then Begin
+   If Previous=Nil Then VBS_Variables:=P^.Next Else Previous^.Next:=P^.Next;
+   Dispose(P);Exit;
+  End;
+  Previous:=P;P:=P^.Next;
+ End;
+End;
+
+Procedure VBS_RemoveVariablesWithPrefix(Prefix:TMailText);
+Var P,Previous,NextVariable:VBS_PVariable;
+Begin
+ Prefix:=VBS_Upper(Prefix);P:=VBS_Variables;Previous:=Nil;
+ While P<>Nil Do Begin
+  NextVariable:=P^.Next;
+  If Copy(P^.Name,1,Length(Prefix))=Prefix Then Begin
+   If Previous=Nil Then VBS_Variables:=NextVariable Else Previous^.Next:=NextVariable;
+   Dispose(P);
+  End Else Previous:=P;
+  P:=NextVariable;
+ End;
+End;
+
+Procedure VBS_EraseVariable(Name:TMailText);
+Var VariableEntry:VBS_PVariable;Reference,CountText,DynamicText:TMailText;Stored:VBS_TValue;
+Begin
+ Name:=VBS_Trim(Name);VariableEntry:=VBS_FindVariable(Name);
+ If VariableEntry=Nil Then Exit;
+ If VariableEntry^.ValueKind=VBS_ValueArray Then Begin
+  Reference:=VariableEntry^.Value;VBS_GetVariable(Reference+'.COUNT',Stored);CountText:=Stored.Text;
+  VBS_GetVariable(Reference+'.DYNAMIC',Stored);DynamicText:=Stored.Text;
+  VBS_RemoveVariablesWithPrefix(Reference+'.');
+  If DynamicText<>'1'Then Begin
+   VBS_SetVariable(Reference+'.COUNT',CountText);VBS_SetVariable(Reference+'.DYNAMIC','0');Exit;
+  End;
+ End;
+ VBS_RemoveVariable(Name);
+End;
+
+Procedure VBS_UBoundValue(A,B:VBS_TValue;ArgumentCount:Integer;Var V:VBS_TValue);
+Var CountValue:VBS_TValue;
+Begin
+ If(A.ValueKind<>VBS_ValueArray)and(Copy(A.Text,1,8)<>'@VBARRAY')Then Begin VBS_MakeText('',V);Exit;End;
+ If(ArgumentCount>1)and(Trunc(B.Number)<>1)Then Begin VBS_MakeText('',V);Exit;End;
+ VBS_GetVariable(A.Text+'.COUNT',CountValue);VBS_MakeNumber(Trunc(CountValue.Number)-1,V);
+End;
+
+Procedure VBS_ValValue(SourceText:TMailText;Var V:VBS_TValue);
+Var NumberText,UpperText:TMailText;Position,Code,Base,Digit:Integer;
+ NumberValue:Real;IntegerValue:LongInt;HasDigit:Boolean;
+Begin
+ SourceText:=VBS_Trim(SourceText);UpperText:=VBS_Upper(SourceText);
+ If(Copy(UpperText,1,2)='&H')or(Copy(UpperText,1,2)='&O')Then Begin
+  If UpperText[2]='H'Then Base:=16 Else Base:=8;
+  Position:=3;IntegerValue:=0;HasDigit:=False;
+  While Position<=Length(UpperText)Do Begin
+   If UpperText[Position]in['0'..'9']Then Digit:=Ord(UpperText[Position])-Ord('0')
+   Else If UpperText[Position]in['A'..'F']Then Digit:=Ord(UpperText[Position])-Ord('A')+10
+   Else Break;
+   If Digit>=Base Then Break;
+   IntegerValue:=IntegerValue*Base+Digit;HasDigit:=True;Inc(Position);
+  End;
+  If HasDigit Then VBS_MakeNumber(IntegerValue,V)Else VBS_MakeNumber(0,V);Exit;
+ End;
+ NumberText:='';Position:=1;HasDigit:=False;
+ If(Position<=Length(SourceText))and(SourceText[Position]in['+','-'])Then Begin
+  NumberText:=SourceText[Position];Inc(Position);End;
+ While(Position<=Length(SourceText))and(SourceText[Position]in['0'..'9'])Do Begin
+  NumberText:=NumberText+SourceText[Position];Inc(Position);HasDigit:=True;End;
+ If(Position<=Length(SourceText))and(SourceText[Position]='.')Then Begin
+  NumberText:=NumberText+'.';Inc(Position);
+  While(Position<=Length(SourceText))and(SourceText[Position]in['0'..'9'])Do Begin
+   NumberText:=NumberText+SourceText[Position];Inc(Position);HasDigit:=True;End;
+ End;
+ If HasDigit and(Position<=Length(SourceText))and(SourceText[Position]in['E','e'])Then Begin
+  NumberText:=NumberText+'E';Inc(Position);
+  If(Position<=Length(SourceText))and(SourceText[Position]in['+','-'])Then Begin
+   NumberText:=NumberText+SourceText[Position];Inc(Position);End;
+  While(Position<=Length(SourceText))and(SourceText[Position]in['0'..'9'])Do Begin
+   NumberText:=NumberText+SourceText[Position];Inc(Position);End;
+ End;
+ If Not HasDigit Then VBS_MakeNumber(0,V)Else Begin
+  Val(NumberText,NumberValue,Code);If Code=0Then VBS_MakeNumber(NumberValue,V)Else VBS_MakeNumber(0,V);
+ End;
+End;
+
+Procedure VBS_VarTypeValue(A:VBS_TValue;Var V:VBS_TValue);
+Var TypeNumber:Integer;
+Begin
+ Case A.ValueKind of
+  VBS_ValueEmpty:TypeNumber:=0;
+  VBS_ValueString:TypeNumber:=8;
+  VBS_ValueNumber:TypeNumber:=5;
+  VBS_ValueDate:TypeNumber:=7;
+  VBS_ValueArray:TypeNumber:=8204; { vbArray + vbVariant }
+  VBS_ValueError:TypeNumber:=10;
+  VBS_ValueNull:TypeNumber:=1;
+  VBS_ValueObject:TypeNumber:=9;
+ Else TypeNumber:=12;
+ End;
+ VBS_MakeNumber(TypeNumber,V);
+End;
+
+Procedure VBS_DateParts(SourceText:TMailText;Var VBS_YearValue,MonthValue,DayValue:Integer;
+ Var Valid:Boolean);
+Var Converted:VBS_TValue;Code:Integer;
+Begin
+ VBS_ParseDateValue(SourceText,Converted);Valid:=Converted.Text<>'';
+ If Not Valid Then Exit;
+ Val(Copy(Converted.Text,1,2),DayValue,Code);If Code<>0Then Valid:=False;
+ Val(Copy(Converted.Text,4,2),MonthValue,Code);If Code<>0Then Valid:=False;
+ Val(Copy(Converted.Text,7,4),VBS_YearValue,Code);If Code<>0Then Valid:=False;
+End;
+
+Procedure VBS_WeekdayValue(A,B:VBS_TValue;ArgumentCount:Integer;Var V:VBS_TValue);
+Var VBS_YearValue,MonthValue,DayValue,FirstDay,H,ResultDay:Integer;Valid:Boolean;
+Begin
+ VBS_DateParts(A.Text,VBS_YearValue,MonthValue,DayValue,Valid);
+ If Not Valid Then Begin VBS_MakeText('',V);Exit;End;
+ If ArgumentCount>1Then FirstDay:=Trunc(B.Number)Else FirstDay:=1;
+ If FirstDay=0Then FirstDay:=1;
+ If(FirstDay<1)or(FirstDay>7)Then Begin VBS_MakeText('',V);Exit;End;
+ If MonthValue<3Then Begin Inc(MonthValue,12);Dec(VBS_YearValue);End;
+ H:=(DayValue+(13*(MonthValue+1))div 5+VBS_YearValue+(VBS_YearValue div 4)-
+     (VBS_YearValue div 100)+(VBS_YearValue div 400))mod 7;
+ ResultDay:=((H+6)mod 7)+1;
+ ResultDay:=((ResultDay-FirstDay+7)mod 7)+1;VBS_MakeNumber(ResultDay,V);
+End;
+
+Procedure VBS_YearValue(SourceText:TMailText;Var V:VBS_TValue);
+Var YearNumber,MonthNumber,DayNumber:Integer;Valid:Boolean;
+Begin
+ VBS_DateParts(SourceText,YearNumber,MonthNumber,DayNumber,Valid);
+ If Valid Then VBS_MakeNumber(YearNumber,V)Else VBS_MakeText('',V);
+End;
+
+Procedure VBS_SkipSpace;
+Begin While(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]in[' ',#9])Do Inc(VBS_ExprPos);End;
+
+Function VBS_ReadWord:TMailText;
+Var S:TMailText;
+Begin
+ VBS_SkipSpace;S:='';
+ While(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]in['A'..'Z','a'..'z','0'..'9','_','.'])Do Begin
+  S:=S+VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);
+ End;
+ VBS_ReadWord:=S;
+End;
+
+Procedure VBS_ParseExpression(Var V:VBS_TValue);Forward;
+Procedure VBS_CallUserFunction(FunctionName:TMailText;A,B,C,D:VBS_TValue;
+ ArgumentCount:Integer;Var V:VBS_TValue);Forward;
+
+Function VBS_UserFunctionExists(FunctionName:TMailText):Boolean;
+Var I,P:Integer;Declaration,DeclarationName:TMailText;
+Begin
+ VBS_UserFunctionExists:=False;
+ For I:=1To VBS_LineCount Do Begin
+  Declaration:=VBS_Trim(VBS_ScriptLineText(I));
+  If VBS_StartsWith(Declaration,'PUBLIC FUNCTION ')Then Delete(Declaration,1,7)
+  Else If VBS_StartsWith(Declaration,'PRIVATE FUNCTION ')Then Delete(Declaration,1,8);
+  If VBS_StartsWith(Declaration,'FUNCTION ')Then Begin
+   Delete(Declaration,1,9);P:=Pos('(',Declaration);
+   If P=0Then P:=Pos(' ',Declaration);
+   If P=0Then DeclarationName:=VBS_Trim(Declaration)
+   Else DeclarationName:=VBS_Trim(Copy(Declaration,1,P-1));
+   If VBS_Upper(DeclarationName)=VBS_Upper(FunctionName)Then Begin VBS_UserFunctionExists:=True;Exit;End;
+  End;
+ End;
+End;
+
+Procedure VBS_ParsePrimary(Var V:VBS_TValue);
+Var Q:Char;S,Name,U,ArrayReference,IndexText:TMailText;N:Real;
+ Code,I,ElementIndex,ArgumentCount:Integer;FunctionByte:Byte;A,B,C,D:VBS_TValue;VariableEntry:VBS_PVariable;
+ DateYear,DateMonth,DateDay,DateDayOfWeek:Word;
+Begin
+ VBS_SkipSpace;If VBS_ExprPos>Length(VBS_ExprText)Then Begin VBS_MakeText('',V);Exit;End;
+ If VBS_ExprText[VBS_ExprPos]in['"','''']Then Begin
+  Q:=VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);S:='';
+  While VBS_ExprPos<=Length(VBS_ExprText)Do Begin
+   If VBS_ExprText[VBS_ExprPos]=Q Then Begin
+    If(VBS_ExprPos<Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos+1]=Q)Then Begin S:=S+Q;Inc(VBS_ExprPos,2);End
+    Else Begin Inc(VBS_ExprPos);Break;End;
+   End Else Begin S:=S+VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);End;
+  End;
+  VBS_MakeText(S,V);V.ValueKind:=VBS_ValueString;Exit;
+ End;
+ If VBS_ExprText[VBS_ExprPos]='('Then Begin Inc(VBS_ExprPos);VBS_ParseExpression(V);VBS_SkipSpace;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=')')Then Inc(VBS_ExprPos);Exit;End;
+ If VBS_ExprText[VBS_ExprPos]in['0'..'9']Then Begin
+  S:='';While(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]in['0'..'9','.'])Do Begin
+  S:=S+VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);End;
+  Val(S,N,Code);If Code=0Then VBS_MakeNumber(N,V)Else VBS_MakeText(S,V);Exit;
+ End;
+ Name:=VBS_ReadWord;U:=VBS_Upper(Name);
+ If U='TRUE'Then Begin VBS_MakeNumber(-1,V);Exit;End;
+ If U='FALSE'Then Begin VBS_MakeNumber(0,V);Exit;End;
+ If U='EMPTY'Then Begin VBS_MakeText('',V);Exit;End;
+ If U='NULL'Then Begin VBS_MakeText('',V);V.ValueKind:=VBS_ValueNull;Exit;End;
+ If U='NOTHING'Then Begin VBS_MakeText('',V);V.ValueKind:=VBS_ValueObject;Exit;End;
+ VBS_SkipSpace;
+ FunctionByte:=VBS_FunctionIndex(U);
+ If((FunctionByte=15)or(FunctionByte=43)or(FunctionByte=56))and
+   ((VBS_ExprPos>Length(VBS_ExprText))or(VBS_ExprText[VBS_ExprPos]<>'('))Then Begin
+  If FunctionByte=15Then Begin GetDate(DateYear,DateMonth,DateDay,DateDayOfWeek);
+   VBS_MakeDateValue(DateYear,DateMonth,DateDay,V);End
+  Else If FunctionByte=43Then VBS_NowValue(V)Else VBS_CurrentTimeValue(V);Exit;
+ End;
+ If(FunctionByte=255)and VBS_UserFunctionExists(Name)and
+   ((VBS_ExprPos>Length(VBS_ExprText))or(VBS_ExprText[VBS_ExprPos]<>'('))Then Begin
+  VBS_MakeText('',A);VBS_MakeText('',B);VBS_MakeText('',C);VBS_MakeText('',D);
+  VBS_CallUserFunction(Name,A,B,C,D,0,V);Exit;
+ End;
+ VariableEntry:=VBS_FindVariable(Name);
+ If(VariableEntry<>Nil)and(Copy(VariableEntry^.Value,1,8)='@VBARRAY')and
+   (VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]='(')Then Begin
+  Inc(VBS_ExprPos);VBS_ParseExpression(A);VBS_SkipSpace;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=')')Then Inc(VBS_ExprPos);
+  Str(Trunc(A.Number),IndexText);
+  VBS_GetVariable(VariableEntry^.Value+'.'+VBS_Trim(IndexText),V);Exit;
+ End;
+ If(U='ARRAY')and(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]='(')Then Begin
+  Inc(VBS_ArrayCounter);Str(VBS_ArrayCounter,IndexText);
+  ArrayReference:='@VBARRAY'+VBS_Trim(IndexText);ElementIndex:=0;Inc(VBS_ExprPos);VBS_SkipSpace;
+  While(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]<>')')Do Begin
+   VBS_ParseExpression(A);Str(ElementIndex,IndexText);
+   VBS_SetVariable(ArrayReference+'.'+VBS_Trim(IndexText),A.Text);Inc(ElementIndex);VBS_SkipSpace;
+   If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=',')Then Begin Inc(VBS_ExprPos);VBS_SkipSpace;End
+   Else Break;
+  End;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=')')Then Inc(VBS_ExprPos);
+  Str(ElementIndex,IndexText);VBS_SetVariable(ArrayReference+'.COUNT',VBS_Trim(IndexText));
+  VBS_MakeText(ArrayReference,V);V.ValueKind:=VBS_ValueArray;Exit;
+ End;
+ If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]='(')Then Begin
+  Inc(VBS_ExprPos);VBS_SkipSpace;ArgumentCount:=0;
+  VBS_MakeText('',A);VBS_MakeText('',B);VBS_MakeText('',C);VBS_MakeText('',D);
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]<>')')Then Begin
+   VBS_ParseExpression(A);Inc(ArgumentCount);VBS_SkipSpace;
+  End;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=',')Then Begin
+   Inc(VBS_ExprPos);
+   VBS_ParseExpression(B);Inc(ArgumentCount);
+   VBS_SkipSpace;
+  End;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=',')Then Begin
+   Inc(VBS_ExprPos);VBS_ParseExpression(C);
+   Inc(ArgumentCount);
+   VBS_SkipSpace;
+  End;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=',')Then Begin
+   Inc(VBS_ExprPos);
+   VBS_ParseExpression(D);
+   Inc(ArgumentCount);
+   VBS_SkipSpace;
+  End;
+  If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]=')')Then Inc(VBS_ExprPos);
+  If(FunctionByte=255)and VBS_UserFunctionExists(Name)Then Begin
+   VBS_CallUserFunction(Name,A,B,C,D,ArgumentCount,V);Exit;
+  End;
+  Case FunctionByte of
+   0:VBS_MakeNumber(Abs(A.Number),V);                         { ABS }
+   1:VBS_MakeText('',V);                                      { ARRAY: analyse variadique ci-dessus }
+   2:Begin If A.Text=''Then VBS_MakeNumber(0,V)
+      Else VBS_MakeNumber(Ord(A.Text[1]),V);End;              { ASC }
+   3:VBS_MakeNumber(ArcTan(A.Number),V);                      { ATN }
+   4:If VBS_Truth(A)Then VBS_MakeText('True',V)Else VBS_MakeText('False',V); { CBOOL }
+   5:Begin                                                { CBYTE }
+      N:=Round(A.Number);
+      If(N<0)or(N>255)Then VBS_MakeText('',V)Else VBS_MakeNumber(N,V);
+     End;
+   6:If A.IsNumber Then VBS_MakeText(A.Text,V)Else VBS_ParseDateValue(A.Text,V); { CDATE }
+   7:VBS_MakeNumber(A.Number,V);                              { CDBL }
+   8:VBS_MakeText(Chr(Trunc(A.Number)and 255),V);             { CHR }
+   9:VBS_MakeNumber(Round(A.Number),V);                       { CINT }
+   10:VBS_MakeNumber(Trunc(A.Number),V);                      { CLNG }
+   11:VBS_MakeNumber(Cos(A.Number),V);                        { COS }
+   12:VBS_MakeSingleNumber(A.Number,V);                       { CSNG }
+   13:Begin VBS_MakeText(A.Text,V);V.ValueKind:=VBS_ValueString;End; { CSTR }
+   14:Begin VBS_MakeText('Error '+A.Text,V);V.Number:=A.Number;V.ValueKind:=VBS_ValueError;End; { CVERR }
+   15:Begin GetDate(DateYear,DateMonth,DateDay,DateDayOfWeek);
+      VBS_MakeDateValue(DateYear,DateMonth,DateDay,V);End;    { DATE }
+   16:VBS_MakeDateValue(Trunc(A.Number),Trunc(B.Number),Trunc(C.Number),V); { DATESERIAL }
+   17:VBS_ParseDateValue(A.Text,V);                           { DATEVALUE }
+   18:VBS_DateDayValue(A.Text,V);                             { DAY }
+   19:VBS_MakeNumber(Exp(A.Number),V);                        { EXP }
+   20:VBS_MakeNumber(Trunc(A.Number),V);                      { FIX }
+   21:VBS_HexValue(Trunc(A.Number),V);                        { HEX }
+   22:VBS_DateHourValue(A.Text,V);                            { HOUR }
+   23:VBS_InputBoxValue(A.Text,B.Text,C.Text,V);              { INPUTBOX }
+   24:VBS_InStrValue(A,B,C,D,ArgumentCount,V);                { INSTR }
+   25:VBS_MakeNumber(Trunc(A.Number),V);                      { INT }
+   26:VBS_BooleanValue((A.ValueKind=VBS_ValueArray)or(Copy(A.Text,1,8)='@VBARRAY'),V); { ISARRAY }
+   27:VBS_IsDateValue(A,V);                                   { ISDATE }
+   28:VBS_BooleanValue(A.ValueKind=VBS_ValueEmpty,V);              { ISEMPTY }
+   29:VBS_BooleanValue(A.ValueKind=VBS_ValueError,V);              { ISERROR }
+   30:VBS_BooleanValue(A.ValueKind=VBS_ValueNull,V);               { ISNULL }
+   31:VBS_BooleanValue(A.IsNumber,V);                          { ISNUMERIC }
+   32:VBS_BooleanValue(A.ValueKind=VBS_ValueObject,V);             { ISOBJECT }
+   33:If((A.ValueKind=VBS_ValueArray)or(Copy(A.Text,1,8)='@VBARRAY'))and
+        ((ArgumentCount<2)or(Trunc(B.Number)=1))Then
+       VBS_MakeNumber(0,V)Else VBS_MakeText('',V);                { LBOUND }
+   34:Begin                                               { LCASE }
+      S:=A.Text;
+      For I:=1To Length(S)Do If S[I]in['A'..'Z']Then S[I]:=Chr(Ord(S[I])+32);
+      VBS_MakeText(S,V);
+     End;
+   35:VBS_MakeText(Copy(A.Text,1,Trunc(B.Number)),V);         { LEFT }
+   36:VBS_MakeNumber(Length(A.Text),V);                       { LEN }
+   37:If A.Number>0Then VBS_MakeNumber(Ln(A.Number),V)Else VBS_MakeText('',V); { LOG }
+   38:Begin S:=A.Text;While(Length(S)>0)and(S[1]=' ')Do Delete(S,1,1);
+      VBS_MakeText(S,V);End;                                  { LTRIM }
+   39:Begin                                               { MID }
+      I:=Trunc(B.Number);If I<1Then VBS_MakeText('',V)
+      Else If ArgumentCount<3Then VBS_MakeText(Copy(A.Text,I,32767),V)
+      Else If C.Number<0Then VBS_MakeText('',V)
+      Else VBS_MakeText(Copy(A.Text,I,Trunc(C.Number)),V);
+     End;
+   40:VBS_DateMinuteValue(A.Text,V);                          { MINUTE }
+   41:VBS_DateMonthValue(A.Text,V);                           { MONTH }
+   42:VBS_MsgBoxValue(A.Text,Trunc(B.Number),C.Text,V);       { MSGBOX }
+   43:VBS_NowValue(V);                                        { NOW }
+   44:VBS_OctValue(Trunc(A.Number),V);                        { OCT }
+   45:VBS_MakeText(Copy(A.Text,Length(A.Text)-Trunc(B.Number)+1,32767),V); { RIGHT }
+   46:VBS_MakeNumber(Random,V);                               { RND }
+   47:Begin                                               { RTRIM }
+      If A.ValueKind=VBS_ValueNull Then V:=A Else Begin S:=A.Text;
+       While(Length(S)>0)and(S[Length(S)]=' ')Do Delete(S,Length(S),1);
+       VBS_MakeText(S,V);End;
+     End;
+   48:VBS_DateSecondValue(A.Text,V);                          { SECOND }
+   49:If A.Number<0Then VBS_MakeNumber(-1,V)
+      Else If A.Number>0Then VBS_MakeNumber(1,V)Else VBS_MakeNumber(0,V); { SGN }
+   50:VBS_MakeNumber(Sin(A.Number),V);                        { SIN }
+   51:If A.Number<0Then VBS_MakeText('',V)Else VBS_MakeNumber(Sqrt(A.Number),V); { SQR }
+   52:VBS_StrValue(A.Number,V);                               { STR }
+   53:VBS_StrCompValue(A,B,C,ArgumentCount,V);                { STRCOMP }
+   54:VBS_StringValue(Trunc(A.Number),B,V);                   { STRING }
+   55:If Cos(A.Number)=0Then VBS_MakeText('',V)Else VBS_MakeNumber(Sin(A.Number)/Cos(A.Number),V); { TAN }
+   56:VBS_CurrentTimeValue(V);                                { TIME }
+   57:VBS_MakeTimeValue(Trunc(A.Number),Trunc(B.Number),Trunc(C.Number),V); { TIMESERIAL }
+   58:VBS_ParseTimeValue(A.Text,V);                           { TIMEVALUE }
+   59:VBS_MakeText(VBS_Trim(A.Text),V);                           { TRIM }
+   60:VBS_UBoundValue(A,B,ArgumentCount,V);                   { UBOUND }
+   61:VBS_MakeText(VBS_Upper(A.Text),V);                          { UCASE }
+   62:VBS_ValValue(A.Text,V);                                 { VAL }
+   63:VBS_VarTypeValue(A,V);                                 { VARTYPE }
+   64:VBS_WeekdayValue(A,B,ArgumentCount,V);                  { WEEKDAY }
+   65:If(Trunc(A.Number)>=0)and(Trunc(A.Number)<VBS_ScriptArgumentCount)Then
+       VBS_MakeText(VBS_ScriptArguments[Trunc(A.Number)],V)
+      Else VBS_MakeText('',V);                               { WSCRIPT.ARGUMENTS }
+   66:VBS_YearValue(A.Text,V);                               { YEAR }
+   Else Begin VBS_MakeText('',V);VBS_ScriptError('Fonction inconnue: '+Name,True);End;
+  End;
+  Exit;
+ End;
+ If U='WSCRIPT.ARGUMENTS.COUNT'Then VBS_MakeNumber(VBS_ScriptArgumentCount,V)
+ Else If U='WSCRIPT.SCRIPTNAME'Then VBS_MakeText(VBS_ScriptName,V)
+ Else If U='WSCRIPT.FULLNAME'Then VBS_MakeText(ParamStr(0),V)
+ Else VBS_GetVariable(Name,V);
+End;
+
+Procedure VBS_ParseUnary(Var V:VBS_TValue);
+Begin
+ VBS_SkipSpace;
+ If Copy(VBS_Upper(Copy(VBS_ExprText,VBS_ExprPos,4)),1,4)='NOT 'Then Begin
+  Inc(VBS_ExprPos,4);VBS_ParseUnary(V);
+  If VBS_Truth(V)Then VBS_MakeNumber(0,V)
+             Else VBS_MakeNumber(-1,V);
+ End
+  Else
+ If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]='-')Then Begin
+  Inc(VBS_ExprPos);
+  VBS_ParseUnary(V);
+  VBS_MakeNumber(-V.Number,V);
+ End
+  Else
+ VBS_ParsePrimary(V);
+End;
+
+Procedure VBS_ParseMul(Var V:VBS_TValue);
+Var R:VBS_TValue;Op:TMailText;
+Begin
+ VBS_ParseUnary(V);
+ While True Do Begin VBS_SkipSpace;Op:='';
+  If Copy(VBS_Upper(Copy(VBS_ExprText,VBS_ExprPos,4)),1,4)=' MOD'Then Begin Op:='MOD';Inc(VBS_ExprPos,4);End
+  Else If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]in['*','/','\'])Then Begin
+  Op:=VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);End;
+  If Op=''Then Exit;VBS_ParseUnary(R);
+  If Op='*'Then VBS_MakeNumber(V.Number*R.Number,V)
+  Else If Op='/'Then Begin If R.Number=0Then VBS_MakeText('',V)Else VBS_MakeNumber(V.Number/R.Number,V);End
+  Else If Op='\'Then Begin If Trunc(R.Number)=0Then VBS_MakeText('',V)Else VBS_MakeNumber(Trunc(V.Number)div
+  Trunc(R.Number),V);End
+  Else If Trunc(R.Number)=0Then VBS_MakeText('',V)Else VBS_MakeNumber(Trunc(V.Number)mod Trunc(R.Number),V);
+ End;
+End;
+
+Procedure VBS_ParseAdd(Var V:VBS_TValue);
+Var R:VBS_TValue;Op:Char;
+Begin
+ VBS_ParseMul(V);
+ While True Do Begin VBS_SkipSpace;
+  If(VBS_ExprPos>Length(VBS_ExprText))or Not(VBS_ExprText[VBS_ExprPos]in['+','-','&'])Then Exit;
+  Op:=VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);VBS_ParseMul(R);
+  If Op='&'Then VBS_MakeText(V.Text+R.Text,V)
+  Else If Op='+'Then Begin If V.IsNumber and R.IsNumber Then VBS_MakeNumber(V.Number+R.Number,V)Else
+  VBS_MakeText(V.Text+R.Text,V);End
+  Else VBS_MakeNumber(V.Number-R.Number,V);
+ End;
+End;
+
+Procedure VBS_ParseExpression(Var V:VBS_TValue);
+Var R:VBS_TValue;Op:TMailText;Result:Boolean;
+Begin
+ VBS_ParseAdd(V);VBS_SkipSpace;Op:='';
+ If Copy(VBS_ExprText,VBS_ExprPos,2)='<>'Then Begin Op:='<>';Inc(VBS_ExprPos,2);End
+ Else If Copy(VBS_ExprText,VBS_ExprPos,2)='<='Then Begin Op:='<=';Inc(VBS_ExprPos,2);End
+ Else If Copy(VBS_ExprText,VBS_ExprPos,2)='>='Then Begin Op:='>=';Inc(VBS_ExprPos,2);End
+ Else If(VBS_ExprPos<=Length(VBS_ExprText))and(VBS_ExprText[VBS_ExprPos]in['=','<','>'])Then Begin
+  Op:=VBS_ExprText[VBS_ExprPos];Inc(VBS_ExprPos);End;
+ If Op<>''Then Begin VBS_ParseAdd(R);
+  If V.IsNumber and R.IsNumber Then Begin
+   If Op='='Then Result:=V.Number=R.Number Else If Op='<>'Then Result:=V.Number<>R.Number
+   Else If Op='<'Then Result:=V.Number<R.Number Else If Op='>'Then Result:=V.Number>R.Number
+   Else If Op='<='Then Result:=V.Number<=R.Number Else Result:=V.Number>=R.Number;
+  End Else Begin
+   If Op='='Then Result:=VBS_Upper(V.Text)=VBS_Upper(R.Text)Else If Op='<>'Then Result:=VBS_Upper(V.Text)<>VBS_Upper(R.Text)
+   Else If Op='<'Then Result:=VBS_Upper(V.Text)<VBS_Upper(R.Text)Else If Op='>'Then
+  Result:=VBS_Upper(V.Text)>VBS_Upper(R.Text)
+   Else If Op='<='Then Result:=VBS_Upper(V.Text)<=VBS_Upper(R.Text)Else Result:=VBS_Upper(V.Text)>=VBS_Upper(R.Text);
+  End;
+  If Result Then VBS_MakeNumber(-1,V)Else VBS_MakeNumber(0,V);
+ End;
+End;
+
+Procedure VBS_Evaluate(S:TMailText;Var V:VBS_TValue);
+Begin VBS_ExprText:=VBS_Trim(S);VBS_ExprPos:=1;VBS_ParseExpression(V);End;
+
+Function VBS_FindAssignment(S:TMailText):Integer;
+Var I:Integer;Q:Char;
+Begin
+ Q:=#0;For I:=1To Length(S)Do Begin
+  If Q<>#0Then Begin If S[I]=Q Then Q:=#0;End Else If S[I]in['"','''']Then Q:=S[I]
+  Else If(S[I]='=')and((I=1)or Not(S[I-1]in['<','>']))Then Begin VBS_FindAssignment:=I;Exit;End;
+ End;VBS_FindAssignment:=0;
+End;
+
+Procedure VBS_CheckTimeout;
+Var H,M,S,HS:Word;Elapsed:LongInt;
+Begin
+ Inc(VBSSteps);
+ If VBSSteps>10000 Then Begin
+  VBS_OnErrorResumeNext:=False;VBS_ScriptError('Limite de 10000 instructions atteinte.',True);Exit;
+ End;
+ If VBS_TimeLimit<=0Then Exit;GetTime(H,M,S,HS);
+ Elapsed:=(LongInt(H)*3600+LongInt(M)*60+S)-(LongInt(VBS_StartHour)*3600+LongInt(VBS_StartMinute)*60+VBS_StartSecond);
+ If Elapsed<0Then Inc(Elapsed,86400);
+ If Elapsed>=VBS_TimeLimit Then Begin VBSOutput('CSCRIPT: Delai d''execution depasse.');VBS_Terminated:=True;
+  VBS_ExitCode:=1;End;
+End;
+
+Function VBS_FindBlock(StartLine:LongInt;OpenWord,CloseWord:TMailText):LongInt;
+Var I:LongInt;Depth:Integer;S:TMailText;
+Begin
+ Depth:=1;For I:=StartLine+1To VBS_LineCount Do Begin S:=VBS_Upper(VBS_Trim(VBS_ScriptLineText(I)));
+  If VBS_StartsWith(S,OpenWord)Then Inc(Depth);If VBS_StartsWith(S,CloseWord)Then Dec(Depth);
+  If Depth=0Then Begin VBS_FindBlock:=I;Exit;End;
+ End;VBS_FindBlock:=VBS_LineCount;
+End;
+
+Function VBS_FindElseLine(StartLine,EndLine:LongInt):LongInt;
+Var I:LongInt;Depth:Integer;S:TMailText;
+Begin
+ Depth:=0;VBS_FindElseLine:=0;
+ For I:=StartLine+1To EndLine-1Do Begin
+  S:=VBS_Upper(VBS_Trim(VBS_ScriptLineText(I)));
+  If VBS_StartsWith(S,'IF ')and(Pos(' THEN',S)>0)and
+    (VBS_Trim(Copy(S,Pos(' THEN',S)+5,32767))='')Then Inc(Depth)
+  Else If S='END IF'Then Begin If Depth>0Then Dec(Depth);End
+  Else If(Depth=0)and((S='ELSE')or VBS_StartsWith(S,'ELSEIF '))Then Begin
+   VBS_FindElseLine:=I;Exit;
+  End;
+ End;
+End;
+
+Function VBS_FindLoopEnd(StartLine:LongInt):LongInt;
+Var I:LongInt;Depth:Integer;S:TMailText;
+Begin
+ Depth:=1;
+ For I:=StartLine+1To VBS_LineCount Do Begin
+  S:=VBS_Upper(VBS_Trim(VBS_ScriptLineText(I)));
+  If(S='DO')or VBS_StartsWith(S,'DO WHILE ')or VBS_StartsWith(S,'DO UNTIL ')Then Inc(Depth)
+  Else If VBS_StartsWith(S,'LOOP')Then Dec(Depth);
+  If Depth=0Then Begin VBS_FindLoopEnd:=I;Exit;End;
+ End;
+ VBS_FindLoopEnd:=VBS_LineCount;
+End;
+
+Function VBS_KeywordOutsideQuotes(Source,Keyword:TMailText):Integer;
+Var I:Integer;Quote:Char;
+Begin
+ VBS_KeywordOutsideQuotes:=0;Quote:=#0;I:=1;
+ While I<=Length(Source)-Length(Keyword)+1Do Begin
+  If Quote<>#0Then Begin
+   If Source[I]=Quote Then Begin
+    If(I<Length(Source))and(Source[I+1]=Quote)Then Inc(I)Else Quote:=#0;
+   End;
+  End Else If Source[I]in['''','"']Then Quote:=Source[I]
+  Else If VBS_Upper(Copy(Source,I,Length(Keyword)))=VBS_Upper(Keyword)Then Begin
+   VBS_KeywordOutsideQuotes:=I;Exit;
+  End;
+  Inc(I);
+ End;
+End;
+
+Procedure VBS_ExecuteRange(FirstLine,LastLine:LongInt);Forward;
+Procedure VBS_CallSub(CallText:TMailText);Forward;
+Function VBS_ListItem(Var Source:TMailText):TMailText;Forward;
+Function VBS_SimpleIdentifier(Source:TMailText):Boolean;Forward;
+Procedure VBS_ExecuteStatementList(Source:TMailText);Forward;
+
+Procedure VBS_ScriptError(MessageText:TMailText;StopScript:Boolean);
+Begin
+ If VBS_OnErrorResumeNext Then Exit;
+ VBSOutput('Erreur VBScript: '+MessageText);
+ VBS_ExitCode:=1;VBS_Terminated:=True;
+End;
+
+Procedure VBS_DeclareVariable(Declaration:TMailText);
+Var Name,Bounds,Reference,NumberText:TMailText;P:Integer;UpperBound:VBS_TValue;ArrayValue:VBS_TValue;
+ IsDynamic:Boolean;
+Begin
+ Declaration:=VBS_Trim(Declaration);P:=Pos('(',Declaration);
+ If P=0Then Begin VBS_SetVariable(Declaration,'');Exit;End;
+ Name:=VBS_Trim(Copy(Declaration,1,P-1));Bounds:=Copy(Declaration,P+1,32767);
+ If(Length(Bounds)>0)and(Bounds[Length(Bounds)]=')')Then Delete(Bounds,Length(Bounds),1);
+ Inc(VBS_ArrayCounter);Str(VBS_ArrayCounter,NumberText);Reference:='@VBARRAY'+VBS_Trim(NumberText);
+ IsDynamic:=VBS_Trim(Bounds)='';
+ If IsDynamic Then VBS_MakeNumber(0,UpperBound)Else VBS_Evaluate(Bounds,UpperBound);
+ If UpperBound.Number<0Then VBS_MakeNumber(0,UpperBound);
+ If IsDynamic Then NumberText:='0'Else Str(Trunc(UpperBound.Number)+1,NumberText);
+ VBS_SetVariable(Reference+'.COUNT',VBS_Trim(NumberText));
+ If IsDynamic Then VBS_SetVariable(Reference+'.DYNAMIC','1')Else VBS_SetVariable(Reference+'.DYNAMIC','0');
+ VBS_MakeText(Reference,ArrayValue);ArrayValue.ValueKind:=VBS_ValueArray;VBS_SetVariableValue(Name,ArrayValue);
+End;
+
+Procedure VBS_RemoveArrayElementsFrom(Reference:TMailText;FirstRemoved:LongInt);
+Var P,Previous,NextVariable:VBS_PVariable;Suffix:TMailText;ElementNumber:LongInt;Code:Integer;
+ Removed:Boolean;
+Begin
+ Reference:=VBS_Upper(Reference)+'.';P:=VBS_Variables;Previous:=Nil;
+ While P<>Nil Do Begin
+  NextVariable:=P^.Next;Removed:=False;
+  If Copy(P^.Name,1,Length(Reference))=Reference Then Begin
+   Suffix:=Copy(P^.Name,Length(Reference)+1,32767);Val(Suffix,ElementNumber,Code);
+   If(Code=0)and(ElementNumber>=FirstRemoved)Then Begin
+    If Previous=Nil Then VBS_Variables:=NextVariable Else Previous^.Next:=NextVariable;
+    Dispose(P);Removed:=True;
+   End;
+  End;
+  If Not Removed Then Previous:=P;P:=NextVariable;
+ End;
+End;
+
+Procedure VBS_ResizeArray(Declaration:TMailText;PreserveValues:Boolean);
+Var Name,Bounds,Reference,NumberText:TMailText;P:Integer;UpperBound,Stored,ArrayValue:VBS_TValue;
+ VariableEntry:VBS_PVariable;NewCount:LongInt;
+Begin
+ Declaration:=VBS_Trim(Declaration);P:=Pos('(',Declaration);
+ If(P=0)or(Declaration[Length(Declaration)]<>')')Then Begin
+  VBS_ScriptError('REDIM exige une borne de tableau.',True);Exit;
+ End;
+ Name:=VBS_Trim(Copy(Declaration,1,P-1));Bounds:=Copy(Declaration,P+1,Length(Declaration)-P-1);
+ If Pos(',',Bounds)>0Then Begin VBS_ScriptError('REDIM multidimensionnel non supporte.',True);Exit;End;
+ VBS_Evaluate(Bounds,UpperBound);
+ If(Not UpperBound.IsNumber)or(UpperBound.Number<0)Then Begin
+  VBS_ScriptError('borne REDIM invalide.',True);Exit;
+ End;
+ NewCount:=Trunc(UpperBound.Number)+1;VariableEntry:=VBS_FindVariable(Name);
+ If(VariableEntry<>Nil)and(VariableEntry^.ValueKind=VBS_ValueArray)Then Begin
+  Reference:=VariableEntry^.Value;VBS_GetVariable(Reference+'.DYNAMIC',Stored);
+  If Stored.Text<>'1'Then Begin VBS_ScriptError('REDIM exige un tableau dynamique.',True);Exit;End;
+ End Else Begin
+  If PreserveValues Then Begin VBS_ScriptError('REDIM PRESERVE exige un tableau existant.',True);Exit;End;
+  Inc(VBS_ArrayCounter);Str(VBS_ArrayCounter,NumberText);Reference:='@VBARRAY'+VBS_Trim(NumberText);
+ End;
+ If PreserveValues Then VBS_RemoveArrayElementsFrom(Reference,NewCount)
+ Else VBS_RemoveVariablesWithPrefix(Reference+'.');
+ Str(NewCount,NumberText);VBS_SetVariable(Reference+'.COUNT',VBS_Trim(NumberText));
+ VBS_SetVariable(Reference+'.DYNAMIC','1');VBS_MakeText(Reference,ArrayValue);
+ ArrayValue.ValueKind:=VBS_ValueArray;VBS_SetVariableValue(Name,ArrayValue);
+End;
+
+Procedure VBS_DeclareStaticVariable(Declaration:TMailText);
+Var Name:TMailText;P:Integer;
+Begin
+ Declaration:=VBS_Trim(Declaration);P:=Pos('(',Declaration);
+ If P=0Then Name:=Declaration Else Name:=VBS_Trim(Copy(Declaration,1,P-1));
+ If VBS_FindVariable(Name)=Nil Then VBS_DeclareVariable(Declaration);
+End;
+
+Function VBS_UserSubExists(CallText:TMailText):Boolean;
+Var I,P:Integer;CallName,Declaration,DeclarationName:TMailText;
+Begin
+ CallText:=VBS_Trim(CallText);P:=Pos('(',CallText);If P=0Then P:=Pos(' ',CallText);
+ If P=0Then CallName:=CallText Else CallName:=Copy(CallText,1,P-1);
+ VBS_UserSubExists:=False;
+ For I:=1To VBS_LineCount Do Begin
+  Declaration:=VBS_Trim(VBS_ScriptLineText(I));
+  If VBS_StartsWith(Declaration,'PUBLIC SUB ')Then Delete(Declaration,1,7)
+  Else If VBS_StartsWith(Declaration,'PRIVATE SUB ')Then Delete(Declaration,1,8);
+  If VBS_StartsWith(Declaration,'SUB ')Then Begin
+   Delete(Declaration,1,4);P:=Pos('(',Declaration);If P=0Then P:=Pos(' ',Declaration);
+   If P=0Then DeclarationName:=VBS_Trim(Declaration)
+   Else DeclarationName:=VBS_Trim(Copy(Declaration,1,P-1));
+   If VBS_Upper(DeclarationName)=VBS_Upper(CallName)Then Begin VBS_UserSubExists:=True;Exit;End;
+  End;
+ End;
+End;
+
+Procedure VBS_AlignStringAssignment(StatementText:TMailText;AlignRight:Boolean);
+Var Name,SourceText,ResultText:TMailText;P,TargetLength:Integer;Value,OldValue:VBS_TValue;
+Begin
+ P:=VBS_FindAssignment(StatementText);
+ If P=0Then Begin
+  If AlignRight Then VBS_ScriptError('RSET exige une affectation.',True)
+  Else VBS_ScriptError('LSET exige une affectation.',True);Exit;
+ End;
+ Name:=VBS_Trim(Copy(StatementText,1,P-1));SourceText:=Copy(StatementText,P+1,32767);
+ VBS_Evaluate(SourceText,Value);VBS_GetVariable(Name,OldValue);TargetLength:=Length(OldValue.Text);
+ If TargetLength=0Then TargetLength:=Length(Value.Text);
+ If Length(Value.Text)>TargetLength Then ResultText:=Copy(Value.Text,1,TargetLength)
+ Else Begin ResultText:=Value.Text;
+  If AlignRight Then While Length(ResultText)<TargetLength Do ResultText:=' '+ResultText
+  Else While Length(ResultText)<TargetLength Do ResultText:=ResultText+' ';
+ End;
+ VBS_MakeText(ResultText,Value);Value.ValueKind:=VBS_ValueString;VBS_SetVariableValue(Name,Value);
+End;
+
+Procedure VBS_ExecuteStatement(S:TMailText);
+Var U,Name,RightSide,BaseName,IndexText:TMailText;P,I:Integer;
+ V,IndexValue:VBS_TValue;ArrayVariable:VBS_PVariable;WasLet,WasSet:Boolean;
+Begin
+ If VBS_Upper(VBS_Trim(S))='OPTION EXPLICIT' Then Begin VBSExplicit:=True;Exit;End;
+ If VBSHostStatement(S) Then Exit;
+ S:=VBS_Trim(S);If(S='')or(S[1]='''')or(VBS_Upper(S)='REM')or VBS_StartsWith(S,'REM ')Then Exit;
+ U:=VBS_Upper(S);WasLet:=False;WasSet:=False;
+ If VBS_StartsWith(S,'DIM ')Then Begin
+  Delete(S,1,4);Repeat Name:=VBS_ListItem(S);VBS_DeclareVariable(Name);Until S='';Exit;End;
+ If VBS_StartsWith(S,'PRIVATE ')Then Begin
+  Delete(S,1,8);Repeat Name:=VBS_ListItem(S);VBS_DeclareVariable(Name);Until S='';Exit;End;
+ If VBS_StartsWith(S,'PUBLIC ')Then Begin
+  Delete(S,1,7);Repeat Name:=VBS_ListItem(S);VBS_DeclareVariable(Name);Until S='';Exit;End;
+ If VBS_StartsWith(S,'STATIC ')Then Begin
+  Delete(S,1,7);Repeat Name:=VBS_ListItem(S);VBS_DeclareStaticVariable(Name);Until S='';Exit;End;
+ If VBS_StartsWith(S,'ERASE ')Then Begin
+  Delete(S,1,6);Repeat Name:=VBS_ListItem(S);VBS_EraseVariable(Name);Until S='';Exit;End;
+ If VBS_StartsWith(S,'REDIM ')Then Begin
+  Delete(S,1,6);WasLet:=False;
+  If VBS_StartsWith(S,'PRESERVE ')Then Begin Delete(S,1,9);WasLet:=True;End;
+  Repeat Name:=VBS_ListItem(S);VBS_ResizeArray(Name,WasLet);Until(S='')or VBS_Terminated;Exit;
+ End;
+ If U='ON ERROR RESUME NEXT'Then Begin VBS_OnErrorResumeNext:=True;Exit;End;
+ If(U='ON ERROR GOTO 0')or(U='ON ERROR GO TO 0')Then Begin VBS_OnErrorResumeNext:=False;Exit;End;
+ If VBS_StartsWith(U,'ON ERROR ')Then Begin VBS_ScriptError('forme ON ERROR non supportee: '+S,False);Exit;End;
+ If VBS_StartsWith(S,'LSET ')Then Begin
+  Delete(S,1,5);VBS_AlignStringAssignment(S,False);Exit;
+ End;
+ If VBS_StartsWith(S,'RSET ')Then Begin Delete(S,1,5);VBS_AlignStringAssignment(S,True);Exit;End;
+ If U='EXIT DO'Then Begin VBS_ExitDoRequested:=True;Exit;End;
+ If U='EXIT FOR'Then Begin VBS_ExitForRequested:=True;Exit;End;
+ If U='EXIT SUB'Then Begin VBS_ExitSubRequested:=True;Exit;End;
+ If U='EXIT FUNCTION'Then Begin VBS_ExitFunctionRequested:=True;Exit;End;
+ If VBS_StartsWith(S,'CALL ')Then Begin VBS_CallSub(VBS_Trim(Copy(S,6,32767)));Exit;End;
+ If VBS_StartsWith(S,'WScript.Echo')Then Delete(S,1,Length('WScript.Echo'))
+ Else If VBS_StartsWith(S,'Echo ')Then Delete(S,1,5)
+ Else If VBS_StartsWith(S,'WScript.Quit')Then Begin
+  Delete(S,1,Length('WScript.Quit'));
+  VBS_Evaluate(S,V);VBS_ExitCode:=Trunc(V.Number);
+  VBS_Terminated:=True;
+  Exit;
+ End
+  Else
+ If VBS_StartsWith(S,'MSGBOX')Then Begin
+  If(Length(S)>6)and(S[7]='(')Then VBS_Evaluate(S,V)
+  Else VBS_Evaluate('MsgBox('+VBS_Trim(Copy(S,7,32767))+')',V);
+  Exit;
+ End
+  Else
+ If VBS_StartsWith(S,'Randomize')Then Begin
+  RightSide:=VBS_Trim(Copy(S,10,32767));
+  If RightSide=''Then Randomize Else Begin VBS_Evaluate(RightSide,V);RandSeed:=Trunc(V.Number);End;
+  Exit;
+ End
+ Else
+ Begin
+  If VBS_StartsWith(S,'SET ')Then Begin Delete(S,1,4);WasSet:=True;End;
+  If VBS_StartsWith(S,'LET ')Then Begin Delete(S,1,4);WasLet:=True;End;
+  P:=VBS_FindAssignment(S);If P>0Then Begin
+   Name:=VBS_Trim(Copy(S,1,P-1));
+   If VBSExplicit And (Pos('(',Name)=0) And (VBS_FindVariable(Name)=Nil) Then Begin
+    VBS_ScriptError('Variable non declaree: '+Name,True);Exit;
+   End;
+   RightSide:=Copy(S,P+1,32767);
+   VBS_Evaluate(RightSide,V);
+   I:=Pos('(',Name);
+   If(I>0)and(Name[Length(Name)]=')')Then Begin
+    BaseName:=VBS_Trim(Copy(Name,1,I-1));ArrayVariable:=VBS_FindVariable(BaseName);
+    If(ArrayVariable<>Nil)and(ArrayVariable^.ValueKind=VBS_ValueArray)Then Begin
+     VBS_Evaluate(Copy(Name,I+1,Length(Name)-I-1),IndexValue);Str(Trunc(IndexValue.Number),IndexText);
+     VBS_SetVariableValue(ArrayVariable^.Value+'.'+VBS_Trim(IndexText),V);
+    End Else VBS_SetVariableValue(Name,V);
+   End Else VBS_SetVariableValue(Name,V);
+   Exit;
+  End;
+  If WasLet Then Begin
+   VBS_ScriptError('LET exige une affectation.',True);Exit;
+  End;
+  If WasSet Then Begin VBS_ScriptError('SET exige une affectation.',True);Exit;End;
+  If VBS_UserSubExists(S)Then Begin VBS_CallSub(S);Exit;End;
+  VBS_ScriptError('instruction non reconnue: '+S,False);
+  Exit;
+ End;
+ { La branche Echo arrive ici. }
+ I:=1;While I<=Length(S)Do Begin P:=Pos(',',Copy(S,I,32767));
+  If P=0Then Begin VBS_Evaluate(Copy(S,I,32767),V);VBSOutput(V.Text);I:=Length(S)+1;End
+  Else Begin VBS_Evaluate(Copy(S,I,P-1),V);VBSOutput(V.Text+' ');Inc(I,P);End;
+ End;
+End;
+
+Procedure VBS_ExecuteStatementList(Source:TMailText);
+Var I,StartPosition:Integer;Quote:Char;StatementText:TMailText;
+Begin
+ I:=1;StartPosition:=1;Quote:=#0;
+ While I<=Length(Source)Do Begin
+  If Quote<>#0Then Begin
+   If Source[I]=Quote Then Begin
+    If(I<Length(Source))and(Source[I+1]=Quote)Then Inc(I)Else Quote:=#0;
+   End;
+  End Else If Source[I]in['''','"']Then Quote:=Source[I]
+  Else If Source[I]=':'Then Begin
+   StatementText:=VBS_Trim(Copy(Source,StartPosition,I-StartPosition));
+   If StatementText<>''Then VBS_ExecuteStatement(StatementText);StartPosition:=I+1;
+   If VBS_Terminated or VBS_ExitDoRequested or VBS_ExitForRequested or VBS_ExitSubRequested or
+     VBS_ExitFunctionRequested Then Exit;
+  End;
+  Inc(I);
+ End;
+ StatementText:=VBS_Trim(Copy(Source,StartPosition,32767));
+ If StatementText<>''Then VBS_ExecuteStatement(StatementText);
+End;
+
+Procedure VBS_ExecuteRangeWork(FirstLine,LastLine:LongInt);
+Var S,U,Condition,Name,Rest:TMailText;P,ThenPos,ElsePos:Integer;
+ EndLine,BodyStart,I,ElseLine,ElementIndex,ElementCount:LongInt;
+ V,StartValue,EndValue,StepValue,Counter,Collection,CountValue:VBS_TValue;
+ LoopAgain,UntilMode:Boolean;IndexText,NextName:TMailText;
+Begin
+ I:=FirstLine;
+ While(I<=LastLine)and Not VBS_Terminated and Not VBS_ExitDoRequested and
+   Not VBS_ExitForRequested and Not VBS_ExitSubRequested and Not VBS_ExitFunctionRequested Do Begin
+  VBS_CheckTimeout;If VBS_Terminated Then Exit;VBS_CurrentLine:=I;S:=VBS_Trim(VBS_ScriptLineText(I));U:=VBS_Upper(S);
+  If VBS_StartsWith(S,'ELSEIF ')Then Begin S:='IF '+VBS_Trim(Copy(S,8,32767));U:=VBS_Upper(S);End;
+  If VBS_StartsWith(S,'SUB ')or VBS_StartsWith(S,'PUBLIC SUB ')or
+    VBS_StartsWith(S,'PRIVATE SUB ')Then Begin
+   While(I<=LastLine)and(VBS_Upper(VBS_Trim(VBS_ScriptLineText(I)))<>'END SUB')Do Inc(I);
+  End
+  Else If VBS_StartsWith(S,'FUNCTION ')or VBS_StartsWith(S,'PUBLIC FUNCTION ')or
+    VBS_StartsWith(S,'PRIVATE FUNCTION ')Then Begin
+   While(I<=LastLine)and(VBS_Upper(VBS_Trim(VBS_ScriptLineText(I)))<>'END FUNCTION')Do Inc(I);
+  End
+  Else If U='END SUB'Then Exit
+  Else If U='END FUNCTION'Then Exit
+  Else If VBS_StartsWith(S,'IF ')Then Begin
+   ThenPos:=Pos(' THEN',U);If ThenPos>0Then Begin Condition:=Copy(S,4,ThenPos-4);VBS_Evaluate(Condition,V);
+    Rest:=VBS_Trim(Copy(S,ThenPos+5,32767));
+    If Rest<>''Then Begin ElsePos:=VBS_KeywordOutsideQuotes(Rest,' ELSE ');
+     If VBS_Truth(V)Then Begin
+      If ElsePos>0Then VBS_ExecuteStatementList(Copy(Rest,1,ElsePos-1))Else VBS_ExecuteStatementList(Rest);End
+     Else If ElsePos>0Then VBS_ExecuteStatementList(Copy(Rest,ElsePos+6,32767));
+    End Else Begin EndLine:=VBS_FindBlock(I,'IF ','END IF');BodyStart:=I+1;
+     ElseLine:=VBS_FindElseLine(I,EndLine);
+     If VBS_Truth(V)Then Begin If ElseLine=0Then VBS_ExecuteRange(BodyStart,EndLine-1)Else
+  VBS_ExecuteRange(BodyStart,ElseLine-1);End
+     Else If ElseLine>0Then Begin
+      If VBS_StartsWith(VBS_Trim(VBS_ScriptLineText(ElseLine)),'ELSEIF ')Then VBS_ExecuteRange(ElseLine,EndLine-1)
+      Else VBS_ExecuteRange(ElseLine+1,EndLine-1);
+     End;I:=EndLine;
+    End;
+   End;
+  End Else If VBS_StartsWith(S,'FOR EACH ')Then Begin
+   Rest:=VBS_Trim(Copy(S,10,32767));P:=Pos(' IN ',VBS_Upper(Rest));
+   If P=0Then Begin VBSOutput('Erreur VBScript: FOR EACH sans IN.');VBS_ExitCode:=1;Exit;End;
+   Name:=VBS_Trim(Copy(Rest,1,P-1));VBS_Evaluate(Copy(Rest,P+4,32767),Collection);
+   EndLine:=VBS_FindBlock(I,'FOR ','NEXT');ElementCount:=0;
+   If(Collection.ValueKind=VBS_ValueArray)or(Copy(Collection.Text,1,8)='@VBARRAY')Then Begin
+    VBS_GetVariable(Collection.Text+'.COUNT',CountValue);ElementCount:=Trunc(CountValue.Number);
+   End;
+   For ElementIndex:=0To ElementCount-1Do Begin
+    Str(ElementIndex,IndexText);VBS_GetVariable(Collection.Text+'.'+VBS_Trim(IndexText),V);
+    VBS_SetVariableValue(Name,V);VBS_ExecuteRange(I+1,EndLine-1);
+    If VBS_ExitForRequested Then Begin VBS_ExitForRequested:=False;Break;End;
+    If VBS_Terminated or VBS_ExitSubRequested or VBS_ExitFunctionRequested or VBS_ExitDoRequested Then Break;
+   End;
+   I:=EndLine;
+  End Else If VBS_StartsWith(S,'FOR ')Then Begin
+   Rest:=VBS_Trim(Copy(S,5,32767));P:=VBS_FindAssignment(Rest);
+   If P=0Then Begin VBSOutput('Erreur VBScript: FOR sans signe =.');VBS_ExitCode:=1;VBS_Terminated:=True;Exit;End;
+   Name:=VBS_Trim(Copy(Rest,1,P-1));Delete(Rest,1,P);
+   If Not VBS_SimpleIdentifier(Name)Then Begin VBSOutput('Erreur VBScript: compteur FOR invalide.');
+    VBS_ExitCode:=1;VBS_Terminated:=True;Exit;End;
+   ThenPos:=Pos(' TO ',VBS_Upper(Rest));
+   If ThenPos=0Then Begin VBSOutput('Erreur VBScript: FOR sans TO.');VBS_ExitCode:=1;VBS_Terminated:=True;Exit;End;
+   VBS_Evaluate(Copy(Rest,1,ThenPos-1),StartValue);Delete(Rest,1,ThenPos+3);
+   ElsePos:=Pos(' STEP ',VBS_Upper(Rest));If ElsePos>0Then Begin
+    VBS_Evaluate(Copy(Rest,1,ElsePos-1),EndValue);
+    VBS_Evaluate(Copy(Rest,ElsePos+6,32767),StepValue);
+   End
+    Else
+   Begin
+    VBS_Evaluate(Rest,EndValue);
+    VBS_MakeNumber(1,StepValue);
+   End;
+   If Not StartValue.IsNumber or Not EndValue.IsNumber or Not StepValue.IsNumber Then Begin
+    VBSOutput('Erreur VBScript: bornes FOR non numeriques.');VBS_ExitCode:=1;VBS_Terminated:=True;Exit;End;
+   If StepValue.Number=0Then Begin VBSOutput('Erreur VBScript: STEP ne peut pas etre nul.');
+    VBS_ExitCode:=1;VBS_Terminated:=True;Exit;End;
+   EndLine:=VBS_FindBlock(I,'FOR ','NEXT');
+   NextName:=VBS_Trim(Copy(VBS_Trim(VBS_ScriptLineText(EndLine)),5,32767));
+   If(NextName<>'')and(VBS_Upper(NextName)<>VBS_Upper(Name))Then Begin
+    VBSOutput('Erreur VBScript: NEXT '+NextName+' ne correspond pas a FOR '+Name+'.');
+    VBS_ExitCode:=1;VBS_Terminated:=True;Exit;
+   End;
+   Counter:=StartValue;
+   While(((StepValue.Number>=0)and(Counter.Number<=EndValue.Number))or((StepValue.Number<0)and
+        (Counter.Number>=EndValue.Number)))and Not VBS_Terminated and Not VBS_ExitSubRequested and
+        Not VBS_ExitDoRequested and Not VBS_ExitFunctionRequested Do Begin
+    VBS_SetVariableValue(Name,Counter);
+    VBS_ExecuteRange(I+1,EndLine-1);
+    If VBS_ExitForRequested Then Begin VBS_ExitForRequested:=False;Break;End;
+    VBS_MakeNumber(Counter.Number+StepValue.Number,Counter);
+   End;
+   I:=EndLine;
+  End
+   Else
+  If(U='DO')or VBS_StartsWith(U,'DO WHILE ')or VBS_StartsWith(U,'DO UNTIL ')Then Begin
+   EndLine:=VBS_FindLoopEnd(I);Condition:='';UntilMode:=False;
+   If VBS_StartsWith(U,'DO WHILE ')Then Condition:=VBS_Trim(Copy(S,10,32767))
+   Else If VBS_StartsWith(U,'DO UNTIL ')Then Begin Condition:=VBS_Trim(Copy(S,10,32767));UntilMode:=True;End;
+   Repeat
+    LoopAgain:=True;
+    If Condition<>''Then Begin VBS_Evaluate(Condition,V);
+     If UntilMode Then LoopAgain:=Not VBS_Truth(V)Else LoopAgain:=VBS_Truth(V);End;
+    If LoopAgain Then VBS_ExecuteRange(I+1,EndLine-1);
+    If VBS_ExitDoRequested Then Begin VBS_ExitDoRequested:=False;LoopAgain:=False;End;
+    If LoopAgain and Not VBS_Terminated and(Condition='')Then Begin
+     Rest:=VBS_Trim(VBS_ScriptLineText(EndLine));
+     If VBS_StartsWith(Rest,'LOOP WHILE ')Then Begin VBS_Evaluate(VBS_Trim(Copy(Rest,12,32767)),V);
+  LoopAgain:=VBS_Truth(V);End
+     Else If VBS_StartsWith(Rest,'LOOP UNTIL ')Then Begin VBS_Evaluate(VBS_Trim(Copy(Rest,12,32767)),V);LoopAgain:=Not
+  VBS_Truth(V);End;
+    End;
+    VBS_CheckTimeout;
+   Until(Not LoopAgain)or VBS_Terminated or VBS_ExitSubRequested or VBS_ExitFunctionRequested or VBS_ExitForRequested;
+   I:=EndLine;
+  End Else
+  If VBS_StartsWith(S,'WHILE ')Then Begin
+   EndLine:=VBS_FindBlock(I,'WHILE ','WEND');
+   Condition:=Copy(S,7,32767);VBS_Evaluate(Condition,V);
+   While VBS_Truth(V)and Not VBS_Terminated and Not VBS_ExitSubRequested and
+     Not VBS_ExitForRequested and Not VBS_ExitDoRequested and Not VBS_ExitFunctionRequested Do Begin
+    VBS_ExecuteRange(I+1,EndLine-1);
+    VBS_Evaluate(Condition,V);VBS_CheckTimeout;
+   End;
+   I:=EndLine;
+  End
+   Else
+  If VBS_StartsWith(U,'NEXT')Then Begin VBS_ScriptError('NEXT sans FOR correspondant.',False);Exit;End
+  Else If(U='ELSE')or(U='END IF')or(U='WEND')or VBS_StartsWith(U,'LOOP')Then Exit
+  Else If(U='REM')or VBS_StartsWith(U,'REM ')or((Length(S)>0)and(S[1]=''''))Then VBS_ExecuteStatement(S)
+  Else VBS_ExecuteStatementList(S);
+  Inc(I);
+ End;
+End;
+
+Procedure VBS_ExecuteRange(FirstLine,LastLine:LongInt);
+Begin
+ Inc(VBSDepth);
+ If VBSDepth>32 Then Begin
+  VBS_OnErrorResumeNext:=False;VBS_ScriptError('Recursion trop profonde.',True);
+ End
+ Else VBS_ExecuteRangeWork(FirstLine,LastLine);
+ Dec(VBSDepth);
+End;
+
+Function VBS_ListItem(Var Source:TMailText):TMailText;
+Var I,Depth:Integer;Quote:Char;InQuote:Boolean;
+Begin
+ I:=1;Depth:=0;Quote:=#0;InQuote:=False;
+ While I<=Length(Source)Do Begin
+  If InQuote Then Begin
+   If Source[I]=Quote Then Begin
+    If(I<Length(Source))and(Source[I+1]=Quote)Then Inc(I)Else InQuote:=False;
+   End;
+  End Else If Source[I]in['''','"']Then Begin InQuote:=True;Quote:=Source[I];End
+  Else If Source[I]='('Then Inc(Depth)
+  Else If Source[I]=')'Then Begin If Depth>0Then Dec(Depth);End
+  Else If(Source[I]=',')and(Depth=0)Then Begin
+   VBS_ListItem:=VBS_Trim(Copy(Source,1,I-1));Delete(Source,1,I);Exit;
+  End;
+  Inc(I);
+ End;
+ VBS_ListItem:=VBS_Trim(Source);Source:='';
+End;
+
+Function VBS_SimpleIdentifier(Source:TMailText):Boolean;
+Var I:Integer;
+Begin
+ Source:=VBS_Trim(Source);VBS_SimpleIdentifier:=False;If Source=''Then Exit;
+ If Not(Source[1]in['A'..'Z','a'..'z','_'])Then Exit;
+ For I:=2To Length(Source)Do If Not(Source[I]in['A'..'Z','a'..'z','0'..'9','_'])Then Exit;
+ VBS_SimpleIdentifier:=True;
+End;
+
+Procedure VBS_CallSub(CallText:TMailText);
+Var CallName,ArgumentText,Declaration,DeclarationName,ParameterText:TMailText;
+ ParameterName,ArgumentExpression,UpperDeclaration:TMailText;
+ I,P,NameEnd:Integer;StartLine,EndLine:LongInt;Binding,NextBinding:VBS_PCallBinding;
+ Existing:VBS_PVariable;ArgumentValue,CopyValue:VBS_TValue;ByReference:Boolean;
+Begin
+ CallText:=VBS_Trim(CallText);P:=Pos('(',CallText);
+ If P>0Then Begin
+  CallName:=VBS_Trim(Copy(CallText,1,P-1));ArgumentText:=Copy(CallText,P+1,32767);
+  If(Length(ArgumentText)>0)and(ArgumentText[Length(ArgumentText)]=')')Then
+   Delete(ArgumentText,Length(ArgumentText),1);
+ End Else Begin
+  P:=Pos(' ',CallText);
+  If P>0Then Begin CallName:=Copy(CallText,1,P-1);ArgumentText:=VBS_Trim(Copy(CallText,P+1,32767));End
+  Else Begin CallName:=CallText;ArgumentText:='';End;
+ End;
+ StartLine:=0;EndLine:=0;ParameterText:='';
+ For I:=1To VBS_LineCount Do Begin
+  Declaration:=VBS_Trim(VBS_ScriptLineText(I));UpperDeclaration:=VBS_Upper(Declaration);
+  If VBS_StartsWith(Declaration,'PUBLIC SUB ')Then Delete(Declaration,1,7)
+  Else If VBS_StartsWith(Declaration,'PRIVATE SUB ')Then Delete(Declaration,1,8);
+  If VBS_StartsWith(Declaration,'SUB ')Then Begin
+   Delete(Declaration,1,4);P:=Pos('(',Declaration);NameEnd:=Pos(' ',Declaration);
+   If(P=0)or((NameEnd>0)and(NameEnd<P))Then P:=NameEnd;
+   If P=0Then DeclarationName:=VBS_Trim(Declaration)
+   Else DeclarationName:=VBS_Trim(Copy(Declaration,1,P-1));
+   If VBS_Upper(DeclarationName)=VBS_Upper(CallName)Then Begin
+    StartLine:=I;P:=Pos('(',Declaration);
+    If P>0Then Begin ParameterText:=Copy(Declaration,P+1,32767);
+     If(Length(ParameterText)>0)and(ParameterText[Length(ParameterText)]=')')Then
+      Delete(ParameterText,Length(ParameterText),1);End;
+    Break;
+   End;
+  End;
+ End;
+ If StartLine=0Then Begin
+  VBSOutput('Erreur VBScript: procedure introuvable: '+CallName);
+  VBS_ExitCode:=1;Exit;
+ End;
+ EndLine:=StartLine+1;
+ While(EndLine<=VBS_LineCount)and(VBS_Upper(VBS_Trim(VBS_ScriptLineText(EndLine)))<>'END SUB')Do Inc(EndLine);
+ Binding:=Nil;
+ While ParameterText<>''Do Begin
+  ParameterName:=VBS_ListItem(ParameterText);ByReference:=True;
+  If VBS_StartsWith(ParameterName,'BYVAL ')Then Begin Delete(ParameterName,1,6);ByReference:=False;End
+  Else If VBS_StartsWith(ParameterName,'BYREF ')Then Delete(ParameterName,1,6);
+  P:=Pos(' ',ParameterName);If P>0Then ParameterName:=Copy(ParameterName,1,P-1);
+  ArgumentExpression:=VBS_ListItem(ArgumentText);VBS_Evaluate(ArgumentExpression,ArgumentValue);
+  New(NextBinding);NextBinding^.Name:=VBS_Upper(ParameterName);
+  NextBinding^.ActualName:=VBS_Upper(VBS_Trim(ArgumentExpression));
+  NextBinding^.CopyBack:=ByReference and VBS_SimpleIdentifier(ArgumentExpression);
+  Existing:=VBS_FindVariable(ParameterName);NextBinding^.Existed:=Existing<>Nil;
+  If Existing<>Nil Then Begin NextBinding^.OldValue:=Existing^.Value;
+   NextBinding^.OldKind:=Existing^.ValueKind;End
+  Else Begin NextBinding^.OldValue:='';NextBinding^.OldKind:=VBS_ValueEmpty;End;
+  NextBinding^.Next:=Binding;Binding:=NextBinding;VBS_SetVariableValue(ParameterName,ArgumentValue);
+ End;
+ VBS_ExecuteRange(StartLine+1,EndLine-1);VBS_ExitSubRequested:=False;
+ NextBinding:=Binding;
+ While NextBinding<>Nil Do Begin
+  If NextBinding^.CopyBack Then Begin VBS_GetVariable(NextBinding^.Name,CopyValue);
+   VBS_SetVariableValue(NextBinding^.ActualName,CopyValue);End;
+  NextBinding:=NextBinding^.Next;
+ End;
+ While Binding<>Nil Do Begin
+  NextBinding:=Binding^.Next;
+  If Binding^.Existed Then Begin VBS_MakeText(Binding^.OldValue,CopyValue);
+   CopyValue.ValueKind:=Binding^.OldKind;VBS_SetVariableValue(Binding^.Name,CopyValue);End
+  Else VBS_RemoveVariable(Binding^.Name);
+  Dispose(Binding);Binding:=NextBinding;
+ End;
+End;
+
+Procedure VBS_FunctionArgument(Index:Integer;A,B,C,D:VBS_TValue;Var V:VBS_TValue);
+Begin
+ Case Index of
+  0:V:=A;
+  1:V:=B;
+  2:V:=C;
+  3:V:=D;
+ Else VBS_MakeText('',V);
+ End;
+End;
+
+Procedure VBS_SaveFunctionBinding(Name:TMailText;Value:VBS_TValue;Var Bindings:VBS_PCallBinding);
+Var Binding:VBS_PCallBinding;Existing:VBS_PVariable;
+Begin
+ New(Binding);Binding^.Name:=VBS_Upper(VBS_Trim(Name));Binding^.ActualName:='';
+ Binding^.CopyBack:=False;Existing:=VBS_FindVariable(Name);Binding^.Existed:=Existing<>Nil;
+ If Existing<>Nil Then Begin Binding^.OldValue:=Existing^.Value;
+  Binding^.OldKind:=Existing^.ValueKind;End
+ Else Begin Binding^.OldValue:='';Binding^.OldKind:=VBS_ValueEmpty;End;
+ Binding^.Next:=Bindings;Bindings:=Binding;VBS_SetVariableValue(Name,Value);
+End;
+
+Procedure VBS_RestoreFunctionBindings(Var Bindings:VBS_PCallBinding);
+Var Binding:VBS_PCallBinding;OldValue:VBS_TValue;
+Begin
+ While Bindings<>Nil Do Begin Binding:=Bindings^.Next;
+  If Bindings^.Existed Then Begin VBS_MakeText(Bindings^.OldValue,OldValue);
+   OldValue.ValueKind:=Bindings^.OldKind;VBS_SetVariableValue(Bindings^.Name,OldValue);End
+  Else VBS_RemoveVariable(Bindings^.Name);
+  Dispose(Bindings);Bindings:=Binding;
+ End;
+End;
+
+Procedure VBS_CallUserFunction(FunctionName:TMailText;A,B,C,D:VBS_TValue;
+ ArgumentCount:Integer;Var V:VBS_TValue);
+Var I,P,ParameterIndex:Integer;StartLine,EndLine:LongInt;
+ Declaration,DeclarationName,ParameterText,ParameterName:TMailText;
+ SavedExpression:TMailText;SavedPosition:Integer;
+ Bindings:VBS_PCallBinding;ArgumentValue,EmptyValue:VBS_TValue;
+Begin
+ SavedExpression:=VBS_ExprText;SavedPosition:=VBS_ExprPos;
+ StartLine:=0;EndLine:=0;ParameterText:='';
+ For I:=1To VBS_LineCount Do Begin
+  Declaration:=VBS_Trim(VBS_ScriptLineText(I));
+  If VBS_StartsWith(Declaration,'PUBLIC FUNCTION ')Then Delete(Declaration,1,7)
+  Else If VBS_StartsWith(Declaration,'PRIVATE FUNCTION ')Then Delete(Declaration,1,8);
+  If VBS_StartsWith(Declaration,'FUNCTION ')Then Begin
+   Delete(Declaration,1,9);P:=Pos('(',Declaration);
+   If P=0Then DeclarationName:=VBS_Trim(Declaration)
+   Else DeclarationName:=VBS_Trim(Copy(Declaration,1,P-1));
+   If VBS_Upper(DeclarationName)=VBS_Upper(FunctionName)Then Begin
+    StartLine:=I;
+    If P>0Then Begin ParameterText:=Copy(Declaration,P+1,32767);
+     If(Length(ParameterText)>0)and(ParameterText[Length(ParameterText)]=')')Then
+      Delete(ParameterText,Length(ParameterText),1);End;
+    Break;
+   End;
+  End;
+ End;
+ If StartLine=0Then Begin VBS_MakeText('',V);VBS_ExprText:=SavedExpression;VBS_ExprPos:=SavedPosition;Exit;End;
+ EndLine:=StartLine+1;
+ While(EndLine<=VBS_LineCount)and(VBS_Upper(VBS_Trim(VBS_ScriptLineText(EndLine)))<>'END FUNCTION')Do Inc(EndLine);
+ Bindings:=Nil;VBS_MakeText('',EmptyValue);VBS_SaveFunctionBinding(FunctionName,EmptyValue,Bindings);
+ ParameterIndex:=0;
+ While ParameterText<>''Do Begin
+  ParameterName:=VBS_ListItem(ParameterText);
+  If VBS_StartsWith(ParameterName,'BYVAL ')Then Delete(ParameterName,1,6)
+  Else If VBS_StartsWith(ParameterName,'BYREF ')Then Delete(ParameterName,1,6);
+  P:=Pos(' ',ParameterName);If P>0Then ParameterName:=Copy(ParameterName,1,P-1);
+  If ParameterIndex<ArgumentCount Then VBS_FunctionArgument(ParameterIndex,A,B,C,D,ArgumentValue)
+  Else VBS_MakeText('',ArgumentValue);
+  VBS_SaveFunctionBinding(ParameterName,ArgumentValue,Bindings);Inc(ParameterIndex);
+ End;
+ VBS_ExecuteRange(StartLine+1,EndLine-1);VBS_ExitFunctionRequested:=False;
+ VBS_GetVariable(FunctionName,V);VBS_RestoreFunctionBindings(Bindings);
+ VBS_ExprText:=SavedExpression;VBS_ExprPos:=SavedPosition;
+End;
+
+
+{ Hote Outlook du moteur Pascal inspire de DEV-COOLS/CSCRIPT.PAS.
+  Un seul message composeur est disponible. Aucun envoi implicite. }
+Function VBSName(S:TMailText):TMailText;
+Begin
+ S:=VBS_Upper(VBS_Trim(S));
+ While (Length(S)>0) And (S[Length(S)]='.') Do Delete(S,Length(S),1);
+ VBSName:=S;
+End;
+
+Function VBSModalOpen:Boolean;
+Begin
+ VBSModalOpen:=ComposerVisible Or AccountDialogVisible Or PrefsVisible Or RulesVisible Or
+  FileOpenVisible Or SortDialogVisible Or ColumnsDialogVisible Or AboutVisible Or EventDialogVisible;
+End;
+
+Procedure VBSSetProperty(Name,Value:TMailText);
+Var I,P:LongInt; Rest,Part:TMailText;
+Begin
+ If Not ComposerVisible Then Begin VBS_ScriptError('Aucun nouveau message ouvert.',True);Exit;End;
+ SaveComposerFields;
+ Name:=VBSName(Name);
+ If ((Name='SUBJECT') And (Length(Value)>80)) Or
+    (((Name='TO') Or (Name='CC') Or (Name='BCC')) And (Length(Value)>250)) Then Begin
+  VBS_ScriptError('Champ du message trop long: '+Name,True);Exit;
+ End;
+ If Name='SUBJECT' Then Composer.SubjectField:=Value
+ Else If Name='TO' Then Composer.ToField:=Value
+ Else If Name='CC' Then Composer.CcField:=Value
+ Else If Name='BCC' Then Composer.BccField:=Value
+ Else If (Name='FROM') Or (Name='SENDER') Or (Name='SOURCE') Then Begin
+  I:=0;
+  While (I<EmailAccountCount) And (VBS_Upper(EmailAccounts[I].EmailAddress)<>VBS_Upper(Value)) Do Inc(I);
+  If I=EmailAccountCount Then Begin VBS_ScriptError('Compte expediteur inconnu: '+Value,True);Exit;End;
+  Composer.AccountIndex:=I;
+ End Else If Name='BODY' Then Begin
+  Composer.LineCount:=0; Rest:=Value;
+  Repeat
+   P:=Pos(#10,Rest); If P=0 Then P:=Length(Rest)+1;
+   Part:=Copy(Rest,1,P-1);Delete(Rest,1,P);
+   If (Length(Part)>0) And (Part[Length(Part)]=#13) Then Delete(Part,Length(Part),1);
+   Repeat
+    I:=Composer.LineCount;
+    If I>=500 Then Begin VBS_ScriptError('Corps du message trop long.',True);Exit;End;
+    Composer.Lines[I].Text:=Copy(Part,1,250); Delete(Part,1,250);
+    Inc(Composer.LineCount);
+   Until Part='';
+  Until Rest='';
+ End Else Begin VBS_ScriptError('Propriete de message inconnue: '+Name,True);Exit;End;
+ Composer.Modified:=True; InitComposerFields;
+End;
+
+Function VBSHostValue(Name:TMailText;Var V:VBS_TValue):Boolean;
+Var P,I,A:Integer;Obj:VBS_PVariable;Value:TMailText;
+Begin
+ VBSHostValue:=False;P:=Pos('.',Name);If P=0 Then Exit;
+ Obj:=VBS_FindVariable(Copy(Name,1,P-1));
+ If (Obj=Nil) Or (Obj^.Value<>'@MESSAGE') Then Exit;
+ VBSHostValue:=True;Name:=VBSName(Copy(Name,P+1,32767));Value:='';
+ If Not ComposerVisible Then Begin VBS_ScriptError('Aucun message ouvert.',True);VBS_MakeText('',V);Exit;End;
+ SaveComposerFields;
+ If Name='SUBJECT' Then Value:=Composer.SubjectField
+ Else If Name='TO' Then Value:=Composer.ToField
+ Else If Name='CC' Then Value:=Composer.CcField
+ Else If Name='BCC' Then Value:=Composer.BccField
+ Else If Name='BODY' Then Begin
+  For I:=0 To Composer.LineCount-1 Do Begin
+   If I>0 Then Value:=Value+#13#10;
+   Value:=Value+Composer.Lines[I].Text;
+  End;
+ End Else If (Name='FROM') Or (Name='SOURCE') Or (Name='SENDER') Then Begin
+  A:=Composer.AccountIndex;
+  If (A<0) And (SelectedFolder>=0) And (SelectedFolder<FolderCount) Then A:=MailFolderAccount[SelectedFolder];
+  If A<0 Then For I:=0 To EmailAccountCount-1 Do If EmailAccounts[I].IsDefault Then A:=I;
+  If (A>=0) And (A<EmailAccountCount) Then Value:=EmailAccounts[A].EmailAddress;
+ End Else VBS_ScriptError('Propriete de message inconnue: '+Name,True);
+ VBS_MakeText(Value,V);V.ValueKind:=VBS_ValueString;
+End;
+
+Function VBSHostStatement(S:TMailText):Boolean;
+Var U,Name,RightSide,Target,Method,Args,Base:TMailText; P,Q,I,J,Cmd:Integer; V:VBS_TValue;
+ Obj:VBS_PVariable;
+Begin
+ VBSHostStatement:=False;S:=VBS_Trim(S);U:=VBS_Upper(S);
+ If (S='') Or (S[1]='''') Or (U='REM') Or VBS_StartsWith(U,'REM ') Then Exit;
+ If VBS_StartsWith(S,'CALL ') Then Begin Delete(S,1,5); S:=VBS_Trim(S); U:=VBS_Upper(S);End;
+ If VBS_StartsWith(S,'SET ') Then Begin
+  Delete(S,1,4);P:=VBS_FindAssignment(S);If P=0 Then Exit;
+  Name:=VBS_Trim(Copy(S,1,P-1));
+  If VBSExplicit And (VBS_FindVariable(Name)=Nil) Then Begin
+   VBSHostStatement:=True;VBS_ScriptError('Variable non declaree: '+Name,True);Exit;
+  End;
+  RightSide:=VBS_Trim(Copy(S,P+1,32767));U:=VBS_Upper(RightSide);
+  If (U='OUTLOOK') Or (U='APPLICATION') Or (Pos('CREATEOBJECT(',U)=1) Then Begin
+   If Pos('CREATEOBJECT(',U)=1 Then Begin
+    Args:=Copy(RightSide,14,Length(RightSide)-14);VBS_Evaluate(Args,V);
+    If VBS_Upper(V.Text)<>'OUTLOOK.APPLICATION' Then Begin
+     VBSHostStatement:=True;VBS_ScriptError('CreateObject accepte Outlook.Application uniquement.',True);Exit;
+    End;
+   End;
+   VBS_MakeText('@OUTLOOK',V);V.ValueKind:=VBS_ValueObject;
+   VBS_SetVariableValue(Name,V);VBSHostStatement:=True;Exit;
+  End;
+  P:=Pos('.',U);
+  If P>0 Then Begin
+   Base:=VBS_Trim(Copy(RightSide,1,P-1));Obj:=VBS_FindVariable(Base);
+   If (VBS_Upper(Base)='OUTLOOK') Or (VBS_Upper(Base)='APPLICATION') Or
+      ((Obj<>Nil) And (Obj^.Value='@OUTLOOK')) Then Begin
+    If Copy(U,P+1,11)='CREATEITEM(' Then Begin
+     VBSHostStatement:=True;Args:=Copy(RightSide,P+12,Length(RightSide)-P-12);VBS_Evaluate(Args,V);
+     If Not V.IsNumber Or (V.Number<>0) Then Begin VBS_ScriptError('CreateItem accepte 0 (courriel).',True);Exit;End;
+     If VBSModalOpen Then Begin VBS_ScriptError('Fermez le dialogue actif avant CreateItem.',True);Exit;End;
+     ActiveMenu:=-1;OpenNewMessage;VBS_MakeText('@MESSAGE',V);V.ValueKind:=VBS_ValueObject;
+     VBS_SetVariableValue(Name,V);Exit;
+    End;
+   End;
+  End;
+  Exit;
+ End;
+ P:=Pos('.',S);If P=0 Then Exit;
+ Target:=VBS_Upper(VBS_Trim(Copy(S,1,P-1)));
+ If Not VBS_SimpleIdentifier(Target) Then Exit;
+ If Target='WSCRIPT' Then Exit;
+ Obj:=VBS_FindVariable(Target);
+ If (Target='OUTLOOK') Or (Target='APPLICATION') Then Target:='@OUTLOOK'
+ Else If Obj<>Nil Then Target:=Obj^.Value;
+ If (Target<>'@OUTLOOK') And (Target<>'@MESSAGE') Then Begin
+  Q:=VBS_FindAssignment(S);
+  If (Q=0) Or (P<Q) Then Begin
+   VBSHostStatement:=True;VBS_ScriptError('Objet inconnu: '+Target,True);
+  End;
+  Exit;
+ End;
+ VBSHostStatement:=True;Method:=VBS_Trim(Copy(S,P+1,32767));
+ P:=VBS_FindAssignment(Method);
+ If (Target='@MESSAGE') And (P>0) Then Begin
+  Name:=VBS_Trim(Copy(Method,1,P-1));VBS_Evaluate(Copy(Method,P+1,32767),V);
+  If Not VBS_Terminated Then VBSSetProperty(Name,V.Text);Exit;
+ End;
+ P:=1;While (P<=Length(Method)) And Not (Method[P] In [' ',#9,'(']) Do Inc(P);
+ Args:=VBS_Trim(Copy(Method,P,32767));Method:=VBSName(Copy(Method,1,P-1));
+ If (Length(Args)>0) And (Args[1]='(') Then Begin
+  If Args[Length(Args)]<>')' Then Begin VBS_ScriptError('Parenthese fermante manquante.',True);Exit;End;
+  Args:=Copy(Args,2,Length(Args)-2);
+ End;
+ If Target='@MESSAGE' Then Begin
+  If (Method='DISPLAY') And (Args='') Then Begin DrawInterface;Exit;End;
+  VBS_ScriptError('Methode de message inconnue: '+Method,True);Exit;
+ End;
+ If Method='NEWMESSAGE' Then Begin
+  If VBSModalOpen Then Begin VBS_ScriptError('Un dialogue est deja ouvert.',True);Exit;End;
+  ActiveMenu:=-1;OpenNewMessage;
+  I:=0;While Args<>'' Do Begin
+   Name:=VBS_ListItem(Args);VBS_Evaluate(Name,V);
+   Case I Of 0:Name:='SUBJECT';1:Name:='FROM';2:Name:='TO';3:Name:='BODY';
+    Else Begin VBS_ScriptError('NewMessage: quatre arguments maximum.',True);Exit;End;
+   End;
+   If (I<>1) Or (V.Text<>'') Then VBSSetProperty(Name,V.Text);
+   If VBS_Terminated Then Exit;Inc(I);
+  End;
+  Exit;
+ End;
+ If VBSModalOpen Then Begin VBS_ScriptError('Un dialogue est deja ouvert.',True);Exit;End;
+ VBS_Evaluate(Args,V);If VBS_Terminated Then Exit;Name:=VBSName(V.Text);
+ If Method='OPENMENU' Then Begin
+  If Name='AIDE' Then Name:='?';
+  For I:=0 To 5 Do If VBSName(Menus[I].Title)=Name Then Begin OpenMenuShortcut(I);Exit;End;
+  VBS_ScriptError('Menu inconnu: '+V.Text,True);Exit;
+ End;
+ If (Method='SHOWDIALOG') Or (Method='EXECUTECOMMAND') Then Begin
+  Cmd:=-1;
+  For I:=0 To 5 Do For J:=0 To Menus[I].ItemCount-1 Do
+   If Not Menus[I].Items[J].Separator And (VBSName(Menus[I].Items[J].Caption)=Name) Then
+    Cmd:=Menus[I].Items[J].ItemID;
+  If Cmd<0 Then Begin VBS_ScriptError('Commande inconnue: '+V.Text,True);Exit;End;
+  ExecuteMenuCommand(Cmd);Exit;
+ End;
+ VBS_ScriptError('Methode Outlook inconnue: '+Method,True);
+End;
+
+Function VBSWithoutComment(S:TMailText):TMailText;
+Var I:Integer;Quoted:Boolean;
+Begin
+ I:=1;Quoted:=False;
+ While I<=Length(S) Do Begin
+  If S[I]='"' Then Begin
+   If Quoted And (I<Length(S)) And (S[I+1]='"') Then Inc(I)
+   Else Quoted:=Not Quoted;
+  End Else If (S[I]='''') And Not Quoted Then Begin
+   S:=Copy(S,1,I-1);Break;
+  End;
+  Inc(I);
+ End;
+ VBSWithoutComment:=S;
+End;
+
+Procedure RunStartupScript;
+Var F:Text; S:TMailText; Err:Integer; Line:VBS_PScriptLine; Entry:VBS_PVariable; N:TMailText;
+Begin
+ If VBSStarted Or (CommandLineScript='') Then Exit;
+ VBSStarted:=True;VBS_Terminated:=False;VBS_ExitCode:=0;VBSDiagnostic:='';VBS_CurrentLine:=0;
+ VBS_LineCount:=0;VBS_ArrayCounter:=0;VBSSteps:=0;VBSDepth:=0;
+ VBS_FirstScriptLine:=Nil;VBS_LastScriptLine:=Nil;VBS_Variables:=Nil;
+ VBS_OnErrorResumeNext:=False;VBS_TimeLimit:=5;VBSExplicit:=False;
+ VBS_ExitDoRequested:=False;VBS_ExitForRequested:=False;
+ VBS_ExitSubRequested:=False;VBS_ExitFunctionRequested:=False;
+ VBS_ScriptName:=CommandLineScript;VBS_ScriptArgumentCount:=0;
+ For Err:=0 To VBS_MaxArguments-1 Do VBS_ScriptArguments[Err]:='';
+ {$I-}Assign(F,CommandLineScript);Reset(F);{$I+}Err:=IOResult;
+ If Err<>0 Then VBS_ScriptError('Impossible de lire '+CommandLineScript,True)
+ Else Begin
+  While Not Eof(F) And Not VBS_Terminated Do Begin
+   {$I-}ReadLn(F,S);{$I+}Err:=IOResult;
+   If Err<>0 Then VBS_ScriptError('Erreur de lecture du script.',True)
+   Else If Length(S)>255 Then Begin
+    VBS_CurrentLine:=VBS_LineCount+1;VBS_ScriptError('Ligne de script superieure a 255 caracteres.',True);
+   End Else Begin
+    If (VBS_LineCount=0) And (Copy(S,1,3)=#$EF#$BB#$BF) Then Delete(S,1,3);
+    VBS_AddScriptLine(VBSWithoutComment(S));
+   End;
+   If VBS_LineCount>10000 Then VBS_ScriptError('Script trop volumineux.',True);
+  End;
+  {$I-}Close(F);{$I+}Err:=IOResult;
+ End;
+ If Not VBS_Terminated Then Begin
+  VBS_SetVariable('vbCrLf',#13#10);VBS_SetVariable('vbCr',#13);VBS_SetVariable('vbLf',#10);
+  VBS_SetVariable('vbTab',#9);VBS_SetVariable('olMailItem','0');
+  GetTime(VBS_StartHour,VBS_StartMinute,VBS_StartSecond,VBS_StartHundredth);
+  VBS_ExecuteRange(1,VBS_LineCount);
+ End;
+ If VBS_ExitCode<>0 Then Begin
+  If VBSDiagnostic='' Then Begin Str(VBS_ExitCode,N);VBSDiagnostic:='Code de sortie '+N;End;
+  Str(VBS_CurrentLine,N);MailStatus:='VBScript ligne '+N+': '+VBSDiagnostic;
+ End Else If VBSDiagnostic='' Then MailStatus:='VBScript execute: '+CommandLineScript;
+ While VBS_FirstScriptLine<>Nil Do Begin
+  Line:=VBS_FirstScriptLine^.Next;Dispose(VBS_FirstScriptLine);VBS_FirstScriptLine:=Line;
+ End;
+ VBS_LastScriptLine:=Nil;
+ While VBS_Variables<>Nil Do Begin Entry:=VBS_Variables^.Next;Dispose(VBS_Variables);VBS_Variables:=Entry;End;
+ DrawInterface;
+End;
+
+{ Boucle principale de gestion des evenements }
 Procedure MainEventLoop;
 Var
  LastBtn: Integer;
  Key: Char;
+ IsExtendedKey: Boolean;
  MouseEvent: TMouseEvent;
  InToolbar: Boolean;
  InFolderPane: Boolean;
  InMessageList: Boolean;
  InMessageListHeader: Boolean;
- ClickedCol, ClickedMsg: Integer;
+ ClickedCol, ClickedMsg, ShortcutMenu: Integer;
 Begin
  Running := True;
+ LastMenuShortcut := -1; LastViewShortcut:=0;
  LastBtn := 0;
  DragState := dsNone;
  InitMouseState;
@@ -22073,8 +26197,16 @@ Begin
  LastMouseY := 0;
  HoveredFolder := -1;
  ContextMenuVisible := False;
+ RunStartupScript;
 
  While Running Do Begin
+  If ApplicationQuitRequested Then Begin
+   Running := False;
+   Break;
+  End;
+
+  PollMenuShortcut;
+
   { Lecture de l'état de la souris }
   {$IFDEF FPC}
    GetMouseState(MouseX, MouseY, MouseButtons);
@@ -22083,221 +26215,311 @@ Begin
    GetMouseState(MouseX, MouseY, MouseBtn);
   {$ENDIF}
 
-  { Mise à jour du survol des menus (seulement si la souris a bouge) }
-  If (ActiveMenu >= 0) And
-     ((MouseX <> LastMouseX) Or (MouseY <> LastMouseY)) Then
-   UpdateMenuHover;
+  { Un relachement hors du ruban annule aussi le bouton, meme au-dessus du calendrier. }
+  If RibbonMode And (RibbonPressed>=0) And (MouseBtn And MOUSE_LEFT=0) And
+     (LastBtn And MOUSE_LEFT<>0) Then HandleToolbarRelease;
 
-  { Mise à jour du survol du menu contextuel (seulement si la souris a bouge) }
-  If ContextMenuVisible And
-     ((MouseX <> LastMouseX) Or (MouseY <> LastMouseY)) Then Begin
-   HoveredContextItem := GetContextMenuItemAtPoint(MouseX, MouseY);
-   HideMouse;
-   DrawContextMenu;
-   ShowMouse;
-  End;
-
-  { Mise à jour du survol des boutons de barre d'outils }
-  InToolbar := (MouseY >= Layout.ToolBarRect.Y1) And
-               (MouseY <= Layout.ToolBarRect.Y2);
-  InFolderPane := (MouseX >= Layout.FolderPaneRect.X1) And
-                  (MouseX <= Layout.FolderPaneRect.X2) And
-                  (MouseY >= Layout.FolderPaneRect.Y1 + 28) And
-                  (MouseY <= Layout.FolderPaneRect.Y2);
-  InMessageListHeader := (MouseX >= Layout.MessageListRect.X1) And
-                         (MouseX <= Layout.MessageListRect.X2) And
-                         (MouseY >= Layout.MessageListRect.Y1) And
-                         (MouseY <= Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT);
-  InMessageList := (MouseX >= Layout.MessageListRect.X1) And
-                   (MouseX <= Layout.MessageListRect.X2) And
-                   (MouseY >= Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT) And
-                   (MouseY <= Layout.MessageListRect.Y2);
-
-  If (ActiveMenu < 0) And InToolbar Then
-   UpdateToolbarHover
-  Else If HoveredToolButton >= 0 Then Begin
-   { Réinitialiser quand on quitte la barre d'outils }
-   ToolButtons[HoveredToolButton].State := tbsNormal;
-   HoveredToolButton := -1;
-   If TooltipVisible Then HideTooltip;
-   HideMouse;
-   DrawToolBar;
-   ShowMouse;
-  End;
-
-  { Mise à jour du survol de l'arbre de dossiers }
-  If (ActiveMenu < 0) And (Not InToolbar) And InFolderPane Then
-   UpdateFolderHover
-  Else If HoveredFolder >= 0 Then Begin
-   HoveredFolder := -1;
-   HideMouse;
-   DrawFolderPane;
-   ShowMouse;
-  End;
-
-  { Cacher l'infobulle si la souris bouge trop }
-  If TooltipVisible And
-     ((Abs(MouseX - LastMouseX) > 5) Or (Abs(MouseY - LastMouseY) > 5)) Then Begin
-   HideTooltip;
-   TooltipStartTime := GetTickCount;
-  End;
-
-  LastMouseX := MouseX;
-  LastMouseY := MouseY;
-
-  { Détection des événements souris avancés }
-  MouseEvent := DetectMouseEvent(LastBtn, MouseBtn, MouseX, MouseY);
-
-  Case MouseEvent Of
-   meLeftClick: Begin
-    { Clic simple traité lors de l'appui du bouton }
+  If EventDialogVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then EventClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If AboutVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    HandleAboutClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If PrefsVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    Prefs_HandleClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If RulesVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+    Rules_HandleClick(MouseX,MouseY); DrawInterface;
    End;
-   meRightClick: Begin
-    { Fermer le menu contextuel si visible }
-    If ContextMenuVisible Then Begin
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If ColumnsDialogVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    HandleColumnsDialogClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If SortDialogVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    HandleSortDialogClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If FileOpenVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    HandleOpenFileClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If AccountDialogVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    HandleAccountDialogClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else If ComposerVisible Then Begin
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then
+    HandleComposerClick(MouseX, MouseY);
+   LastMouseX := MouseX;
+   LastMouseY := MouseY;
+   LastBtn := MouseBtn;
+  End Else If CalendarVisible And (ActiveMenu<0) And
+     (MouseX>=SCREEN_WIDTH-CalendarPaneWidth) And (MouseY>Layout.ToolBarRect.Y2) And
+     (MouseY<Layout.StatusBarRect.Y1) Then Begin
+   If RibbonMode And (RibbonHover>=0) Then Begin RibbonHover:=-1; DrawToolBar; End;
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then CalendarClick(MouseX,MouseY);
+   LastMouseX:=MouseX; LastMouseY:=MouseY; LastBtn:=MouseBtn;
+  End Else Begin
+   If RibbonMode And RibbonKeyboardActive And
+      (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+    RibbonKeyboardActive:=False; RibbonFocus:=-1; DrawMenuBar; DrawToolBar;
+   End;
+   If CalendarVisible And CalendarHasFocus And (ActiveMenu<0) And
+      (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+    CalendarHasFocus:=False; DrawInterface;
+   End;
+   { Mise à jour du survol des menus (seulement si la souris a bouge) }
+   If (ActiveMenu >= 0) And
+      ((MouseX <> LastMouseX) Or (MouseY <> LastMouseY)) Then
+    UpdateMenuHover;
+
+   { Mise à jour du survol du menu contextuel (seulement si la souris a bouge) }
+   If ContextMenuVisible And
+      ((MouseX <> LastMouseX) Or (MouseY <> LastMouseY)) Then Begin
+    HoveredContextItem := GetContextMenuItemAtPoint(MouseX, MouseY);
+    HideMouse;
+    DrawContextMenu;
+    ShowMouse;
+   End;
+
+   { Mise à jour du survol des boutons de barre d'outils }
+   InToolbar := (MouseY >= Layout.ToolBarRect.Y1) And
+                (MouseY <= Layout.ToolBarRect.Y2);
+   InFolderPane := (MouseX >= Layout.FolderPaneRect.X1) And
+                   (MouseX <= Layout.FolderPaneRect.X2) And
+                   (MouseY >= Layout.FolderPaneRect.Y1 + 28) And
+                   (MouseY <= Layout.FolderPaneRect.Y2);
+   InMessageListHeader := (MouseX >= Layout.MessageListRect.X1) And
+                          (MouseX <= Layout.MessageListRect.X2) And
+                          (MouseY >= Layout.MessageListRect.Y1) And
+                          (MouseY <= Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT);
+   InMessageList := (MouseX >= Layout.MessageListRect.X1) And
+                    (MouseX <= Layout.MessageListRect.X2) And
+                    (MouseY >= Layout.MessageListRect.Y1 + COLUMN_HEADER_HEIGHT) And
+                    (MouseY <= Layout.MessageListRect.Y2);
+
+   If RibbonMode And Not InToolbar And (RibbonHover>=0) Then Begin
+    RibbonHover:=-1; DrawToolBar;
+   End;
+   If (ActiveMenu < 0) And InToolbar Then
+    UpdateToolbarHover
+   Else If HoveredToolButton >= 0 Then Begin
+    { Réinitialiser quand on quitte la barre d'outils }
+    ToolButtons[HoveredToolButton].State := tbsNormal;
+    HoveredToolButton := -1;
+    If TooltipVisible Then HideTooltip;
+    HideMouse;
+    DrawToolBar;
+    ShowMouse;
+   End;
+
+   { Mise à jour du survol de l'arbre de dossiers }
+   If (ActiveMenu < 0) And (Not InToolbar) And InFolderPane Then
+    UpdateFolderHover
+   Else If HoveredFolder >= 0 Then Begin
+    HoveredFolder := -1;
+    HideMouse;
+    DrawFolderPane;
+    ShowMouse;
+   End;
+
+   { Cacher l'infobulle si la souris bouge trop }
+   If TooltipVisible And
+      ((Abs(MouseX - LastMouseX) > 5) Or (Abs(MouseY - LastMouseY) > 5)) Then Begin
+    HideTooltip;
+    TooltipStartTime := GetTickCount;
+   End;
+
+   LastMouseX := MouseX;
+   LastMouseY := MouseY;
+
+   { Détection des événements souris avancés }
+   MouseEvent := DetectMouseEvent(LastBtn, MouseBtn, MouseX, MouseY);
+
+   Case MouseEvent Of
+    meLeftClick: Begin
+     { Clic simple traité lors de l'appui du bouton }
+    End;
+    meRightClick: Begin
+     { Fermer le menu contextuel si visible }
+     If ContextMenuVisible Then Begin
+      HideContextMenu;
+      HideMouse;
+      DrawMessageList;
+      ShowMouse;
+     End
+     { Fermer le menu si ouvert }
+     Else If ActiveMenu >= 0 Then
+      CloseDropdownMenu
+     { Clic droit sur la liste des messages }
+     Else If InMessageList Then Begin
+      ClickedMsg := GetMessageAtPoint(MouseX, MouseY);
+      If ClickedMsg >= 0 Then Begin
+       { Selectionner le message si pas deja selectionne }
+       If Not Messages[ClickedMsg].IsSelected Then Begin
+        DeselectAllMessages;
+        Messages[ClickedMsg].IsSelected := True;
+        SelectedMessage := ClickedMsg;
+       End;
+       ShowContextMenu(MouseX, MouseY);
+       HideMouse;
+       DrawMessageList;
+       ShowMouse;
+      End;
+     End
+     Else
+      HandleRightClick;
+    End;
+    meLeftDoubleClick: Begin
+     HandleDoubleClick;
+    End;
+    meRightDoubleClick: Begin
+     { Double-clic droit: pas d'action spécifique }
+    End;
+    meWheelUp: Begin
+     HandleMouseWheel(1);
+    End;
+    meWheelDown: Begin
+     HandleMouseWheel(-1);
+    End;
+   End;
+
+   { Détection du clic gauche (bouton enfoncé) }
+   If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
+    { Gerer les clics dans le compositeur de messages (TODO 12) }
+    If ComposerVisible Then Begin
+     HandleComposerClick(MouseX, MouseY);
+    End
+    { Gerer les clics dans la boite de dialogue des comptes }
+    Else If AccountDialogVisible Then Begin
+     HandleAccountDialogClick(MouseX, MouseY);
+    End
+    { Fermer le menu contextuel si clic ailleurs }
+    Else If ContextMenuVisible Then Begin
+     ClickedMsg := GetContextMenuItemAtPoint(MouseX, MouseY);
+     If ClickedMsg >= 0 Then Begin
+      { Executer la commande du menu }
+      { TODO: Implementer les actions des commandes }
+     End;
      HideContextMenu;
      HideMouse;
      DrawMessageList;
      ShowMouse;
     End
-    { Fermer le menu si ouvert }
-    Else If ActiveMenu >= 0 Then
-     CloseDropdownMenu
-    { Clic droit sur la liste des messages }
-    Else If InMessageList Then Begin
+    { Vérifier d'abord si c'est un clic sur la barre d'outils }
+    Else If InToolbar And (ActiveMenu < 0) Then
+     HandleToolbarClick
+    { Vérifier si c'est un clic sur l'arbre de dossiers }
+    Else If InFolderPane And (ActiveMenu < 0) Then
+     HandleFolderClick(MouseX, MouseY)
+    { Verifier si c'est un clic sur l'en-tete de colonne }
+    Else If InMessageListHeader And (ActiveMenu < 0) Then Begin
+     ClickedCol := GetColumnAtPoint(MouseX);
+     If ClickedCol >= 0 Then Begin
+      HandleColumnHeaderClick(ClickedCol);
+      HideMouse;
+      DrawMessageList;
+      ShowMouse;
+     End;
+    End
+    { Verifier si c'est un clic sur un message }
+    Else If InMessageList And (ActiveMenu < 0) Then Begin
      ClickedMsg := GetMessageAtPoint(MouseX, MouseY);
      If ClickedMsg >= 0 Then Begin
-      { Selectionner le message si pas deja selectionne }
-      If Not Messages[ClickedMsg].IsSelected Then Begin
-       DeselectAllMessages;
-       Messages[ClickedMsg].IsSelected := True;
-       SelectedMessage := ClickedMsg;
-      End;
-      ShowContextMenu(MouseX, MouseY);
+      HandleMessageClick(ClickedMsg);
       HideMouse;
       DrawMessageList;
       ShowMouse;
      End;
     End
     Else
-     HandleRightClick;
+     HandleMouseClick;
    End;
-   meLeftDoubleClick: Begin
-    HandleDoubleClick;
-   End;
-   meRightDoubleClick: Begin
-    { Double-clic droit: pas d'action spécifique }
-   End;
-   meWheelUp: Begin
-    HandleMouseWheel(1);
-   End;
-   meWheelDown: Begin
-    HandleMouseWheel(-1);
-   End;
-  End;
 
-  { Détection du clic gauche (bouton enfoncé) }
-  If (MouseBtn And MOUSE_LEFT <> 0) And (LastBtn And MOUSE_LEFT = 0) Then Begin
-   { Gerer les clics dans le compositeur de messages (TODO 12) }
-   If ComposerVisible Then Begin
-    HandleComposerClick(MouseX, MouseY);
-   End
-   { Gerer les clics dans la boite de dialogue des comptes }
-   Else If AccountDialogVisible Then Begin
-    HandleAccountDialogClick(MouseX, MouseY);
-   End
-   { Fermer le menu contextuel si clic ailleurs }
-   Else If ContextMenuVisible Then Begin
-    ClickedMsg := GetContextMenuItemAtPoint(MouseX, MouseY);
-    If ClickedMsg >= 0 Then Begin
-     { Executer la commande du menu }
-     { TODO: Implementer les actions des commandes }
-    End;
-    HideContextMenu;
-    HideMouse;
-    DrawMessageList;
-    ShowMouse;
-   End
-   { Vérifier d'abord si c'est un clic sur la barre d'outils }
-   Else If InToolbar And (ActiveMenu < 0) Then
-    HandleToolbarClick
-   { Vérifier si c'est un clic sur l'arbre de dossiers }
-   Else If InFolderPane And (ActiveMenu < 0) Then
-    HandleFolderClick(MouseX, MouseY)
-   { Verifier si c'est un clic sur l'en-tete de colonne }
-   Else If InMessageListHeader And (ActiveMenu < 0) Then Begin
-    ClickedCol := GetColumnAtPoint(MouseX);
-    If ClickedCol >= 0 Then Begin
-     HandleColumnHeaderClick(ClickedCol);
-     HideMouse;
-     DrawMessageList;
-     ShowMouse;
-    End;
-   End
-   { Verifier si c'est un clic sur un message }
-   Else If InMessageList And (ActiveMenu < 0) Then Begin
-    ClickedMsg := GetMessageAtPoint(MouseX, MouseY);
-    If ClickedMsg >= 0 Then Begin
-     HandleMessageClick(ClickedMsg);
-     HideMouse;
-     DrawMessageList;
-     ShowMouse;
-    End;
-   End
-   Else
-    HandleMouseClick;
-  End;
+   { Détection du relâchement du bouton gauche }
+   If (MouseBtn And MOUSE_LEFT = 0) And (LastBtn And MOUSE_LEFT <> 0) Then Begin
+    If (PressedToolButton >= 0) Or (RibbonMode And (RibbonPressed>=0)) Then
+     HandleToolbarRelease
+    Else
+     HandleMouseRelease;
+   End;
 
-  { Détection du relâchement du bouton gauche }
-  If (MouseBtn And MOUSE_LEFT = 0) And (LastBtn And MOUSE_LEFT <> 0) Then Begin
-   If PressedToolButton >= 0 Then
-    HandleToolbarRelease
-   Else
-    HandleMouseRelease;
-  End;
+   { Gestion du glissement }
+   If (MouseBtn And MOUSE_LEFT <> 0) And (DragState <> dsNone) Then Begin
+    HandleMouseDrag;
+   End;
 
-  { Gestion du glissement }
-  If (MouseBtn And MOUSE_LEFT <> 0) And (DragState <> dsNone) Then Begin
-   HandleMouseDrag;
-  End;
+   LastBtn := MouseBtn;
 
-  LastBtn := MouseBtn;
+  End; { Evenements de la fenetre principale }
 
   { Vérification des touches du clavier }
   If KeyPressed Then Begin
    Key := ReadKey;
-   { Gerer les touches dans le compositeur de messages (TODO 12) }
-   If ComposerVisible Then Begin
-    HandleComposerKeyPress(Key);
-   End
-   { Gerer les touches dans la boite de dialogue des comptes }
-   Else If AccountDialogVisible Then Begin
-    HandleAccountDialogKeyPress(Key);
-   End
-   Else If Key = #27 Then Begin
-    If TooltipVisible Then
-     HideTooltip
-    Else If ContextMenuVisible Then Begin
-     HideContextMenu;
-     HideMouse;
-     DrawMessageList;
-     ShowMouse;
-    End
-    Else If ActiveMenu >= 0 Then
-     CloseDropdownMenu
-    Else
-     Running := False; { Echap pour quitter }
-   End
-   Else If Key = #13 Then Begin
-    { Entree: executer l'element de menu selectionne }
-    If (ActiveMenu >= 0) And (ActiveMenuItem >= 0) Then Begin
-     If Menus[ActiveMenu].Items[ActiveMenuItem].Enabled Then
-      ExecuteMenuCommand(Menus[ActiveMenu].Items[ActiveMenuItem].ItemID);
-    End;
-   End
-   Else If Key = #0 Then Begin
-    { Touches etendues (fleches, F1-F12, etc.) }
+   IsExtendedKey := (Key = #0) Or (Key = #224);
+   If IsExtendedKey Then Begin
     Key := ReadKey;
+    If Key = #107 Then Begin { Code etendu Alt+F4, y compris sous DOS. }
+     Running := False;
+     Break;
+    End;
+   End;
+   If EventDialogVisible Then Begin EventKey(Key,IsExtendedKey); Continue; End;
+   If AboutVisible Then Begin
+    If Not IsExtendedKey Then HandleAboutKey(Key);
+    Continue;
+   End;
+   If PrefsVisible Then Begin Prefs_HandleKey(Key,IsExtendedKey); Continue; End;
+   If RulesVisible Then Begin
+    Rules_HandleKey(Key,IsExtendedKey); Continue;
+   End;
+   If ColumnsDialogVisible Then Begin
+    HandleColumnsDialogKey(Key,IsExtendedKey);
+    Continue;
+   End;
+   If SortDialogVisible Then Begin
+    HandleSortDialogKey(Key,IsExtendedKey);
+    Continue;
+   End;
+   If FileOpenVisible Then Begin
+    HandleOpenFileKey(Key,IsExtendedKey);
+    Continue;
+   End;
+   If AccountDialogVisible Then Begin
+    If Not IsExtendedKey Then HandleAccountDialogKeyPress(Key);
+    Continue;
+   End;
+   If RibbonMode Then Begin
+    ShortcutMenu:=-1;
+    If IsExtendedKey Then ShortcutMenu:=MenuShortcutFromScan(Key);
+    If ShortcutMenu>=0 Then Begin OpenMenuShortcut(ShortcutMenu); Continue; End;
+    If IsExtendedKey And (Key=#68) Then Begin
+     RibbonKeyboardActive:=Not RibbonKeyboardActive; RibbonFocus:=-1; DrawInterface; Continue;
+    End;
+    If RibbonKeyboardActive Then Begin RibbonKey(Key,IsExtendedKey); Continue; End;
+   End;
+   If CalendarVisible And CalendarHasFocus And (ActiveMenu<0) Then Begin
+    ShortcutMenu:=-1;
+    If IsExtendedKey Then ShortcutMenu:=MenuShortcutFromScan(Key);
+    If ShortcutMenu>=0 Then OpenMenuShortcut(ShortcutMenu)
+    Else CalendarKey(Key,IsExtendedKey);
+    Continue;
+   End;
+   If Not IsExtendedKey And (Key=#19) Then Begin { Ctrl+S }
+    ExecuteMenuCommand(CMD_FILE_SAVEAS);
+    Continue;
+   End;
+   If IsExtendedKey Then Begin
+    ShortcutMenu := MenuShortcutFromScan(Key);
+    If ShortcutMenu >= 0 Then Begin
+     OpenMenuShortcut(ShortcutMenu);
+     Continue;
+    End;
+    { Touches etendues (fleches, F1-F12, etc.) }
     If ActiveMenu >= 0 Then Begin
      Case Key Of
       #72: Begin { Fleche Haut }
@@ -22363,6 +26585,34 @@ Begin
       End;
      End; { Case }
     End; { ActiveMenu >= 0 }
+   End
+   { Gerer les touches dans le compositeur de messages (TODO 12) }
+   Else If ComposerVisible Then Begin
+    HandleComposerKeyPress(Key);
+   End
+   Else If Key = #15 Then Begin { Ctrl+O }
+    ExecuteMenuCommand(CMD_FILE_OPEN);
+   End
+   Else If Key = #27 Then Begin
+    If TooltipVisible Then
+     HideTooltip
+    Else If ContextMenuVisible Then Begin
+     HideContextMenu;
+     HideMouse;
+     DrawMessageList;
+     ShowMouse;
+    End
+    Else If ActiveMenu >= 0 Then
+     CloseDropdownMenu
+    Else
+     Running := False; { Echap pour quitter }
+   End
+   Else If Key = #13 Then Begin
+    { Entree: executer l'element de menu selectionne }
+    If (ActiveMenu >= 0) And (ActiveMenuItem >= 0) Then Begin
+     If Menus[ActiveMenu].Items[ActiveMenuItem].Enabled Then
+      ExecuteMenuCommand(Menus[ActiveMenu].Items[ActiveMenuItem].ItemID);
+    End;
    End;
   End; { KeyPressed }
 
@@ -22375,9 +26625,136 @@ End;
   PROGRAMME PRINCIPAL
   ============================================================================ }
 
+{ Traiter l aide avant toute ouverture de fenetre ou lecture des comptes. }
+Function CommandLineHelpRequested: Boolean;
+Var I: Integer; Argument: TMailText;
+Begin
+ CommandLineHelpRequested := False;
+ For I := 1 To ParamCount Do Begin
+  Argument := MailUpper(ParamStr(I));
+  If (Argument = '/?') Or (Argument = '-H') Or (Argument = '--HELP') Then Begin
+   CommandLineHelpRequested := True;
+   Exit;
+  End;
+ End;
+End;
+
+{ Les chemins relatifs sont interpretes depuis le repertoire courant. }
+Function ParseAccountsOption: Boolean;
+Var
+ I: Integer;
+ Argument, UpperArgument, FileName: TMailText;
+ ErrorOutput: Text;
+Begin
+ ParseAccountsOption := False;
+ CommandLineAccountsFile := '';
+ CommandLineScript:=''; VBSStarted:=False;
+ MaxScreen := False; RibbonMode:=False; RibbonTab:=4;
+ RibbonKeyboardActive:=False; RibbonFocus:=-1; RibbonHover:=-1; RibbonPressed:=-1;
+ I := 1;
+ While I <= ParamCount Do Begin
+  Argument := ParamStr(I);
+  UpperArgument := MailUpper(Argument);
+  If (UpperArgument='/CLASSICMENU') Or (UpperArgument='/RUBANMENU') Then Begin
+   RibbonMode:=UpperArgument='/RUBANMENU'; Inc(I); Continue;
+  End;
+  If Copy(UpperArgument,1,10)='/VBSCRIPT:' Then Begin
+   FileName:=Copy(Argument,11,Length(Argument));
+   If (FileName='') Or (Length(Argument)=255) Then Begin
+    Assign(ErrorOutput,'');Rewrite(ErrorOutput);
+    WriteLn(ErrorOutput,'Erreur: /VBSCRIPT exige un chemin .vbs valide de moins de 245 caracteres.');
+    Close(ErrorOutput);Exit;
+   End;
+   CommandLineScript:=FileName;Inc(I);Continue;
+  End;
+  If UpperArgument = '-MAXSCREEN' Then Begin
+   MaxScreen := True;
+   Inc(I);
+   Continue;
+  End;
+  FileName := '';
+  If Copy(UpperArgument, 1, 10) = '/ACCOUNTS:' Then
+   FileName := Copy(Argument, 11, Length(Argument))
+  Else If Copy(UpperArgument, 1, 11) = '--ACCOUNTS=' Then
+   FileName := Copy(Argument, 12, Length(Argument))
+  Else If (UpperArgument = '/ACCOUNTS') Or (UpperArgument = '--ACCOUNTS') Then Begin
+   Inc(I);
+   If I <= ParamCount Then FileName := ParamStr(I);
+  End
+  Else Begin
+   Inc(I);
+   Continue;
+  End;
+  { Reserver quatre caracteres pour les fichiers temporaires .TMP et .BAK. }
+  If (FileName = '') Or (Length(FileName) > 251) Or
+     (Length(Argument) = 255) Then Begin
+   Assign(ErrorOutput, '');
+   Rewrite(ErrorOutput);
+   WriteLn(ErrorOutput, 'Erreur: /ACCOUNTS exige un chemin de 1 a 251 caracteres.');
+   WriteLn(ErrorOutput, 'Exemple : OUTLOOK /ACCOUNTS:"C:\Courriel\Mes comptes.ACC"');
+   WriteLn(ErrorOutput, 'Utilisez OUTLOOK /? pour afficher l aide.');
+   Close(ErrorOutput);
+   Exit;
+  End;
+  CommandLineAccountsFile := FileName;
+  Inc(I);
+ End;
+ ParseAccountsOption := True;
+End;
+
+Procedure ShowCommandLineHelp;
+Var HelpOutput: Text;
+Begin
+ { Un flux distinct conserve la sortie console, meme avec les unites Crt. }
+ Assign(HelpOutput, '');
+ Rewrite(HelpOutput);
+ WriteLn(HelpOutput, 'OUTLOOK - Cette commande permet de lancer le client de messagerie graphique.');
+ WriteLn(HelpOutput);
+ WriteLn(HelpOutput, 'Syntaxe : OUTLOOK [/CLASSICMENU | /RUBANMENU] [-maxscreen]');
+ WriteLn(HelpOutput, '                  [/ACCOUNTS:<fichier>] [/VBSCRIPT:<fichier>] [/? | -h | --help]');
+ WriteLn(HelpOutput);
+ WriteLn(HelpOutput, '  Sans option          Lance l''application graphique en 640x480.');
+ WriteLn(HelpOutput, '  -h, --help           Affichent egalement cette aide.');
+ WriteLn(HelpOutput, '  -maxscreen           Utilise la resolution maximale disponible.');
+ WriteLn(HelpOutput, '  /?                   Affiche cette aide et quitte.');
+ WriteLn(HelpOutput, '  /ACCOUNTS:<fichier>  Utilise ce fichier pour lire et sauvegarder les comptes.');
+ WriteLn(HelpOutput, '  /ACCOUNTS <fichier> et --accounts <fichier> sont aussi acceptes.');
+ WriteLn(HelpOutput, '      La forme --accounts=<fichier> est egalement acceptee.');
+ WriteLn(HelpOutput, '  /CLASSICMENU         Menus classiques (par defaut).');
+ WriteLn(HelpOutput, '  /RUBANMENU           Onglets et commandes en ruban.');
+ WriteLn(HelpOutput, '      Si les deux sont specifies, le dernier parametre est utilise.');
+ WriteLn(HelpOutput, '      Ruban : Alt+lettre ou F10, Tab/fleches, Enter et Esc.');
+ WriteLn(HelpOutput, '  /VBSCRIPT:<fichier>  Execute un script VBScript Pascal au demarrage.');
+ WriteLn(HelpOutput, '     Exemple : OUTLOOK /VBSCRIPT:"C:\Scripts\Nouveau message.vbs"');
+ WriteLn(HelpOutput, '     Script : Outlook.OpenMenu "Outils" ou Outlook.ShowDialog "Options"');
+ WriteLn(HelpOutput, '     Set mail = Outlook.CreateItem(0) : To, Subject, Body, From puis mail.Display');
+ WriteLn(HelpOutput, '     Sous-ensemble VBScript : aucun moteur COM, aucun envoi implicite.');
+ WriteLn(HelpOutput);
+ WriteLn(HelpOutput, 'Exemple : OUTLOOK /ACCOUNTS:"C:\Courriel\Mes comptes.ACC"');
+ WriteLn(HelpOutput, 'Les chemins relatifs partent du repertoire courant.');
+ WriteLn(HelpOutput);
+ WriteLn(HelpOutput, 'Ouvrir un courriel .eml : menu Fichier / Ouvrir ou Ctrl+O.');
+ WriteLn(HelpOutput, 'Enregistrer sous : menu Fichier / Enregistrer sous ou Ctrl+S.');
+ WriteLn(HelpOutput, 'Configurer les comptes : menu Outils / Comptes.');
+ WriteLn(HelpOutput, 'Recevoir les courriels : selectionner la boite du compte,');
+ WriteLn(HelpOutput, 'puis cliquer sur Envoyer/Recevoir (IMAP ou POP3).');
+ WriteLn(HelpOutput, 'Envoyer un message : nouveau message, puis Envoyer (SMTP).');
+ WriteLn(HelpOutput);
+ WriteLn(HelpOutput, 'Par defaut, les comptes sont conserves dans OUTLOOK.ACC,');
+ WriteLn(HelpOutput, 'dans le repertoire de l executable.');
+ Close(HelpOutput);
+End;
+
 BEGIN
+ If CommandLineHelpRequested Then Begin
+  ShowCommandLineHelp;
+  Halt(0);
+ End;
+ If Not ParseAccountsOption Then Halt(1);
+
  { Initialisation du mode graphique }
  InitializeGraphics;
+ BusyGraphicsReady:=True;
 
  { Vérification de la souris }
  If Not MouseDriverFound Then Begin
@@ -22400,14 +26777,16 @@ BEGIN
  { Initialisation de la barre d'outils }
  InitializeToolbar;
 
+ { Charger les comptes avant de construire leurs dossiers. }
+ InitializeAccountManager;
+
  { Initialisation de l'arbre de dossiers }
  InitializeFolderTree;
 
  { Initialisation de la liste des messages }
  InitializeMessageList;
 
- { Initialisation du gestionnaire de comptes (TODO 11) }
- InitializeAccountManager;
+
 
  { Initialisation du compositeur de messages (TODO 12) }
  InitializeComposer;
@@ -22427,7 +26806,8 @@ BEGIN
 
  { Initialisation du systeme de regles (TODO 17) }
  Rules_Init;
- Rules_AddDemoRules;
+ Rules_Load;
+ EventInit;
 
  { Initialisation de la recherche avancee (TODO 18) }
  Search_Init;
@@ -22451,8 +26831,8 @@ BEGIN
 
  { Initialisation du mode hors ligne (TODO 24) }
  Offline_Init;
- Offline_LoadCache;
- Offline_LoadQueue;
+ { Les anciens caches de demonstration ne constituent pas une source serveur. }
+ { La boite est chargee explicitement via Envoyer/Recevoir. }
 
  { Initialisation du support multi-langue (TODO 25) }
  Lang_Init;
@@ -22461,6 +26841,9 @@ BEGIN
  ShowMouse;
  DrawInterface;
 
+ If UserPrefs.General.CheckMailOnStart And Not UserPrefs.Connection.OfflineMode And
+    (EmailAccountCount>0) Then Begin ReceiveMail; DrawInterface; End;
+
  { Boucle principale }
  MainEventLoop;
 
@@ -22468,9 +26851,15 @@ BEGIN
  Offline_SaveCache;
  Offline_SaveQueue;
 
+ MailClose(IMAPWire); MailClose(POP3Wire); MailClose(SMTPWire);
+ {$IFDEF WINDOWS}
+ If MailWinsockReady Then MailWSACleanup;
+ {$ENDIF}
+
  { Fermeture du mode graphique }
+ BusyGraphicsReady:=False;
  HideMouse;
  CloseGraph;
 
- WriteLn('Outlook Express - Ferme normalement.');
+ WriteLn('Outlook - Ferme normalement.');
 END.
