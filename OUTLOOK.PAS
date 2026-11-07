@@ -4,7 +4,7 @@
   @website(https://www.gladir.com/office-0)
   @website(https://www.gladir.com/networkkitp)
   @abstract(Target: Turbo Pascal 7, Free Pascal
-  @description: Clone de l'application Outlook en mode graphique
+  @description: Clone de l'application Outlink en mode graphique
 
   ============================================================================
                          TODO - CLONE OUTLOOK EN PASCAL
@@ -5169,7 +5169,7 @@ Begin
 
  { Titre de la fenêtre }
  SetColor(COLOR_TITLEBAR_TEXT);
- OutTextXY(22, 5, 'Outlook');
+ OutTextXY(22, 5, 'Outlink');
 
  { Boutons de contrôle de fenêtre (Minimiser, Maximiser, Fermer) }
  { Bouton Minimiser }
@@ -17239,7 +17239,7 @@ Begin
  PrintSettings.Margins.Left := PRINT_DEFAULT_MARGIN_LEFT;
  PrintSettings.Margins.Right := PRINT_DEFAULT_MARGIN_RIGHT;
  PrintSettings.Header.Left := '';
- PrintSettings.Header.Center := 'Outlook';
+ PrintSettings.Header.Center := 'Outlink';
  PrintSettings.Header.Right := '';
  PrintSettings.Header.Enabled := True;
  PrintSettings.Footer.Left := '';
@@ -17576,7 +17576,7 @@ Begin
 
  { Pied de page }
  WriteLn(F, '<div class="footer">');
- WriteLn(F, '<p>Imprime depuis Outlook - ' + Print_ReplaceVariables('%DATE%', 1, 1) + '</p>');
+ WriteLn(F, '<p>Imprime depuis Outlink - ' + Print_ReplaceVariables('%DATE%', 1, 1) + '</p>');
  WriteLn(F, '</div>');
 
  WriteLn(F, '</body>');
@@ -20066,7 +20066,7 @@ Begin
  End;
  FillChar(Stamp,SizeOf(Stamp),0);
  {$IFDEF WINDOWS} EventGetSystemTime(Stamp); {$ENDIF}
- Add('BEGIN:VCALENDAR'); Add('VERSION:2.0'); Add('PRODID:-//OFFICE-0//Outlook Clone//FR');
+ Add('BEGIN:VCALENDAR'); Add('VERSION:2.0'); Add('PRODID:-//OFFICE-0//Outlink//FR');
  Add('CALSCALE:GREGORIAN'); Add('METHOD:REQUEST'); Add('BEGIN:VEVENT'); Add('UID:'+E.UID);
  Add('DTSTAMP:'+EventNumber(Stamp.Year,4)+EventNumber(Stamp.Month,2)+EventNumber(Stamp.Day,2)+'T'+
   EventNumber(Stamp.Hour,2)+EventNumber(Stamp.Minute,2)+EventNumber(Stamp.Second,2)+'Z');
@@ -20350,7 +20350,7 @@ Begin
  SetColor(Blue);
  Rectangle(X+20,Y+44,X+66,Y+78);
  Line(X+20,Y+44,X+43,Y+62); Line(X+66,Y+44,X+43,Y+62);
- OutTextXY(X+84,Y+46,'Outlook Clone');
+ OutTextXY(X+84,Y+46,'Outlink');
  SetColor(Black);
  OutTextXY(X+84,Y+66,'Version 1.00');
  OutTextXY(X+20,Y+100,'Client de messagerie graphique en Pascal');
@@ -21680,7 +21680,7 @@ Begin
  Rewrite(F);
  If IOResult <> 0 Then Exit;
 
- WriteLn(F, '; Fichier de langue pour Outlook');
+ WriteLn(F, '; Fichier de langue pour Outlink');
  WriteLn(F, '; Langue: ' + LANG_NAMES[CurrentLanguage]);
  WriteLn(F, '; Code: ' + LANG_CODES[CurrentLanguage]);
  WriteLn(F, ';');
@@ -26691,8 +26691,8 @@ Begin
    Assign(ErrorOutput, '');
    Rewrite(ErrorOutput);
    WriteLn(ErrorOutput, 'Erreur: /ACCOUNTS exige un chemin de 1 a 251 caracteres.');
-   WriteLn(ErrorOutput, 'Exemple : OUTLOOK /ACCOUNTS:"C:\Courriel\Mes comptes.ACC"');
-   WriteLn(ErrorOutput, 'Utilisez OUTLOOK /? pour afficher l aide.');
+   WriteLn(ErrorOutput, 'Exemple : OUTLINK /ACCOUNTS:"C:\Courriel\Mes comptes.ACC"');
+   WriteLn(ErrorOutput, 'Utilisez OUTLINK /? pour afficher l aide.');
    Close(ErrorOutput);
    Exit;
   End;
@@ -26708,9 +26708,9 @@ Begin
  { Un flux distinct conserve la sortie console, meme avec les unites Crt. }
  Assign(HelpOutput, '');
  Rewrite(HelpOutput);
- WriteLn(HelpOutput, 'OUTLOOK - Cette commande permet de lancer le client de messagerie graphique.');
+ WriteLn(HelpOutput, 'OUTLINK - Cette commande permet de lancer le client de messagerie graphique.');
  WriteLn(HelpOutput);
- WriteLn(HelpOutput, 'Syntaxe : OUTLOOK [/CLASSICMENU | /RUBANMENU] [-maxscreen]');
+ WriteLn(HelpOutput, 'Syntaxe : OUTLINK [/CLASSICMENU | /RUBANMENU] [-maxscreen]');
  WriteLn(HelpOutput, '                  [/ACCOUNTS:<fichier>] [/VBSCRIPT:<fichier>] [/? | -h | --help]');
  WriteLn(HelpOutput);
  WriteLn(HelpOutput, '  Sans option          Lance l''application graphique en 640x480.');
@@ -26725,12 +26725,12 @@ Begin
  WriteLn(HelpOutput, '      Si les deux sont specifies, le dernier parametre est utilise.');
  WriteLn(HelpOutput, '      Ruban : Alt+lettre ou F10, Tab/fleches, Enter et Esc.');
  WriteLn(HelpOutput, '  /VBSCRIPT:<fichier>  Execute un script VBScript Pascal au demarrage.');
- WriteLn(HelpOutput, '     Exemple : OUTLOOK /VBSCRIPT:"C:\Scripts\Nouveau message.vbs"');
+ WriteLn(HelpOutput, '     Exemple : OUTLINK /VBSCRIPT:"C:\Scripts\Nouveau message.vbs"');
  WriteLn(HelpOutput, '     Script : Outlook.OpenMenu "Outils" ou Outlook.ShowDialog "Options"');
  WriteLn(HelpOutput, '     Set mail = Outlook.CreateItem(0) : To, Subject, Body, From puis mail.Display');
  WriteLn(HelpOutput, '     Sous-ensemble VBScript : aucun moteur COM, aucun envoi implicite.');
  WriteLn(HelpOutput);
- WriteLn(HelpOutput, 'Exemple : OUTLOOK /ACCOUNTS:"C:\Courriel\Mes comptes.ACC"');
+ WriteLn(HelpOutput, 'Exemple : OUTLINK /ACCOUNTS:"C:\Courriel\Mes comptes.ACC"');
  WriteLn(HelpOutput, 'Les chemins relatifs partent du repertoire courant.');
  WriteLn(HelpOutput);
  WriteLn(HelpOutput, 'Ouvrir un courriel .eml : menu Fichier / Ouvrir ou Ctrl+O.');
@@ -26861,5 +26861,5 @@ BEGIN
  HideMouse;
  CloseGraph;
 
- WriteLn('Outlook - Ferme normalement.');
+ WriteLn('Outlink - Ferme normalement.');
 END.
